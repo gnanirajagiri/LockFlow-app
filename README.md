@@ -130,6 +130,40 @@ supabase migration new < descriptive_name >
 | **Models**    | The Model Builder system — versioned and locked **independently** of environments. |
 | **Content Studio** | The Environment Builder system — a separate builder with its own locks and versions. |
 
+## Models domain
+
+Models are independently reusable actors. Their protected identity is a **versioned Character Sheet** containing identity traits only — face features, hair, complexion, body proportions and distinctive details. Clothing, accessories, props, products and environments are **not** identity traits; they attach from the one unified shared Library at job time.
+
+### Version & lock rules
+
+| Rule | Enforcement |
+| ---- | ----------- |
+| Draft versions are editable | UI + service guard + DB triggers allow it |
+| Locking makes a version read-only forever | `refuseIfLocked` guard in `src/domain/models/guards.ts` **and** `BEFORE UPDATE` triggers in Postgres |
+| Any change after locking creates a new draft | `create_next_model_version` RPC copies the selected version's sheet |
+| Version numbers start at 1, increment by 1 | Computed in the RPC inside the transaction |
+| One draft version per model at a time | Partial unique index `model_versions_one_draft_per_model` |
+| Historic versions are preserved permanently | No delete policies on the app path; models soft-archive only |
+| Exactly one Character Sheet per version | `character_sheets.model_version_id` is both PK and FK |
+| Model asset shortcuts are pointers, not assets | `model_asset_shortcuts` references the future shared Library by id — never duplicates it |
+
+### Migrations
+
+Schema changes live only in versioned files under `supabase/migrations/`:
+
+- `20260926000000_initial_schema.sql` — profiles, workspaces, memberships, RLS baseline
+- `20260926000001_models_domain.sql` — models, model_versions, character_sheets, model_references, model_asset_shortcuts; RLS; lock-immutability triggers; `create_next_model_version` / `lock_model_version` RPCs; adds `admin`/`member` to `workspace_role`
+
+Apply with `supabase migration up` (local) or let the platform apply on push (linked projects).
+
+### Development seed data
+
+`src/mock/modelsSeed.ts` provides one fictional model, **Aisha** (`ready`), with locked v1 ("Original approved identity"), draft v2 ("Hair and lighting refinement"), full Character Sheets for both and three local placeholder references (portrait, full-body, profile). No real people, no external URLs. In demo mode the repository layer (`src/data/index.ts`) serves this seed; the same domain guards run over it, so lock/immutability behaviour matches production.
+
+### Tests
+
+`npm test` runs the domain guard suites (`src/domain/models/guards.test.ts`): locked-edit refusal, version-number increments, Character Sheet copying on new drafts, workspace isolation and validation schemas.
+
 ## Roadmap beyond this milestone
 
 1. Workspace provisioning on first sign-in (create workspace + owner membership).

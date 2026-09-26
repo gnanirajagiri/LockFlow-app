@@ -95,6 +95,33 @@
   text-align: center;
 }
 
+/* ── Models grid cards ───────────────────────────────────────────────── */
+.lf-modelcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-3);
+}
+.lf-modelcard__header {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-3);
+}
+.lf-modelcard__slug {
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-ink-muted);
+}
+.lf-modelcard__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lf-space-2);
+}
+.lf-modelcard__footer {
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-ink-muted);
+  border-top: 1px solid var(--lf-color-border);
+  padding-top: var(--lf-space-2);
+}
+
 /* ── Demo mode banner ────────────────────────────────────────────────── */
 .lf-demobanner {
   display: flex;

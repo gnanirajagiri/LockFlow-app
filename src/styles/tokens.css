@@ -1,0 +1,129 @@
+/**
+ * LockFlow design tokens — single source of truth.
+ * Premium calm creative-studio: warm off-white canvas, dark navy chrome,
+ * white rounded surfaces, indigo/violet primary actions.
+ *
+ * Consume via CSS custom properties only; component styles must not hard-code
+ * raw values. (TypeScript mirror: src/styles/tokens.ts)
+ */
+:root {
+  /* ── Colour · canvas & surfaces ─────────────────────────────────────── */
+  --lf-color-bg: #faf8f4; /* warm off-white page background */
+  --lf-color-surface: #ffffff; /* cards, sheets, modals */
+  --lf-color-surface-muted: #f3f0ea; /* inset wells, table headers */
+  --lf-color-surface-raised: #ffffff; /* hover-elevated surfaces */
+
+  /* ── Colour · navy chrome (sidebar, topbar, footer bands) ───────────── */
+  --lf-color-navy-900: #101b2e;
+  --lf-color-navy-800: #16233b;
+  --lf-color-navy-700: #1e2f4d;
+  --lf-color-navy-600: #2a3f63;
+  --lf-color-navy-text: #e8ecf5;
+  --lf-color-navy-text-muted: #9aa8c0;
+  --lf-color-navy-border: rgba(232, 236, 245, 0.12);
+
+  /* ── Colour · ink (text on light surfaces) ──────────────────────────── */
+  --lf-color-ink: #1c2434;
+  --lf-color-ink-secondary: #4b5568;
+  --lf-color-ink-muted: #79839a;
+  --lf-color-ink-faint: #a3abbd;
+  --lf-color-ink-inverse: #ffffff;
+
+  /* ── Colour · primary (indigo → violet) ─────────────────────────────── */
+  --lf-color-primary-50: #eef0fe;
+  --lf-color-primary-100: #e0e2fd;
+  --lf-color-primary-200: #c6c8fb;
+  --lf-color-primary-500: #6366f1;
+  --lf-color-primary-600: #5457e5;
+  --lf-color-primary-700: #4648ce;
+  --lf-color-primary-soft: #eef0fe; /* tinted chips, focus washes */
+  --lf-gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+
+  /* ── Colour · feedback ──────────────────────────────────────────────── */
+  --lf-color-success-bg: #e6f4ea;
+  --lf-color-success-text: #1d7a3d;
+  --lf-color-success-border: #bfe3cb;
+  --lf-color-warning-bg: #fdf3e2;
+  --lf-color-warning-text: #96620d;
+  --lf-color-warning-border: #f3ddb2;
+  --lf-color-danger-bg: #fdeaea;
+  --lf-color-danger-text: #b3363e;
+  --lf-color-danger-border: #f2c4c7;
+  --lf-color-info-bg: #e9f1fd;
+  --lf-color-info-text: #2563c9;
+  --lf-color-info-border: #c4d9f6;
+
+  /* ── Colour · lines ─────────────────────────────────────────────────── */
+  --lf-color-border: #e7e2d9; /* warm hairline on light surfaces */
+  --lf-color-border-strong: #d5cfc3;
+  --lf-color-border-focus: #6366f1;
+
+  /* ── Spacing scale (4px base) ───────────────────────────────────────── */
+  --lf-space-1: 4px;
+  --lf-space-2: 8px;
+  --lf-space-3: 12px;
+  --lf-space-4: 16px;
+  --lf-space-5: 24px;
+  --lf-space-6: 32px;
+  --lf-space-7: 48px;
+  --lf-space-8: 64px;
+  --lf-space-9: 96px;
+
+  /* ── Radii ──────────────────────────────────────────────────────────── */
+  --lf-radius-sm: 8px;
+  --lf-radius-md: 12px;
+  --lf-radius-lg: 16px;
+  --lf-radius-xl: 24px;
+  --lf-radius-full: 999px;
+
+  /* ── Shadows — restrained, warm-tinted ─────────────────────────────── */
+  --lf-shadow-xs: 0 1px 2px rgba(28, 30, 38, 0.05);
+  --lf-shadow-sm: 0 1px 3px rgba(28, 30, 38, 0.07), 0 1px 2px rgba(28, 30, 38, 0.04);
+  --lf-shadow-md: 0 4px 14px rgba(28, 30, 38, 0.08), 0 2px 4px rgba(28, 30, 38, 0.04);
+  --lf-shadow-lg: 0 16px 40px rgba(22, 26, 40, 0.14), 0 4px 12px rgba(22, 26, 40, 0.06);
+
+  /* ── Typography ─────────────────────────────────────────────────────── */
+  --lf-font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --lf-text-xs: 0.75rem; /* 12 */
+  --lf-text-sm: 0.8125rem; /* 13 */
+  --lf-text-base: 0.9375rem; /* 15 — default UI size */
+  --lf-text-md: 1rem; /* 16 */
+  --lf-text-lg: 1.125rem; /* 18 */
+  --lf-text-xl: 1.375rem; /* 22 */
+  --lf-text-2xl: 1.75rem; /* 28 */
+  --lf-text-3xl: 2.25rem; /* 36 */
+  --lf-leading-tight: 1.25;
+  --lf-leading-normal: 1.55;
+  --lf-tracking-tight: -0.015em;
+  --lf-font-weight-normal: 450;
+  --lf-font-weight-medium: 550;
+  --lf-font-weight-semibold: 600;
+
+  /* ── Motion ─────────────────────────────────────────────────────────── */
+  --lf-duration-fast: 120ms;
+  --lf-duration-normal: 200ms;
+  --lf-ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* ── Z-index ladder ─────────────────────────────────────────────────── */
+  --lf-z-drawer: 600;
+  --lf-z-modal: 700;
+  --lf-z-toast: 800;
+
+  /* ── Layout metrics ─────────────────────────────────────────────────── */
+  --lf-sidebar-width: 264px;
+  --lf-sidebar-width-collapsed: 76px;
+  --lf-topbar-height: 60px;
+  --lf-content-max: 1160px;
+
+  /* ── Focus ──────────────────────────────────────────────────────────── */
+  --lf-focus-ring: 0 0 0 2px var(--lf-color-bg), 0 0 0 4px var(--lf-color-border-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --lf-duration-fast: 0ms;
+    --lf-duration-normal: 0ms;
+  }
+}

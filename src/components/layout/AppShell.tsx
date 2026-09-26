@@ -1,0 +1,60 @@
+import { useEffect, useState } from 'react';
+import { Outlet } from 'react-router-dom';
+import { Sidebar } from './Sidebar';
+import { Topbar } from './Topbar';
+import { MobileNavDrawer } from './MobileNavDrawer';
+import { readStoredString, writeStoredString } from '../../lib/storage';
+import { isDemoMode } from '../../lib/env';
+
+const SIDEBAR_COLLAPSED_KEY = 'lockflow.sidebar.collapsed';
+
+/**
+ * Authenticated application frame: desktop sidebar (collapse state persisted
+ * to localStorage), sticky topbar, scrollable content outlet, and the mobile
+ * hamburger drawer below 960px.
+ */
+export function AppShell() {
+  const [collapsed, setCollapsed] = useState(
+    () => readStoredString(SIDEBAR_COLLAPSED_KEY) === '1',
+  );
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    writeStoredString(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
+  }, [collapsed]);
+
+  // Close the mobile drawer whenever the viewport crosses to desktop.
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 961px)');
+    function onChange(event: MediaQueryListEvent) {
+      if (event.matches) setMobileNavOpen(false);
+    }
+    query.addEventListener('change', onChange);
+    return () => query.removeEventListener('change', onChange);
+  }, []);
+
+  return (
+    <div className="lf-shell">
+      <a href="#lf-main-content" className="lf-skip-link">
+        Skip to content
+      </a>
+      <Sidebar
+        collapsed={collapsed}
+        onToggleCollapsed={() => setCollapsed((value) => !value)}
+      />
+      <div className="lf-main">
+        {isDemoMode ? (
+          <div className="lf-demobanner" role="status">
+            <strong>Demo mode</strong>
+            <span>— Supabase is not configured; authentication and data are mocked.</span>
+          </div>
+        ) : null}
+        <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} />
+        <main className="lf-content" id="lf-main-content">
+          <Outlet />
+        </main>
+      </div>
+      <MobileNavDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+    </div>
+  );
+}

@@ -1,0 +1,126 @@
+/* LockFlow base — reset + document-level defaults */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--lf-font-sans);
+  font-size: var(--lf-text-base);
+  font-weight: var(--lf-font-weight-normal);
+  line-height: var(--lf-leading-normal);
+  color: var(--lf-color-ink);
+  background: var(--lf-color-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: var(--lf-font-weight-semibold);
+  line-height: var(--lf-leading-tight);
+  letter-spacing: var(--lf-tracking-tight);
+  color: var(--lf-color-ink);
+}
+
+h1 {
+  font-size: var(--lf-text-2xl);
+}
+h2 {
+  font-size: var(--lf-text-xl);
+}
+h3 {
+  font-size: var(--lf-text-lg);
+}
+h4 {
+  font-size: var(--lf-text-md);
+}
+
+p {
+  color: var(--lf-color-ink-secondary);
+}
+
+a {
+  color: var(--lf-color-primary-600);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+code {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  background: var(--lf-color-surface-muted);
+  border-radius: var(--lf-radius-sm);
+  padding: 0.1em 0.4em;
+}
+
+/* Strong, visible keyboard focus everywhere */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--lf-focus-ring);
+  border-radius: var(--lf-radius-sm);
+}
+
+::selection {
+  background: var(--lf-color-primary-200);
+}
+
+/* Calm scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--lf-color-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--lf-color-border-strong);
+  border-radius: var(--lf-radius-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

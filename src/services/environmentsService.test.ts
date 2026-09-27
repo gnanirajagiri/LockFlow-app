@@ -177,6 +177,45 @@ describe('rule 5 — archive is soft only', () => {
   });
 });
 
+describe('rule 1 — locked versions cannot enter edit paths or save', () => {
+  it('refuses spec saves on locked versions (service boundary)', async () => {
+    await expect(
+      service.updateSpec(V1_ID, { roomType: 'hacked' }, workspaceId),
+    ).rejects.toThrow(/locked and cannot be edited/);
+  });
+
+  it('refuses version-draft updates (lock level/summary) on locked versions', async () => {
+    await expect(
+      service.updateVersionDraft(V1_ID, { lockLevel: 'strict' }, workspaceId),
+    ).rejects.toThrow(/locked and cannot be edited/);
+  });
+
+  it('refuses reference metadata changes on locked versions', async () => {
+    await expect(
+      service.addReference(
+        V1_ID,
+        { storagePath: 'placeholders/x.svg', referenceType: 'wide', caption: 'x' },
+        workspaceId,
+      ),
+    ).rejects.toThrow(/locked and cannot be edited/);
+    await expect(
+      service.removeReference(V1_ID, 'eref_wbs_wide', workspaceId),
+    ).rejects.toThrow(/locked and cannot be edited/);
+  });
+
+  it('allows the same operations on the open draft', async () => {
+    const version = await service.updateVersionDraft(V2_ID, { lockLevel: 'strict' }, workspaceId);
+    expect(version.lockLevel).toBe('strict');
+    const added = await service.addReference(
+      V2_ID,
+      { storagePath: 'placeholders/environments/wbs/extra.svg', referenceType: 'detail', caption: 'Extra' },
+      workspaceId,
+    );
+    expect(added.sortOrder).toBeGreaterThanOrEqual(0);
+    await service.removeReference(V2_ID, added.id, workspaceId);
+  });
+});
+
 describe('rule 6 — environments are never model-specific', () => {
   it('exposes no model identifier on any environment entity', async () => {
     const list = await service.listEnvironments(workspaceId);

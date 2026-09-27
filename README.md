@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — Environments data foundation.** The authenticated app shell, design system, Models data foundation + interface, and the Environments data foundation are in place. AI generation, payments, provider integrations, Content Studio (Environment Builder), Gallery, Campaigns and the full Library are intentionally out of scope.
+> **Status — Environment Builder interface.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation, and the functional Environment Builder interface (index, profile, editor, references, versions, lock review) are in place. AI generation, payments, provider integrations, Gallery outputs, Campaigns, Templates and the full Library are intentionally out of scope.
 
 ---
 
@@ -203,7 +203,8 @@ A Character Sheet stores **identity traits only**: identity summary, face & feat
 - `src/services/modelsService.test.ts` — the five product rules at the service boundary: (1) locked sheet fields cannot be saved; (2) draft-from-locked copies data without mutating the source; (3) lock confirmation is required and only drafts lock; (4) archive is soft-archive only with no delete path; (5) cross-workspace models cannot be read or updated.
 - `src/features/models/modelDiff.test.ts` — field-by-field comparison behaviour.
 - `src/domain/environments/guards.test.ts` — locked-version refusal, safe version numbering, spec copying (no source mutation), lifecycle transitions, spec schemas.
-- `src/services/environmentsService.test.ts` — the six Environment product rules at the service boundary: (1) locked environment versions cannot be edited; (2) draft-from-locked copies specs + references without changing the source; (3) version numbers increment safely; (4) cross-workspace reads/updates are prevented; (5) archive is soft-archive only; (6) no model identifier or model-binding API exists anywhere in environment entities.
+- `src/services/environmentsService.test.ts` — the six Environment product rules at the service boundary: (1) locked environment versions cannot be edited (spec saves, version-draft updates, reference metadata changes — and the same operations succeed on drafts); (2) draft-from-locked copies specs + references without changing the source; (3) version numbers increment safely; (4) cross-workspace reads/updates are prevented; (5) archive is soft-archive only; (6) no model identifier or model-binding API exists anywhere in environment entities.
+- `src/features/environments/envLockReview.test.ts` — the lock-review gates: anchor completeness blocks locking (with product zone explicitly optional), lock requires explicit confirmation and the rights acknowledgement, non-drafts refuse to lock, and the two-version spec diff returns changed **and** unchanged fields.
 
 ## Environments domain
 
@@ -245,7 +246,42 @@ Plus continuity notes and lock rules for context. Any change after locking creat
 
 | Route | Purpose |
 | ----- | ------- |
-| `/environments` | Lightweight index: loading/error/empty states (empty copy: "Create your first environment"), environment cards (name, active version, status, lock state, lock level, last updated) and a **New environment** placeholder modal. The guided Environment Builder is a later milestone. |
+| `/environments` | Index: search by name, status filter (All/Draft/Ready/Archived), grid/list toggle, loading/error/empty states (empty copy: "Create your first environment"), environment cards (name, active version, status, lock state, lock level, updated) with Open/Archive quick actions, soft-archive confirmation, and the **Create an environment** modal (required name → creates environment + first draft v1 → redirects to the editor). |
+| `/environments/:environmentId` | Profile Overview: room preview placeholder, active version + lock summary, protected-anchor summary, "How continuity works" panel, reusability note ("Selecting a model later does not change the environment."), "Generated outputs appear in Gallery." placeholder. |
+| `/environments/:environmentId/edit` | Guided editor (draft versions only): Basic setting, Visual anchors, Physical anchors (ordered furniture/prop entries with add/edit/delete/reorder), Lock configuration (flexible/balanced/strict segmented selector). Locked versions render a protected read-only state whose only modification path is "Create new draft version". Explicit Save draft (no autosave), schema-validated, service-layer saves. |
+| `/environments/:environmentId/references` | Reference metadata per version: type filter (wide/hero_angle/detail/layout/lighting/product_zone/other), draft add/rename/reorder/remove, locked read-only, disabled future-upload area ("Reference upload will be connected to secure storage next"). |
+| `/environments/:environmentId/versions` | Version timeline (number, status, change summary, lock level, created/locked dates), status filter, inspect drawer with the version's spec, two-version comparison (changed AND unchanged fields), create-draft dialog with required change summary, lock actions deep-link to the lock review page. |
+| `/environments/:environmentId/lock` | Final review: "Lock and save your environment" checklist of all defining anchors, lock-level explanation, version-rules card, required rights-confirmation checkbox, optional usage tags, and **Lock environment v[N]** — disabled until rights are acknowledged and required anchors are complete; then confirm dialog → lock → toast → redirect to the profile. |
+| `/environments/:environmentId/specs` | Alias that redirects to `/edit` (one guided form covers all spec sections). |
+
+Routes always use the real environment id from data — the seeded Warm Bedroom Studio id is never hard-coded into route logic.
+
+### Draft, locked and superseded behaviour (environments)
+
+- **Draft** versions are the only editable state: spec anchors, reference metadata and the version's lock level can change through the editor, validated by the domain schemas and saved via `EnvironmentsService` (which re-checks the lock guard before every write).
+- **Locked** versions are permanently read-only. There is no UI or service path that edits them: the pure `refuseEnvironmentLocked` guard, the service checks, the mock repository, and the Postgres triggers all refuse independently. The only modification path is **Create new draft version**, which opens the required-change-summary dialog and uses the safe copy/increment path (spec + reference metadata duplicated; the source is never mutated). On lock, the environment's `active_version_id` points at the newly locked version and older locked versions become `superseded`, preserved forever.
+- **Superseded** versions are immutable history — still inspectable and still selectable as a copy source for a new draft.
+
+### Lock levels and protected anchors
+
+`lock_level` lives on the version (`flexible | balanced | strict`), is editable while the version is a draft, is frozen on lock, and is inherited by the next draft when copying:
+
+- **Flexible** — protects the key mood and setting direction.
+- **Balanced** — protects defining anchors while allowing minor natural variation.
+- **Strict** — protects layout, anchor placement and the core visual setup closely.
+
+A lock freezes the version's defining anchors: room type and layout feel, hero camera angle, lighting style, key furniture anchors, signature props, palette/material direction, and the product zone when present. The `/lock` review page enforces completeness (all required anchors present) plus an explicit rights acknowledgement before the lock action enables; the pure gate is `assertEnvironmentLockAllowed` in `src/features/environments/envLockReview.ts`.
+
+### How "create new draft version" works
+
+1. From a locked version (profile header, versions row, or locked editor state) choose **Create new draft version**.
+2. Pick the source version and enter a **required change summary** in the dialog.
+3. The service calls the safe increment path (`create_next_environment_version` RPC on Supabase; the equivalent guarded mock in demo mode): `max(version_number) + 1`, refuses when a draft already exists, copies the source's Environment Spec (and its reference metadata) into the new draft, and never mutates the source.
+4. You land on the new draft's editor, ready to change anchors.
+
+### Environments stay independently reusable
+
+Environments are standalone assets — never model-specific, never bound to a model here. Models, Looks, props, products and wardrobe are selected later in Content Studio; selecting a model never changes the environment. Reusable props and items remain in the **one shared Library**: `environment_asset_shortcuts` rows are pointers only (`library_asset_id` stays a documented nullable placeholder until the Library migration adds its foreign key). Generated media belongs in Gallery — environment pages show only a lightweight placeholder note.
 
 ### Development seed data
 
@@ -259,6 +295,6 @@ Plus continuity notes and lock rules for context. Any change after locking creat
 
 1. Workspace provisioning on first sign-in (create workspace + owner membership).
 2. ~~Model Builder and Environment Builder data models with version + lock tables.~~ Done — Models data foundation + interface, Environments data foundation.
-3. Environment Builder UI (Content Studio) on the new Environments data layer: guided composition, lock confirmation, version comparison.
-4. Library asset types backed by Supabase Storage (private bucket already provisioned) + the FK migration for asset shortcuts.
+3. ~~Environment Builder UI~~ Done — the Environment Builder interface (index, profile, editor, references, versions, lock review) ships on the Environments data layer; AI-assisted composition remains out of scope.
+4. Library asset types backed by Supabase Storage (private bucket already provisioned) + the FK migration for asset shortcuts; reference uploads to secure storage.
 5. Content job pipeline feeding the Gallery.

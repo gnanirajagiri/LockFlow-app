@@ -21,6 +21,7 @@ import type {
   LockEnvironmentVersionInput,
   UpdateEnvironmentDraftInput,
   UpdateEnvironmentSpecInput,
+  UpdateEnvironmentVersionDraftInput,
 } from '../domain/environments';
 import { ENVIRONMENTS_SEED } from '../mock/environmentsSeed';
 import type { EnvironmentsRepository } from './environmentsRepository';
@@ -81,6 +82,52 @@ export class MockEnvironmentsRepository implements EnvironmentsRepository {
 
   async getReferences(versionId: string): Promise<EnvironmentReferenceRecord[]> {
     return structuredClone(this.references.get(versionId) ?? []);
+  }
+
+  /** Adds a reference-metadata row (draft versions only). */
+  async addReference(
+    versionId: string,
+    input: { storagePath: string; referenceType: EnvironmentReferenceRecord['referenceType']; caption: string },
+  ): Promise<EnvironmentReferenceRecord> {
+    const version = await this.getVersion(versionId);
+    if (version.status === 'locked') throw new LockedEnvironmentVersionError(versionId);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can modify references (status: ${version.status}).`);
+    }
+    const stamp = now();
+    const row: EnvironmentReferenceRecord = {
+      id: crypto.randomUUID(),
+      environmentVersionId: versionId,
+      storagePath: input.storagePath,
+      referenceType: input.referenceType,
+      caption: input.caption,
+      sortOrder: (this.references.get(versionId) ?? []).length,
+      createdAt: stamp,
+      updatedAt: stamp,
+    };
+    this.references.set(versionId, [...(this.references.get(versionId) ?? []), row]);
+    return structuredClone(row);
+  }
+
+  async updateReference(
+    versionId: string,
+    referenceId: string,
+    patch: { storagePath?: string; referenceType?: EnvironmentReferenceRecord['referenceType']; caption?: string },
+  ): Promise<void> {
+    const version = await this.getVersion(versionId);
+    if (version.status === 'locked') throw new LockedEnvironmentVersionError(versionId);
+    const rows = this.references.get(versionId) ?? [];
+    this.references.set(
+      versionId,
+      rows.map((row) => (row.id === referenceId ? { ...row, ...patch, updatedAt: now() } : row)),
+    );
+  }
+
+  async removeReference(versionId: string, referenceId: string): Promise<void> {
+    const version = await this.getVersion(versionId);
+    if (version.status === 'locked') throw new LockedEnvironmentVersionError(versionId);
+    const rows = this.references.get(versionId) ?? [];
+    this.references.set(versionId, rows.filter((row) => row.id !== referenceId));
   }
 
   async createEnvironment(input: CreateEnvironmentInput, createdBy: string): Promise<EnvironmentRecord> {
@@ -260,6 +307,22 @@ export class MockEnvironmentsRepository implements EnvironmentsRepository {
     });
 
     return structuredClone(locked);
+  }
+
+  /** Draft-only: update a version's own fields (lock level, change summary). */
+  async updateVersionDraft(
+    versionId: string,
+    patch: UpdateEnvironmentVersionDraftInput,
+  ): Promise<EnvironmentVersionRecord> {
+    const version = await this.getVersion(versionId);
+    if (version.status === 'locked') throw new LockedEnvironmentVersionError(versionId);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can be updated (status: ${version.status}).`);
+    }
+
+    const next: EnvironmentVersionRecord = { ...version, ...patch, updatedAt: now() };
+    this.versions.set(versionId, next);
+    return structuredClone(next);
   }
 
   async updateSpec(

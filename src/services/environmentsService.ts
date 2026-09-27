@@ -19,6 +19,7 @@ import {
   validateCreateEnvironmentVersion,
   validateUpdateEnvironmentDraft,
   validateUpdateEnvironmentSpec,
+  validateUpdateEnvironmentVersionDraft,
 } from '../domain/environments';
 import type {
   EnvironmentRecord,
@@ -74,6 +75,49 @@ export class EnvironmentsService {
   ): Promise<EnvironmentReferenceRecord[]> {
     await this.getVersion(versionId, activeWorkspaceId);
     return this.repo.getReferences(versionId);
+  }
+
+  /** Adds reference metadata to a draft version (guard-checked). */
+  async addReference(
+    versionId: string,
+    input: { storagePath: string; referenceType: EnvironmentReferenceRecord['referenceType']; caption: string },
+    activeWorkspaceId: string,
+  ): Promise<EnvironmentReferenceRecord> {
+    const version = await this.getVersion(versionId, activeWorkspaceId);
+    refuseEnvironmentLocked(version);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can modify references (status: ${version.status}).`);
+    }
+    return this.repo.addReference(versionId, input);
+  }
+
+  /** Updates reference metadata on a draft version (guard-checked). */
+  async updateReference(
+    versionId: string,
+    referenceId: string,
+    patch: { storagePath?: string; referenceType?: EnvironmentReferenceRecord['referenceType']; caption?: string },
+    activeWorkspaceId: string,
+  ): Promise<void> {
+    const version = await this.getVersion(versionId, activeWorkspaceId);
+    refuseEnvironmentLocked(version);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can modify references (status: ${version.status}).`);
+    }
+    return this.repo.updateReference(versionId, referenceId, patch);
+  }
+
+  /** Removes reference metadata from a draft version (guard-checked). */
+  async removeReference(
+    versionId: string,
+    referenceId: string,
+    activeWorkspaceId: string,
+  ): Promise<void> {
+    const version = await this.getVersion(versionId, activeWorkspaceId);
+    refuseEnvironmentLocked(version);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can modify references (status: ${version.status}).`);
+    }
+    return this.repo.removeReference(versionId, referenceId);
   }
 
   async createEnvironment(input: unknown, createdBy: string): Promise<EnvironmentRecord> {
@@ -158,6 +202,28 @@ export class EnvironmentsService {
 
     refuseEnvironmentLocked(version); // locked → error; draft → proceeds
     return this.repo.lockVersion({ versionId });
+  }
+
+  /** Draft-only: update a version's lock level / change summary. */
+  async updateVersionDraft(
+    versionId: string,
+    patch: unknown,
+    activeWorkspaceId: string,
+  ): Promise<EnvironmentVersionRecord> {
+    const version = await this.repo.getVersion(versionId);
+    const environment = await this.repo.getEnvironment(version.environmentId);
+    assertEnvironmentInWorkspace(environment, activeWorkspaceId);
+
+    refuseEnvironmentLocked(version);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can be updated (status: ${version.status}).`);
+    }
+
+    const result = validateUpdateEnvironmentVersionDraft(patch);
+    if (!result.ok) {
+      throw new Error(`Invalid version update: ${result.errors.join('; ')}`);
+    }
+    return this.repo.updateVersionDraft(versionId, result.value);
   }
 
   async updateSpec(

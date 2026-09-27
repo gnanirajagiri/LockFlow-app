@@ -8,6 +8,15 @@ import { HomePage } from './pages/HomePage';
 import { CreatePage } from './pages/CreatePage';
 import { ModelsPage } from './pages/ModelsPage';
 import { EnvironmentsPage } from './pages/EnvironmentsPage';
+import { EnvironmentProfileLayout } from './features/environments/EnvironmentProfileLayout';
+import {
+  EnvironmentEditRoute,
+  EnvironmentOverviewRoute,
+  EnvironmentReferencesRoute,
+  EnvironmentSpecsRoute,
+  EnvironmentVersionsRoute,
+} from './features/environments/tabRoutes';
+import { EnvironmentLockPage } from './features/environments/EnvironmentLockPage';
 import { StudioPage } from './pages/StudioPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { GalleryPage } from './pages/GalleryPage';
@@ -45,6 +54,14 @@ export default function App() {
               <Route path="create" element={<CreatePage />} />
               <Route path="models" element={<ModelsPage />} />
               <Route path="environments" element={<EnvironmentsPage />} />
+              <Route path="environments/:environmentId/lock" element={<EnvironmentLockPage />} />
+              <Route path="environments/:environmentId" element={<EnvironmentProfileLayout />}>
+                <Route index element={<EnvironmentOverviewRoute />} />
+                <Route path="edit" element={<EnvironmentEditRoute />} />
+                <Route path="references" element={<EnvironmentReferencesRoute />} />
+                <Route path="versions" element={<EnvironmentVersionsRoute />} />
+                <Route path="specs" element={<EnvironmentSpecsRoute />} />
+              </Route>
               <Route path="models/:modelId" element={<ModelProfileLayout />}>
                 <Route index element={<ModelOverviewRoute />} />
                 <Route path="character-sheet" element={<ModelCharacterSheetRoute />} />

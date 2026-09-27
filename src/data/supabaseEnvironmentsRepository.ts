@@ -17,6 +17,7 @@ import type {
   LockEnvironmentVersionInput,
   UpdateEnvironmentDraftInput,
   UpdateEnvironmentSpecInput,
+  UpdateEnvironmentVersionDraftInput,
 } from '../domain/environments';
 import type { EnvironmentsRepository } from './environmentsRepository';
 
@@ -147,6 +148,56 @@ export class SupabaseEnvironmentsRepository implements EnvironmentsRepository {
     return (data ?? []).map(mapReference);
   }
 
+  /** Adds a reference-metadata row (draft versions only; trigger + RLS guard). */
+  async addReference(
+    versionId: string,
+    input: { storagePath: string; referenceType: EnvironmentReferenceRecord['referenceType']; caption: string },
+  ): Promise<EnvironmentReferenceRecord> {
+    const { count } = await this.client
+      .from('environment_references')
+      .select('id', { count: 'exact', head: true })
+      .eq('environment_version_id', versionId);
+    const { data, error } = await this.client
+      .from('environment_references')
+      .insert({
+        environment_version_id: versionId,
+        storage_path: input.storagePath,
+        reference_type: input.referenceType,
+        caption: input.caption,
+        sort_order: count ?? 0,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    return mapReference(data);
+  }
+
+  async updateReference(
+    versionId: string,
+    referenceId: string,
+    patch: { storagePath?: string; referenceType?: EnvironmentReferenceRecord['referenceType']; caption?: string },
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {};
+    if (patch.storagePath !== undefined) payload.storage_path = patch.storagePath;
+    if (patch.referenceType !== undefined) payload.reference_type = patch.referenceType;
+    if (patch.caption !== undefined) payload.caption = patch.caption;
+    const { error } = await this.client
+      .from('environment_references')
+      .update(payload)
+      .eq('id', referenceId)
+      .eq('environment_version_id', versionId);
+    if (error) throw error;
+  }
+
+  async removeReference(versionId: string, referenceId: string): Promise<void> {
+    const { error } = await this.client
+      .from('environment_references')
+      .delete()
+      .eq('id', referenceId)
+      .eq('environment_version_id', versionId);
+    if (error) throw error;
+  }
+
   async createEnvironment(input: CreateEnvironmentInput, createdBy: string): Promise<EnvironmentRecord> {
     const { data, error } = await this.client
       .from('environments')
@@ -261,6 +312,27 @@ export class SupabaseEnvironmentsRepository implements EnvironmentsRepository {
     });
     if (error) throw error;
     return this.getVersion(input.versionId);
+  }
+
+  /** Draft-only: update a version's own fields (lock level, change summary). */
+  async updateVersionDraft(
+    versionId: string,
+    patch: UpdateEnvironmentVersionDraftInput,
+  ): Promise<EnvironmentVersionRecord> {
+    const payload: Record<string, unknown> = {};
+    if (patch.lockLevel !== undefined) payload.lock_level = patch.lockLevel;
+    if (patch.changeSummary !== undefined) payload.change_summary = patch.changeSummary;
+    if (Object.keys(payload).length === 0) return this.getVersion(versionId);
+
+    // RLS gates the write; the trigger + service guard refuse locked versions.
+    const { data, error } = await this.client
+      .from('environment_versions')
+      .update(payload)
+      .eq('id', versionId)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return mapVersion(data);
   }
 
   async updateSpec(

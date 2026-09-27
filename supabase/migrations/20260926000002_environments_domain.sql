@@ -319,6 +319,20 @@ create policy "environment_references_update_member" on public.environment_refer
     )
   );
 
+-- Reference metadata rows may be removed from DRAFT versions (the locked/
+-- superseded immutability trigger blocks the rest). This is the only delete
+-- policy in the environments module and never touches versions or specs.
+create policy "environment_references_delete_member" on public.environment_references
+  for delete using (
+    exists (
+      select 1 from public.environment_versions v
+      join public.environments e on e.id = v.environment_id
+      where v.id = environment_version_id
+        and public.is_workspace_member(e.workspace_id)
+        and v.status = 'draft'
+    )
+  );
+
 -- environment_asset_shortcuts ────────────────────────────────────────────────
 create policy "environment_asset_shortcuts_select_member" on public.environment_asset_shortcuts
   for select using (

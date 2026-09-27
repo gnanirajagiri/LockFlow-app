@@ -137,6 +137,12 @@ export interface UpdateEnvironmentSpecInput {
   lockRules?: SpecJson;
 }
 
+export interface UpdateEnvironmentVersionDraftInput {
+  /** How tightly the locked anchors bind future jobs; frozen on lock. */
+  lockLevel?: EnvironmentLockLevel;
+  changeSummary?: string;
+}
+
 export interface CreateEnvironmentVersionInput {
   environmentId: string;
   sourceVersionId: string;

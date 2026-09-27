@@ -18,6 +18,7 @@ import type {
   SpecJson,
   UpdateEnvironmentDraftInput,
   UpdateEnvironmentSpecInput,
+  UpdateEnvironmentVersionDraftInput,
 } from './types';
 
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -133,6 +134,25 @@ export function validateCreateEnvironmentVersion(
   return errors.length
     ? { ok: false, errors }
     : { ok: true, value: { environmentId, sourceVersionId, changeSummary } };
+}
+
+export function validateUpdateEnvironmentVersionDraft(
+  input: unknown,
+): ValidationResult<UpdateEnvironmentVersionDraftInput> {
+  const errors: string[] = [];
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const out: UpdateEnvironmentVersionDraftInput = {};
+
+  if (raw.lockLevel !== undefined) {
+    if (isEnvironmentLockLevel(raw.lockLevel)) out.lockLevel = raw.lockLevel;
+    else errors.push('lockLevel must be flexible, balanced or strict');
+  }
+  if (raw.changeSummary !== undefined) {
+    out.changeSummary = str(raw.changeSummary).slice(0, 500);
+  }
+  if (Object.keys(out).length === 0) errors.push('at least one field must be provided');
+
+  return errors.length ? { ok: false, errors } : { ok: true, value: out };
 }
 
 const REFERENCE_TYPES: EnvironmentReferenceType[] = [

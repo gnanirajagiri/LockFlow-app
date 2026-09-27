@@ -1,6 +1,414 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Environments index — token-only styles (lf-env* namespace)
+   Environments index + profile + editor — token-only styles (lf-env*)
+   Reuses shared patterns (lf-models-toolbar, lf-readonly, lf-lockedbanner,
+   lf-versionlist, lf-compare, lf-actionmenu) from pages.css.
    ═══════════════════════════════════════════════════════════════════════ */
+
+.lf-envlist {
+  display: grid;
+  gap: var(--lf-space-3);
+}
+
+.lf-envrow {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-3);
+  flex-wrap: wrap;
+}
+
+.lf-envrow__cover {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-color-surface-muted);
+  border: 1px solid var(--lf-color-border);
+  color: var(--lf-color-ink-muted);
+}
+
+.lf-envrow__main {
+  display: grid;
+  min-width: 0;
+}
+
+.lf-envrow__name {
+  font-weight: var(--lf-font-weight-medium);
+  color: var(--lf-color-ink);
+}
+
+.lf-envrow__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lf-space-2);
+}
+
+.lf-envprofile__hero {
+  display: flex;
+  gap: var(--lf-space-4);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.lf-envprofile__portrait {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  flex: 0 0 auto;
+  border-radius: var(--lf-radius-lg);
+  background: var(--lf-color-surface-muted);
+  border: 1px solid var(--lf-color-border);
+  color: var(--lf-color-ink-muted);
+}
+
+.lf-envprofile__id {
+  display: grid;
+  gap: var(--lf-space-2);
+  min-width: 0;
+}
+
+.lf-envprofile__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lf-space-2);
+  flex-wrap: wrap;
+}
+
+.lf-envprofile__title h1 {
+  margin: 0;
+  font-size: var(--lf-text-2xl);
+  font-weight: var(--lf-font-weight-semibold);
+}
+
+.lf-envprofile__slug {
+  color: var(--lf-color-ink-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.lf-envprofile__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lf-space-2);
+}
+
+.lf-envprofile__actions {
+  margin-left: auto;
+  display: grid;
+  gap: var(--lf-space-2);
+  justify-items: end;
+}
+
+.lf-envprofile__actions-row {
+  display: flex;
+  gap: var(--lf-space-2);
+  align-items: center;
+}
+
+.lf-envprofile__layout {
+  display: grid;
+  gap: var(--lf-space-4);
+}
+
+.lf-envprofile__preview {
+  display: grid;
+  place-items: center;
+  gap: var(--lf-space-2);
+  min-height: 180px;
+  border-radius: var(--lf-radius-lg);
+  background: var(--lf-color-surface-muted);
+  border: 1px dashed var(--lf-color-border-strong);
+  color: var(--lf-color-ink-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.lf-envprofile__preview--lg {
+  min-height: 240px;
+}
+
+.lf-envpanel__heading {
+  margin: 0 0 var(--lf-space-2);
+  font-size: var(--lf-text-md);
+  font-weight: var(--lf-font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+}
+
+.lf-envpanel__actions {
+  display: flex;
+  gap: var(--lf-space-2);
+  flex-wrap: wrap;
+  margin-top: var(--lf-space-3);
+}
+
+.lf-envpanel__note {
+  margin: 0;
+  padding: var(--lf-space-3);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-color-primary-soft);
+  color: var(--lf-color-ink);
+  font-size: var(--lf-text-sm);
+}
+
+/* Editor */
+.lf-enveditor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--lf-space-4);
+  align-items: start;
+}
+
+.lf-enveditor__form {
+  display: grid;
+  gap: var(--lf-space-4);
+  min-width: 0;
+}
+
+.lf-enveditor__form .lf-field {
+  display: grid;
+  gap: var(--lf-space-1);
+}
+
+.lf-enveditor__side {
+  position: sticky;
+  top: var(--lf-space-4);
+  display: grid;
+  gap: var(--lf-space-3);
+}
+
+.lf-enveditor__status {
+  display: grid;
+  gap: var(--lf-space-2);
+  margin-bottom: var(--lf-space-3);
+}
+
+.lf-enveditor__actions {
+  display: grid;
+  gap: var(--lf-space-2);
+}
+
+.lf-enveditor__mobilesave {
+  display: none;
+  position: sticky;
+  bottom: 0;
+  padding: var(--lf-space-3);
+  background: var(--lf-color-surface);
+  border-top: 1px solid var(--lf-color-border);
+}
+
+.lf-envform__group {
+  border: none;
+  padding: 0;
+  margin: 0 0 var(--lf-space-3);
+  display: grid;
+  gap: var(--lf-space-2);
+}
+
+.lf-envform__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--lf-space-2);
+}
+
+.lf-envform__listitem {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+}
+
+.lf-envform__listitem--stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.lf-envform__index {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-surface-muted);
+  color: var(--lf-color-ink-secondary);
+  font-size: var(--lf-text-xs);
+}
+
+.lf-envform__listactions {
+  display: flex;
+  gap: var(--lf-space-1);
+  flex: 0 0 auto;
+}
+
+.lf-envform__segments {
+  display: grid;
+  gap: var(--lf-space-2);
+}
+
+.lf-envform__segment {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: var(--lf-space-3);
+  border-radius: var(--lf-radius-md);
+  border: 1px solid var(--lf-color-border);
+  background: var(--lf-color-surface);
+  cursor: pointer;
+}
+
+.lf-envform__segment strong {
+  text-transform: capitalize;
+}
+
+.lf-envform__segment span {
+  color: var(--lf-color-ink-secondary);
+  font-size: var(--lf-text-sm);
+}
+
+.lf-envform__segment--active {
+  border-color: var(--lf-color-primary-500);
+  box-shadow: 0 0 0 1px var(--lf-color-primary-500);
+  background: var(--lf-color-primary-soft);
+}
+
+.lf-envform__textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+/* References */
+.lf-envref__state {
+  margin-left: auto;
+}
+
+.lf-envref__row {
+  display: flex;
+  gap: var(--lf-space-2);
+  align-items: center;
+}
+
+.lf-envref__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--lf-space-3);
+}
+
+.lf-envref__item {
+  display: grid;
+  gap: var(--lf-space-2);
+}
+
+.lf-envref__frame {
+  aspect-ratio: 4 / 3;
+  border-radius: var(--lf-radius-md);
+  background:
+    linear-gradient(135deg, var(--lf-color-surface-muted) 0%, var(--lf-color-border) 100%);
+  border: 1px solid var(--lf-color-border);
+}
+
+.lf-envref__upload {
+  display: grid;
+  gap: var(--lf-space-1);
+  padding: var(--lf-space-5);
+  border-radius: var(--lf-radius-lg);
+  border: 1px dashed var(--lf-color-border-strong);
+  background: var(--lf-color-surface-muted);
+  opacity: 0.85;
+}
+
+/* Lock review */
+.lf-envlock__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: var(--lf-space-4);
+  align-items: start;
+}
+
+.lf-envlock__checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--lf-space-2);
+}
+
+.lf-envlock__check {
+  display: flex;
+  gap: var(--lf-space-2);
+  align-items: flex-start;
+  padding: var(--lf-space-2);
+  border-radius: var(--lf-radius-md);
+  border: 1px solid var(--lf-color-border);
+}
+
+.lf-envlock__check > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-success-bg);
+  color: var(--lf-color-success-text);
+  font-size: var(--lf-text-xs);
+}
+
+.lf-envlock__check--missing > span:first-child {
+  background: var(--lf-color-danger-bg);
+  color: var(--lf-color-danger-text);
+}
+
+.lf-envlock__check--missing {
+  border-color: var(--lf-color-danger-border);
+}
+
+.lf-envlock__missingnote {
+  margin: var(--lf-space-3) 0 0;
+  padding: var(--lf-space-3);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-color-warning-bg);
+  color: var(--lf-color-warning-text);
+  font-size: var(--lf-text-sm);
+}
+
+.lf-envlock__rights {
+  display: flex;
+  gap: var(--lf-space-2);
+  align-items: flex-start;
+  margin-bottom: var(--lf-space-3);
+  font-size: var(--lf-text-sm);
+  cursor: pointer;
+}
+
+@media (max-width: 960px) {
+  .lf-enveditor {
+    grid-template-columns: 1fr;
+  }
+
+  .lf-enveditor__side {
+    position: static;
+    order: -1;
+  }
+
+  .lf-enveditor__mobilesave {
+    display: block;
+  }
+
+  .lf-envlock__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .lf-envprofile__actions {
+    margin-left: 0;
+    justify-items: start;
+  }
+}
 
 .lf-envgrid {
   display: grid;

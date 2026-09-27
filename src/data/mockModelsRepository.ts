@@ -9,7 +9,6 @@ import {
   LockedVersionError,
   copyCharacterSheet,
   nextVersionNumber,
-  isInWorkspaceStrict,
   refuseIfLocked,
 } from '../domain/models';
 import type {
@@ -102,6 +101,55 @@ export class MockModelsRepository implements ModelsRepository {
     return structuredClone(record);
   }
 
+  /** First draft version (v1) + empty Character Sheet for a new model. */
+  async createFirstVersion(
+    modelId: string,
+    createdBy: string,
+    changeSummary = 'Initial identity draft',
+  ): Promise<ModelVersionRecord> {
+    const model = await this.getModel(modelId);
+    const existing = await this.getVersions(modelId);
+    if (existing.length > 0) {
+      throw new Error('createFirstVersion is only valid for models without versions.');
+    }
+
+    const stamp = now();
+    const created: ModelVersionRecord = {
+      id: crypto.randomUUID(),
+      modelId,
+      versionNumber: 1,
+      status: 'draft',
+      changeSummary,
+      coverImagePath: null,
+      lockedAt: null,
+      createdBy,
+      createdAt: stamp,
+      updatedAt: stamp,
+    };
+    this.versions.set(created.id, created);
+
+    const stamp2 = now();
+    this.sheets.set(created.id, {
+      id: crypto.randomUUID(),
+      modelVersionId: created.id,
+      identitySummary: '',
+      faceFeatures: {},
+      hairIdentity: {},
+      complexion: {},
+      bodyProportions: {},
+      distinctiveDetails: {},
+      lockRules: {},
+      referenceNotes: '',
+      createdAt: stamp2,
+      updatedAt: stamp2,
+    });
+    this.references.set(created.id, []);
+
+    // A first draft is the only version, so it is the active one.
+    this.models.set(modelId, { ...model, activeVersionId: created.id, updatedAt: now() });
+    return structuredClone(created);
+  }
+
   async updateModelDraft(modelId: string, patch: UpdateModelDraftInput): Promise<ModelRecord> {
     const model = await this.getModel(modelId);
     const next = { ...model, ...patch, updatedAt: now() };
@@ -110,8 +158,7 @@ export class MockModelsRepository implements ModelsRepository {
   }
 
   async createVersion(input: CreateVersionInput, createdBy: string): Promise<ModelVersionRecord> {
-    const model = await this.getModel(input.modelId);
-    isInWorkspaceStrict(model.workspaceId, model.workspaceId); // shape parity; real isolation check in service
+    await this.getModel(input.modelId); // existence check
 
     const existing = await this.getVersions(input.modelId);
     if (existing.some((v) => v.status === 'draft')) {
@@ -151,6 +198,20 @@ export class MockModelsRepository implements ModelsRepository {
     return structuredClone(created);
   }
 
+  /** Copies reference metadata rows (storage paths etc.) into the target draft. */
+  async copyReferences(sourceVersionId: string, targetVersionId: string): Promise<void> {
+    const source = this.references.get(sourceVersionId) ?? [];
+    const copies = source.map((reference, index) => ({
+      ...reference,
+      id: crypto.randomUUID(),
+      modelVersionId: targetVersionId,
+      sortOrder: index,
+      createdAt: now(),
+      updatedAt: now(),
+    }));
+    this.references.set(targetVersionId, copies);
+  }
+
   async lockVersion(input: LockVersionInput): Promise<ModelVersionRecord> {
     const version = await this.getVersion(input.versionId);
     refuseIfLocked(version); // no-op for drafts; LockedVersionError for locked
@@ -177,6 +238,8 @@ export class MockModelsRepository implements ModelsRepository {
     this.models.set(model.id, {
       ...model,
       activeVersionId: version.id,
+      // Locking the first version marks the model Ready. Archived models stay
+      // archived — soft-archive is never auto-reversed.
       status: model.status === 'draft' ? 'ready' : model.status,
       updatedAt: now(),
     });

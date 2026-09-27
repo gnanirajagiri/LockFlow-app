@@ -16,6 +16,8 @@ import type {
 } from '../domain/models';
 
 const WORKSPACE_ID = 'ws_demo';
+/** Separate workspace; models in it are invisible to the demo workspace (isolation). */
+const OTHER_WORKSPACE_ID = 'ws_other';
 
 const V1_ID = 'mv_aisha_v1';
 const V2_ID = 'mv_aisha_v2';
@@ -161,6 +163,47 @@ export const MODELS_SEED: ModelSeed[] = [
       [V2_ID]: [],
     },
   },
+  {
+    // Second-workspace fixture — used by workspace-isolation tests only. It
+    // never appears in the demo listing because the mock repository filters
+    // by workspace (mirroring the RLS membership policies).
+    model: {
+      ...MODEL,
+      id: 'model_bea',
+      name: 'Bea',
+      slug: 'bea',
+      workspaceId: OTHER_WORKSPACE_ID,
+      status: 'ready' as const,
+      activeVersionId: 'mv_bea_v1',
+      updatedAt: '2026-09-24T11:00:00.000Z',
+    },
+    versions: [
+      {
+        ...V1,
+        id: 'mv_bea_v1',
+        modelId: 'model_bea',
+        versionNumber: 1,
+        status: 'locked' as const,
+        changeSummary: 'Original approved identity',
+        lockedAt: '2026-09-23T09:00:00.000Z',
+      },
+    ],
+    sheets: {
+      mv_bea_v1: {
+        ...SHEET_V1,
+        id: 'cs_bea_v1',
+        modelVersionId: 'mv_bea_v1',
+        identitySummary:
+          'Woman in her early thirties with a soft round face and freckled cheeks. Consistent across all content jobs.',
+        hairIdentity: {
+          ...SHEET_V1.hairIdentity,
+          colour: 'light brown with a sun-lit fringe',
+        },
+      },
+    },
+    references: { mv_bea_v1: [] },
+  },
 ];
 
 export const SEED_WORKSPACE_ID = WORKSPACE_ID;
+export const SEED_OTHER_WORKSPACE_ID = OTHER_WORKSPACE_ID;

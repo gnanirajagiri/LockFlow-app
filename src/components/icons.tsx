@@ -173,3 +173,54 @@ export const LogoutIcon = (p: IconProps) => (
     <path d="M10 8l-4 4 4 4M6 12h9" />
   </Icon>
 );
+
+export const SearchIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m20 20-4.4-4.4" />
+  </Icon>
+);
+
+export const GridViewIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="4" y="4" width="7" height="7" rx="1.5" />
+    <rect x="13" y="4" width="7" height="7" rx="1.5" />
+    <rect x="4" y="13" width="7" height="7" rx="1.5" />
+    <rect x="13" y="13" width="7" height="7" rx="1.5" />
+  </Icon>
+);
+
+export const ListViewIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 6.5h16M4 12h16M4 17.5h16" />
+  </Icon>
+);
+
+export const ArchiveIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3.5" y="4.5" width="17" height="4.5" rx="1.5" />
+    <path d="M5.5 9v8.5a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V9" />
+    <path d="M10 12.5h4" />
+  </Icon>
+);
+
+export const CopyIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5" />
+    <path d="M15.5 5.5v-.5A2 2 0 0 0 13.5 3h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h.5" />
+  </Icon>
+);
+
+export const PlusIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 5v14M5 12h14" />
+  </Icon>
+);
+
+export const CompareIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 4v16M16 4v16" />
+    <path d="M8 6.5 4 12l4 5.5" />
+    <path d="m16 6.5 4 5.5-4 5.5" />
+  </Icon>
+);

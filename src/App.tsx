@@ -16,6 +16,15 @@ import { WorkspacePage } from './pages/WorkspacePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { HelpPage } from './pages/HelpPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { ModelProfileLayout } from './features/models/ModelProfileLayout';
+import {
+  ModelCharacterSheetRoute,
+  ModelClosetPropsRoute,
+  ModelLooksRoute,
+  ModelOverviewRoute,
+  ModelUsageHistoryRoute,
+  ModelVersionsRoute,
+} from './features/models/tabRoutes';
 
 export default function App() {
   return (
@@ -34,6 +43,14 @@ export default function App() {
               <Route index element={<HomePage />} />
               <Route path="create" element={<CreatePage />} />
               <Route path="models" element={<ModelsPage />} />
+              <Route path="models/:modelId" element={<ModelProfileLayout />}>
+                <Route index element={<ModelOverviewRoute />} />
+                <Route path="character-sheet" element={<ModelCharacterSheetRoute />} />
+                <Route path="versions" element={<ModelVersionsRoute />} />
+                <Route path="looks" element={<ModelLooksRoute />} />
+                <Route path="closet-props" element={<ModelClosetPropsRoute />} />
+                <Route path="usage-history" element={<ModelUsageHistoryRoute />} />
+              </Route>
               <Route path="studio" element={<StudioPage />} />
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="gallery" element={<GalleryPage />} />

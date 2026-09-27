@@ -60,7 +60,39 @@ export class ModelsService {
   async createModel(input: unknown, createdBy: string): Promise<ModelRecord> {
     const result = validateCreateModel(input);
     if (!result.ok) throw new Error(`Invalid model: ${result.errors.join('; ')}`);
-    return this.repo.createModel(result.value, createdBy);
+
+    // Every model is born with a first draft version (v1) and its empty
+    // Character Sheet — a protected identity record ready to edit.
+    const model = await this.repo.createModel(result.value, createdBy);
+    await this.repo
+      .createFirstVersion(model.id, createdBy)
+      .catch((err) => {
+        // The model record exists; surface the partial-failure honestly.
+        throw new Error(
+          `Model "${model.name}" was created but its first draft version failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      });
+    return model;
+  }
+
+  /**
+   * Soft-archive: status-only transition (draft|ready → archived). LockFlow
+   * never deletes models — history is preserved — so this is the only
+   * archive path in the service layer, and it can never remove records.
+   */
+  async archiveModel(modelId: string, activeWorkspaceId: string): Promise<ModelRecord> {
+    const model = await this.repo.getModel(modelId);
+    isInWorkspaceStrict(model.workspaceId, activeWorkspaceId);
+
+    if (model.status === 'archived') return model; // idempotent
+
+    // Soft-archive guard: refuse anything that is not a plain status change.
+    if (model.status !== 'draft' && model.status !== 'ready') {
+      throw new Error(`Archive is a soft status change only (current status: ${model.status}).`);
+    }
+    return this.repo.updateModelDraft(modelId, { status: 'archived' });
   }
 
   async updateModelDraft(
@@ -85,7 +117,10 @@ export class ModelsService {
 
     // Versions (locked or draft) may be copied; only the newest is a draft.
     await this.repo.getVersion(result.value.sourceVersionId);
-    return this.repo.createVersion(result.value, createdBy);
+    const version = await this.repo.createVersion(result.value, createdBy);
+    // Duplicate the source version's reference metadata into the new draft.
+    await this.repo.copyReferences(result.value.sourceVersionId, version.id);
+    return version;
   }
 
   async lockVersion(versionId: string, activeWorkspaceId: string): Promise<ModelVersionRecord> {

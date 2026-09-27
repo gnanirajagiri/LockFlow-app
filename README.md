@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — foundation milestone.** This repository currently ships the authenticated app shell, design system and database baseline. AI generation, payments, provider integrations and feature logic are intentionally out of scope.
+> **Status — Models interface milestone.** The authenticated app shell, design system, Models data foundation and the functional Models interface are in place. AI generation, payments, provider integrations, Content Studio, Gallery, Campaigns and the full Library are intentionally out of scope.
 
 ---
 
@@ -44,6 +44,7 @@ Without Supabase env vars the app runs in **demo mode**: authentication is mocke
 | `npm run dev`        | Vite dev server                      |
 | `npm run build`      | Typecheck + production build         |
 | `npm run typecheck`  | `tsc --noEmit`                       |
+| `npm test`           | Vitest suites (domain guards + service rules) |
 | `npm run preview`    | Serve the production build           |
 
 ## Environment variables
@@ -160,9 +161,46 @@ Apply with `supabase migration up` (local) or let the platform apply on push (li
 
 `src/mock/modelsSeed.ts` provides one fictional model, **Aisha** (`ready`), with locked v1 ("Original approved identity"), draft v2 ("Hair and lighting refinement"), full Character Sheets for both and three local placeholder references (portrait, full-body, profile). No real people, no external URLs. In demo mode the repository layer (`src/data/index.ts`) serves this seed; the same domain guards run over it, so lock/immutability behaviour matches production.
 
+### Models routes
+
+The functional Models interface lives under `/models`:
+
+| Route | Purpose |
+| ----- | ------- |
+| `/models` | Index: search by name, status filter (All/Draft/Ready/Archived), grid/list toggle, soft-archive with confirmation, and the **Create a model** modal (creates the model + its first draft version, then redirects to the profile). |
+| `/models/:modelId` | Profile Overview: active version + lock summary, identity-protection summary, stat placeholders, "Generated work appears in Gallery." |
+| `/models/:modelId/character-sheet` | Version selector + draft editing form or locked read-only view, with portrait/full-body/profile reference placeholders. |
+| `/models/:modelId/versions` | Version timeline, status filter, inspect dialog, lock confirmation, field-by-field comparison, create-draft flow. |
+| `/models/:modelId/looks` | Placeholder — Looks are reusable wardrobe/accessory combinations; "Looks will connect to the shared Library next." |
+| `/models/:modelId/closet-props` | Placeholder — shortcuts into the one shared Library; "Manage shared assets in Library." |
+| `/models/:modelId/usage-history` | Placeholder — generated outputs remain in Gallery; "Open Gallery" is a future/disabled action. |
+
+Routes always use the real model id from data — the seeded Aisha id is never hard-coded into route logic.
+
+### Locked vs draft behaviour
+
+- A **draft** version's Character Sheet is editable through the schema-validated form (`validateUpdateCharacterSheet`), saved via `ModelsService.updateCharacterSheet`, which re-checks the lock guard before every write.
+- A **locked** version is permanently read-only. There is no UI or service path that updates a locked version: the domain guard `refuseIfLocked`, the service check, the mock repository and the Postgres trigger (`guard_character_sheet_locked`) all refuse independently.
+- Locking requires the confirmation dialog ("Locking protects this identity version. It cannot be edited afterward. Future changes create a new version."), and only draft → locked is legal. On lock the model's `active_version_id` points at the newly locked version (the existing RPC rule) and prior locked versions become `superseded` but are preserved forever.
+
+### Creating a new draft from a locked version
+
+1. Open the model's **Versions** tab (or the locked Character Sheet) and choose **Create new draft version** / **Create new draft from this version**.
+2. Pick the source version and enter a **required change summary**.
+3. The service calls the safe version-increment path (`create_next_model_version` RPC on Supabase; the equivalent guarded mock in demo mode): it computes `max(version_number) + 1`, refuses when a draft already exists, copies the source version's Character Sheet (and its reference metadata) into the new draft, and never mutates the source.
+4. You land on the new draft's Character Sheet, ready to edit.
+
+### Identity traits vs replaceable assets
+
+A Character Sheet stores **identity traits only**: identity summary, face & features, hair identity, complexion, body proportions, distinctive details, reference notes and lock rules. Clothing, accessories, props, products and environments are **replaceable layers**, not identity traits — they attach from the one shared Library at job time and can change without creating a new model version. Models area panels (Looks, Closet & Props, Usage history) are summaries/shortcuts only: no separate model library exists and generated work appears in Gallery.
+
 ### Tests
 
-`npm test` runs the domain guard suites (`src/domain/models/guards.test.ts`): locked-edit refusal, version-number increments, Character Sheet copying on new drafts, workspace isolation and validation schemas.
+`npm test` runs Vitest:
+
+- `src/domain/models/guards.test.ts` — locked-edit refusal, version numbering, Character Sheet copying, workspace isolation, validation schemas.
+- `src/services/modelsService.test.ts` — the five product rules at the service boundary: (1) locked sheet fields cannot be saved; (2) draft-from-locked copies data without mutating the source; (3) lock confirmation is required and only drafts lock; (4) archive is soft-archive only with no delete path; (5) cross-workspace models cannot be read or updated.
+- `src/features/models/modelDiff.test.ts` — field-by-field comparison behaviour.
 
 ## Roadmap beyond this milestone
 

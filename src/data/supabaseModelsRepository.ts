@@ -155,6 +155,50 @@ export class SupabaseModelsRepository implements ModelsRepository {
     return mapModel(data);
   }
 
+  /**
+   * First draft version (v1) for a freshly created model: version + empty
+   * sheet, then the model points at it. `versions_insert_member` RLS covers
+   * the inserts (member of the workspace + created_by = auth.uid()); the
+   * models update is covered by `models_update_member`.
+   */
+  async createFirstVersion(
+    modelId: string,
+    _createdBy: string,
+    changeSummary = 'Initial identity draft',
+  ): Promise<ModelVersionRecord> {
+    void _createdBy; // auth.uid() is applied by RLS; the mock uses this arg
+
+    const { data: versionRow, error: versionError } = await this.client
+      .from('model_versions')
+      .insert({
+        model_id: modelId,
+        version_number: 1,
+        status: 'draft' as const,
+        change_summary: changeSummary,
+      })
+      .select('*')
+      .single();
+    if (versionError) throw versionError;
+
+    const { error: sheetError } = await this.client
+      .from('character_sheets')
+      .insert({ model_version_id: versionRow.id })
+      .select('id')
+      .single();
+    if (sheetError) throw sheetError;
+
+    // v1 is the only version, so it is the active one.
+    const { error: updateError } = await this.client
+      .from('models')
+      .update({ active_version_id: versionRow.id })
+      .eq('id', modelId)
+      .select('id')
+      .single();
+    if (updateError) throw updateError;
+
+    return mapVersion(versionRow);
+  }
+
   async updateModelDraft(modelId: string, patch: UpdateModelDraftInput): Promise<ModelRecord> {
     const payload: Record<string, unknown> = {};
     if (patch.name !== undefined) payload.name = patch.name;
@@ -180,6 +224,22 @@ export class SupabaseModelsRepository implements ModelsRepository {
     });
     if (error) throw error;
     return this.getVersion(data as string);
+  }
+
+  /** Copies reference metadata rows (storage paths etc.) into the target draft. */
+  async copyReferences(sourceVersionId: string, targetVersionId: string): Promise<void> {
+    const existing = await this.getReferences(sourceVersionId);
+    if (existing.length === 0) return;
+    const { error } = await this.client.from('model_references').insert(
+      existing.map((reference, index) => ({
+        model_version_id: targetVersionId,
+        storage_path: reference.storagePath,
+        reference_type: reference.referenceType,
+        caption: reference.caption,
+        sort_order: index,
+      })),
+    );
+    if (error) throw error;
   }
 
   async lockVersion(input: LockVersionInput): Promise<ModelVersionRecord> {

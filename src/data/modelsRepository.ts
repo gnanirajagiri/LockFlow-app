@@ -31,6 +31,13 @@ export interface ModelsRepository {
 
   createModel(input: CreateModelInput, createdBy: string): Promise<ModelRecord>;
 
+  /**
+   * Creates a model's first draft version (v1) with its empty Character
+   * Sheet. Called immediately after `createModel` so every model is born
+   * with an editable identity record.
+   */
+  createFirstVersion(modelId: string, createdBy: string, changeSummary?: string): Promise<ModelVersionRecord>;
+
   updateModelDraft(
     modelId: string,
     patch: UpdateModelDraftInput,
@@ -38,6 +45,9 @@ export interface ModelsRepository {
 
   /** Creates the next draft version (copies the source version's sheet). */
   createVersion(input: CreateVersionInput, createdBy: string): Promise<ModelVersionRecord>;
+
+  /** Copies reference metadata rows from a source version into a target draft. */
+  copyReferences(sourceVersionId: string, targetVersionId: string): Promise<void>;
 
   /** Locks a draft version and sets it as the model's active version. */
   lockVersion(input: LockVersionInput): Promise<ModelVersionRecord>;

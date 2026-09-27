@@ -1,0 +1,43 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Library index — token-only styles (lf-library* namespace)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Visually hidden, still announced by assistive tech. */
+.lf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lf-library__note {
+  margin: 0 0 var(--lf-space-4);
+  padding: var(--lf-space-3) var(--lf-space-4);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-color-primary-soft);
+  color: var(--lf-color-ink);
+  font-size: var(--lf-text-sm);
+}
+
+.lf-library__tags {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lf-space-1);
+}
+
+.lf-library__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--lf-space-2);
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-surface-muted);
+  border: 1px solid var(--lf-color-border);
+  color: var(--lf-color-ink-secondary);
+  font-size: var(--lf-text-xs);
+}

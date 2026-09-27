@@ -7,6 +7,7 @@ import './styles/components.css';
 import './styles/layout.css';
 import './styles/pages.css';
 import './styles/envpage.css';
+import './styles/librarypage.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — Environment Builder interface.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation, and the functional Environment Builder interface (index, profile, editor, references, versions, lock review) are in place. AI generation, payments, provider integrations, Gallery outputs, Campaigns, Templates and the full Library are intentionally out of scope.
+> **Status — unified Library data foundation.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, and the unified Library data foundation (with a lightweight `/library` index) are in place. AI generation, payments, provider integrations, Gallery outputs, Campaigns, Templates and the full Library UI are intentionally out of scope.
 
 ---
 
@@ -155,6 +155,7 @@ Schema changes live only in versioned files under `supabase/migrations/`:
 - `20260926000000_initial_schema.sql` — profiles, workspaces, memberships, RLS baseline
 - `20260926000001_models_domain.sql` — models, model_versions, character_sheets, model_references, model_asset_shortcuts; RLS; lock-immutability triggers; `create_next_model_version` / `lock_model_version` RPCs; adds `admin`/`member` to `workspace_role`
 - `20260926000002_environments_domain.sql` — environments, environment_versions, environment_specs, environment_references, environment_asset_shortcuts; RLS; lock-immutability triggers; `create_next_environment_version` / `lock_environment_version` RPCs
+- `20260926000003_library_domain.sql` — library_assets, library_asset_versions, library_asset_references, library_asset_tags, library_asset_tag_links, look_details, look_asset_items; RLS; lock-immutability triggers; `create_next_library_asset_version` / `lock_library_asset_version` RPCs; **adds the real foreign keys** from `model_asset_shortcuts.library_asset_id` and `environment_asset_shortcuts.library_asset_id` to `library_assets(id)` (nullable preserved) with workspace-consistency triggers
 
 Apply with `supabase migration up` (local) or let the platform apply on push (linked projects).
 
@@ -205,6 +206,7 @@ A Character Sheet stores **identity traits only**: identity summary, face & feat
 - `src/domain/environments/guards.test.ts` — locked-version refusal, safe version numbering, spec copying (no source mutation), lifecycle transitions, spec schemas.
 - `src/services/environmentsService.test.ts` — the six Environment product rules at the service boundary: (1) locked environment versions cannot be edited (spec saves, version-draft updates, reference metadata changes — and the same operations succeed on drafts); (2) draft-from-locked copies specs + references without changing the source; (3) version numbers increment safely; (4) cross-workspace reads/updates are prevented; (5) archive is soft-archive only; (6) no model identifier or model-binding API exists anywhere in environment entities.
 - `src/features/environments/envLockReview.test.ts` — the lock-review gates: anchor completeness blocks locking (with product zone explicitly optional), lock requires explicit confirmation and the rights acknowledgement, non-drafts refuse to lock, and the two-version spec diff returns changed **and** unchanged fields.
+- `src/services/libraryService.test.ts` — the eight Library product rules at the service boundary: (1) locked asset versions cannot be edited; (2) new drafts increment version numbers safely; (3) drafts copy details + references without mutating the source; (4) tags stay workspace-scoped (get-or-create by normalized name, no cross-workspace leaks); (5) `look_details` require the look asset type; (6) Looks link canonical records without duplicating item data (duplicate links and cross-asset pins refused); (7) shortcuts resolve to the one shared Library asset; (8) no Gallery-style output fields or generation APIs exist on Library entities. Plus soft-archive coverage.
 
 ## Environments domain
 
@@ -289,12 +291,54 @@ Environments are standalone assets — never model-specific, never bound to a mo
 
 ### Reusable assets and the shared Library
 
-`environment_asset_shortcuts` rows are quick-access **pointers only** — `library_asset_id` is a nullable placeholder with **no foreign key yet** (the unified Library table does not exist). The future Library migration will add `references public.library_assets (id)` to both `environment_asset_shortcuts` and `model_asset_shortcuts`; until then the column must stay null in normal flows. No second environment-specific Library exists, and generated outputs belong in Gallery, not Environments.
+Both `model_asset_shortcuts` and `environment_asset_shortcuts` are quick-access **pointers only**. Since `20260926000003_library_domain.sql` their `library_asset_id` columns carry real foreign keys to the canonical `library_assets` record (nullable preserved for legacy/placeholder rows), with triggers enforcing same-workspace consistency. No second model- or environment-specific Library exists, and generated outputs belong in Gallery, not Environments or the Library.
+
+## Library domain
+
+LockFlow has **exactly one unified Library** — never "Global Library", "My Library", or per-builder libraries. It stores reusable workspace inputs: products, props, wardrobe, accessories, personal items, creator tools, brand assets, references, scenes and saved Looks, each with **one canonical record** reused across models, environments, content jobs and campaigns. Generated images, videos, story outputs, drafts and exports are **never** Library records — they belong to **Gallery**.
+
+### Library vs Gallery
+
+| Library | Gallery (future) |
+| ------- | ---------------- |
+| Reusable **inputs**: products, props, wardrobe, Looks, scenes, brand assets | Generated **outputs**: images, videos, story drafts, exports |
+| Versioned approved configurations | Rendered jobs and review-ready work |
+| Referenced by models, environments and content jobs | Produced by content jobs |
+
+### Asset version & lock behaviour
+
+- `library_asset_versions` follow the shared lifecycle: **draft** (editable: `structured_details`, `rights_status`, references) → **locked** (immutable forever) → **superseded** (preserved history, still copyable).
+- Version numbers start at 1 and increment safely (`create_next_library_asset_version` RPC computes `max + 1`; one open draft per asset via partial unique index).
+- A new draft copies the source's `structured_details` **and** reference metadata; the source is never mutated.
+- `rights_status` (`unknown | confirmed | restricted`) records usage rights per approved configuration.
+- Guards: `refuseAssetLocked` in the service, `guard_locked_library_version_transition` + `guard_library_reference_locked` triggers in Postgres.
+
+### How Looks work
+
+A **Look** is a special Library asset (`asset_type = 'look'`) — a reusable combination of wardrobe, accessories and presentation choices associated with **one model**:
+
+- `look_details` (1:1 with look versions) carries the `model_id` and presentation notes. A DB trigger refuses `look_details` on non-look assets.
+- `look_asset_items` link **canonical** Library assets (optionally pinning an exact approved version). Items never duplicate asset data; duplicates and cross-asset version pins are refused.
+- A Look **never alters** the model's protected Character Sheet — it changes presentation only, and the wardrobe/accessory assets remain independently reusable.
+
+### Shortcut relationship rules
+
+Model and Environment asset shortcuts are convenience pointers into the one Library: they resolve to the same canonical records the Library serves (`LibraryService.resolveShortcutAssets`), never to copies. The migration added `model_asset_shortcuts.library_asset_id → library_assets(id)` and `environment_asset_shortcuts.library_asset_id → library_assets(id)` (both `ON DELETE SET NULL`, nullable), plus workspace-consistency triggers. Library assets carry **no** model- or environment-ownership columns.
+
+### Library routes
+
+| Route | Purpose |
+| ----- | ------- |
+| `/library` | Lightweight index: helper copy ("Library stores reusable inputs. Generated content lives in Gallery."), search, type + status filters, grid/list toggle, loading/error/empty states, asset cards (cover placeholder, name, type, active version, status, rights, tags, updated) and an **Add asset** placeholder modal. No uploads, scanning or AI descriptions yet. |
+
+### Development seed data (Library)
+
+`src/mock/librarySeed.ts` provides five fictional assets: **Luma Dew Serum Bottle** (product, v1 locked, rights confirmed, tags skincare/bottle/countertop), **Silver creator laptop** (creator tool, v1 locked), **Oversized beige blazer** (wardrobe, v1 locked), **Gold hoop earrings** (accessory, v1 locked), and **Neutral creator outfit** — a Saved Look for Aisha (v1 draft) linking the blazer (version-pinned) and earrings as canonical items with presentation notes; Aisha's Character Sheet is untouched. A sixth asset in another workspace exists for scoping tests. Local placeholder paths only.
 
 ## Roadmap beyond this milestone
 
 1. Workspace provisioning on first sign-in (create workspace + owner membership).
 2. ~~Model Builder and Environment Builder data models with version + lock tables.~~ Done — Models data foundation + interface, Environments data foundation.
 3. ~~Environment Builder UI~~ Done — the Environment Builder interface (index, profile, editor, references, versions, lock review) ships on the Environments data layer; AI-assisted composition remains out of scope.
-4. Library asset types backed by Supabase Storage (private bucket already provisioned) + the FK migration for asset shortcuts; reference uploads to secure storage.
+4. Library asset types backed by Supabase Storage (private bucket already provisioned) — the shortcut FK migration has landed; reference uploads to secure storage come next.
 5. Content job pipeline feeding the Gallery.

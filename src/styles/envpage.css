@@ -1,0 +1,69 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Environments index — token-only styles (lf-env* namespace)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.lf-envgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--lf-space-4);
+}
+
+.lf-envcard {
+  display: flex;
+  gap: var(--lf-space-4);
+  align-items: flex-start;
+}
+
+.lf-envcard__cover {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-color-surface-muted);
+  border: 1px solid var(--lf-color-border);
+  color: var(--lf-color-ink-muted);
+}
+
+.lf-envcard__body {
+  display: grid;
+  gap: var(--lf-space-2);
+  min-width: 0;
+}
+
+.lf-envcard__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lf-space-2);
+  min-width: 0;
+}
+
+.lf-envcard__title h2 {
+  margin: 0;
+  font-size: var(--lf-text-md);
+  font-weight: var(--lf-font-weight-semibold);
+}
+
+.lf-envcard__slug {
+  color: var(--lf-color-ink-muted);
+  font-size: var(--lf-text-sm);
+}
+
+.lf-envcard__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lf-space-2);
+}
+
+.lf-envcard__summary {
+  margin: 0;
+  color: var(--lf-color-ink-secondary);
+  font-size: var(--lf-text-sm);
+}
+
+.lf-envcard__updated {
+  margin: 0;
+  color: var(--lf-color-ink-faint);
+  font-size: var(--lf-text-xs);
+}

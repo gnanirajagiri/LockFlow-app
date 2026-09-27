@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   CampaignIcon,
+  EnvironmentIcon,
   GalleryIcon,
   HomeIcon,
   LibraryIcon,
@@ -52,6 +53,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: 'Work',
     items: [
       { label: 'Models', to: '/models', icon: <ModelIcon /> },
+      { label: 'Environments', to: '/environments', icon: <EnvironmentIcon /> },
       { label: 'Content Studio', to: '/studio', icon: <StudioIcon /> },
       { label: 'Templates', to: '/templates', icon: <TemplateIcon /> },
       { label: 'Gallery', to: '/gallery', icon: <GalleryIcon /> },

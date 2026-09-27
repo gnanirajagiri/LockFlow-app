@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — Models interface milestone.** The authenticated app shell, design system, Models data foundation and the functional Models interface are in place. AI generation, payments, provider integrations, Content Studio, Gallery, Campaigns and the full Library are intentionally out of scope.
+> **Status — Environments data foundation.** The authenticated app shell, design system, Models data foundation + interface, and the Environments data foundation are in place. AI generation, payments, provider integrations, Content Studio (Environment Builder), Gallery, Campaigns and the full Library are intentionally out of scope.
 
 ---
 
@@ -44,7 +44,7 @@ Without Supabase env vars the app runs in **demo mode**: authentication is mocke
 | `npm run dev`        | Vite dev server                      |
 | `npm run build`      | Typecheck + production build         |
 | `npm run typecheck`  | `tsc --noEmit`                       |
-| `npm test`           | Vitest suites (domain guards + service rules) |
+| `npm test`           | Vitest suites (domain guards + service rules, Models + Environments) |
 | `npm run preview`    | Serve the production build           |
 
 ## Environment variables
@@ -154,6 +154,7 @@ Schema changes live only in versioned files under `supabase/migrations/`:
 
 - `20260926000000_initial_schema.sql` — profiles, workspaces, memberships, RLS baseline
 - `20260926000001_models_domain.sql` — models, model_versions, character_sheets, model_references, model_asset_shortcuts; RLS; lock-immutability triggers; `create_next_model_version` / `lock_model_version` RPCs; adds `admin`/`member` to `workspace_role`
+- `20260926000002_environments_domain.sql` — environments, environment_versions, environment_specs, environment_references, environment_asset_shortcuts; RLS; lock-immutability triggers; `create_next_environment_version` / `lock_environment_version` RPCs
 
 Apply with `supabase migration up` (local) or let the platform apply on push (linked projects).
 
@@ -201,10 +202,63 @@ A Character Sheet stores **identity traits only**: identity summary, face & feat
 - `src/domain/models/guards.test.ts` — locked-edit refusal, version numbering, Character Sheet copying, workspace isolation, validation schemas.
 - `src/services/modelsService.test.ts` — the five product rules at the service boundary: (1) locked sheet fields cannot be saved; (2) draft-from-locked copies data without mutating the source; (3) lock confirmation is required and only drafts lock; (4) archive is soft-archive only with no delete path; (5) cross-workspace models cannot be read or updated.
 - `src/features/models/modelDiff.test.ts` — field-by-field comparison behaviour.
+- `src/domain/environments/guards.test.ts` — locked-version refusal, safe version numbering, spec copying (no source mutation), lifecycle transitions, spec schemas.
+- `src/services/environmentsService.test.ts` — the six Environment product rules at the service boundary: (1) locked environment versions cannot be edited; (2) draft-from-locked copies specs + references without changing the source; (3) version numbers increment safely; (4) cross-workspace reads/updates are prevented; (5) archive is soft-archive only; (6) no model identifier or model-binding API exists anywhere in environment entities.
+
+## Environments domain
+
+Environments are **standalone reusable places** — rooms, sets and scenes. They are never model-specific and never classified "global" vs "model-specific"; there is no `model_id` anywhere in the environment schema and no permanent model↔environment relationship. Models and environments meet only later, through content jobs (one model in many environments, one environment with many models).
+
+### Models vs environments
+
+| | Models | Environments |
+| --- | ------ | ------------- |
+| Reusable | People (actors) | Places (rooms, sets) |
+| Protected record | Character Sheet (identity traits only) | Environment Spec (defining anchors) |
+| Independent versioning + locks | Yes | Yes — same lifecycle, separate tables |
+| Asset shortcuts | `model_asset_shortcuts` → shared Library | `environment_asset_shortcuts` → shared Library |
+
+Both builder systems share one vocabulary — draft / locked / superseded, `max(version_number) + 1`, one open draft at a time, soft archive only — and both reference the **single shared Library**; neither embeds a second library.
+
+### Version & lock-level behaviour
+
+- Version numbers start at 1 and increment by 1 (computed inside `create_next_environment_version`); only one draft version per environment (partial unique index).
+- Drafts are editable; locking requires the draft → locked transition and sets `locked_at`. On lock, `environments.active_version_id` points at the newly locked version and prior locked versions become `superseded` — preserved forever, never overwritten.
+- `lock_level` (`flexible | balanced | strict`) records how tightly the locked anchors bind future jobs. It is set per version, can be edited while the version is a draft, and is inherited by the next draft when copying.
+- Every write path refuses locked versions twice: `refuseEnvironmentLocked` in the service layer, and Postgres triggers (`guard_environment_spec_locked`, `guard_environment_reference_locked`, `guard_locked_environment_version_transition`) at the database. Superseding a locked version is only possible inside the lock RPC (transaction-local flag `lockflow.supersede_allowed`).
+
+### Defining anchors protected by an environment lock
+
+An Environment Spec stores exactly one record per version; locking a version freezes its approved defining anchors:
+
+- **Room type and layout feel** (`room_type`, `layout_feel`)
+- **Hero camera / viewing angle** (`hero_angle`)
+- **Lighting style** (`lighting_style`)
+- **Key furniture anchors** (`furniture_anchors` JSONB)
+- **Signature props** (`signature_props` JSONB)
+- **Palette / material direction** (`palette_materials` JSONB)
+- **Product zone / presentation area** (`product_zone` JSONB, nullable — not every environment presents products)
+
+Plus continuity notes and lock rules for context. Any change after locking creates a new draft version via the copy-to-draft flow (spec + reference metadata copied, source never mutated).
+
+### Environments routes
+
+| Route | Purpose |
+| ----- | ------- |
+| `/environments` | Lightweight index: loading/error/empty states (empty copy: "Create your first environment"), environment cards (name, active version, status, lock state, lock level, last updated) and a **New environment** placeholder modal. The guided Environment Builder is a later milestone. |
+
+### Development seed data
+
+`src/mock/environmentsSeed.ts` provides one fictional environment, **Warm Bedroom Studio** (`ready`): locked v1 ("Original approved setup", lock level `balanced`) and draft v2 ("Soft evening lighting variation"), full specs for both (bedroom creator setup; warm lived-in creator corner; three-quarter hero angle facing desk and vanity; soft morning window light with warm practical lamp; bed / light oak desk / vanity mirror / upholstered chair anchors; plant / ceramic mug / notebook / skincare tray signature props; cream–beige–oak–terracotta palette; vanity/desk product zone) and three local placeholder references (wide, hero_angle, product_zone). No real places, no external URLs. A second fixture (**Glass Loft Kitchen**, `strict`) lives in another workspace for isolation tests. In demo mode the repository factory (`src/data/environmentsFactory.ts`) serves this seed under the same domain guards as production.
+
+### Reusable assets and the shared Library
+
+`environment_asset_shortcuts` rows are quick-access **pointers only** — `library_asset_id` is a nullable placeholder with **no foreign key yet** (the unified Library table does not exist). The future Library migration will add `references public.library_assets (id)` to both `environment_asset_shortcuts` and `model_asset_shortcuts`; until then the column must stay null in normal flows. No second environment-specific Library exists, and generated outputs belong in Gallery, not Environments.
 
 ## Roadmap beyond this milestone
 
 1. Workspace provisioning on first sign-in (create workspace + owner membership).
-2. Model Builder and Environment Builder data models with version + lock tables.
-3. Library asset types backed by Supabase Storage (private bucket already provisioned).
-4. Content job pipeline feeding the Gallery.
+2. ~~Model Builder and Environment Builder data models with version + lock tables.~~ Done — Models data foundation + interface, Environments data foundation.
+3. Environment Builder UI (Content Studio) on the new Environments data layer: guided composition, lock confirmation, version comparison.
+4. Library asset types backed by Supabase Storage (private bucket already provisioned) + the FK migration for asset shortcuts.
+5. Content job pipeline feeding the Gallery.

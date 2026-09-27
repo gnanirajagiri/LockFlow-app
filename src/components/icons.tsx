@@ -224,3 +224,13 @@ export const CompareIcon = (p: IconProps) => (
     <path d="m16 6.5 4 5.5-4 5.5" />
   </Icon>
 );
+
+export const EnvironmentIcon = (p: IconProps) => (
+  <Icon {...p}>
+    {/* room outline with a floor line and a window/sun cue */}
+    <path d="M4 9.5 12 4l8 5.5V20H4z" />
+    <path d="M4 20h16" />
+    <path d="M9.5 20v-5.5h5V20" />
+    <circle cx="16.4" cy="10.2" r="1.1" />
+  </Icon>
+);

@@ -7,6 +7,7 @@ import { LoginPage } from './auth/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { CreatePage } from './pages/CreatePage';
 import { ModelsPage } from './pages/ModelsPage';
+import { EnvironmentsPage } from './pages/EnvironmentsPage';
 import { StudioPage } from './pages/StudioPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { GalleryPage } from './pages/GalleryPage';
@@ -43,6 +44,7 @@ export default function App() {
               <Route index element={<HomePage />} />
               <Route path="create" element={<CreatePage />} />
               <Route path="models" element={<ModelsPage />} />
+              <Route path="environments" element={<EnvironmentsPage />} />
               <Route path="models/:modelId" element={<ModelProfileLayout />}>
                 <Route index element={<ModelOverviewRoute />} />
                 <Route path="character-sheet" element={<ModelCharacterSheetRoute />} />

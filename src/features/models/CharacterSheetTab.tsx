@@ -17,12 +17,17 @@ import { useToast } from '../../components/ui/Toast';
 import { LockIcon, PlusIcon, UserIcon } from '../../components/icons';
 import { ModelsService } from '../../services/modelsService';
 import { SEED_WORKSPACE_ID } from '../../mock/modelsSeed';
+import { isDemoMode } from '../../lib/env';
+import { ReferencesMediaService } from '../media/referencesMediaService';
+import { ReferenceUploadDialog } from '../media/ReferenceUploadDialog';
+import { ReferenceMedia, UploadStatusChip } from '../media/ReferenceMedia';
 import { findDraftVersion, type ModelState } from './useModelData';
 import { validateUpdateCharacterSheet } from '../../domain/models';
 import type {
   CharacterSheetRecord,
   ModelReferenceRecord,
   ModelVersionRecord,
+  ReferenceType,
   SheetTraits,
   UpdateCharacterSheetInput,
 } from '../../domain/models';
@@ -38,15 +43,22 @@ interface CharacterSheetTabProps {
   basePath: string;
 }
 
-/** Local placeholder references so the panel never needs external imagery. */
-const PLACEHOLDER_REFERENCES: Array<{
-  referenceType: ModelReferenceRecord['referenceType'];
-  caption: string;
-}> = [
-  { referenceType: 'portrait', caption: 'Portrait — neutral expression' },
-  { referenceType: 'full_body', caption: 'Full body — relaxed posture' },
-  { referenceType: 'profile', caption: 'Profile — hairline and jawline' },
+/** Reference-type options follow the existing Model domain enum. */
+const REFERENCE_TYPE_OPTIONS: Array<{ value: ReferenceType; label: string }> = [
+  { value: 'portrait', label: 'Portrait' },
+  { value: 'full_body', label: 'Full body' },
+  { value: 'profile', label: 'Profile' },
+  { value: 'detail', label: 'Detail' },
+  { value: 'other', label: 'Other' },
 ];
+
+const REFERENCE_TYPE_LABELS: Record<ReferenceType, string> = {
+  portrait: 'Portrait',
+  full_body: 'Full body',
+  profile: 'Profile',
+  detail: 'Detail',
+  other: 'Other',
+};
 
 interface SheetFormState {
   identitySummary: string;
@@ -141,6 +153,56 @@ export function CharacterSheetTab({
   const [fieldErrors, setFieldErrors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [retryTick, setRetryTick] = useState(0);
+
+  const mediaService = useMemo(() => new ReferencesMediaService(), []);
+  const [references, setReferences] = useState<ModelReferenceRecord[] | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [referenceBusy, setReferenceBusy] = useState(false);
+
+  // Real reference rows for the selected version (mock + Supabase alike).
+  useEffect(() => {
+    if (!selectedVersion) return;
+    let cancelled = false;
+    service
+      .getReferences(selectedVersion.id, SEED_WORKSPACE_ID)
+      .then((rows) => {
+        if (!cancelled) setReferences(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setReferences([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [service, selectedVersion, retryTick]);
+
+  async function refreshReferences() {
+    if (!selectedVersion) return;
+    setReferences(await service.getReferences(selectedVersion.id, SEED_WORKSPACE_ID));
+  }
+
+  /** Draft-only removal: real uploads soft-delete via the media service;
+   *  metadata-only placeholder rows remove through the domain service. */
+  async function handleRemoveReference(reference: ModelReferenceRecord) {
+    if (!selectedVersion || !isDraft) return;
+    setReferenceBusy(true);
+    try {
+      if (reference.mimeType || reference.storageBucket) {
+        await mediaService.softDeleteReference(reference.id, 'model_reference');
+      } else {
+        await service.removeReference(selectedVersion.id, reference.id, SEED_WORKSPACE_ID);
+      }
+      await refreshReferences();
+    } catch (err) {
+      toast({
+        title: 'Could not remove the reference',
+        description: err instanceof Error ? err.message : 'Something went wrong.',
+        tone: 'error',
+      });
+    } finally {
+      setReferenceBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!selectedVersion) return;
@@ -373,24 +435,85 @@ export function CharacterSheetTab({
           <CardBody flush>
             <div style={{ padding: 'var(--lf-space-4)' }} className="lf-sheet__section">
               <h3>References</h3>
-              <p className="lf-tile__description">
-                Local placeholder frames — reference uploads arrive with the Model Builder.
-              </p>
-              <div className="lf-refgrid">
-                {PLACEHOLDER_REFERENCES.map((reference) => (
-                  <div key={reference.referenceType} className="lf-refcard">
-                    <div className="lf-refcard__frame" aria-hidden="true">
-                      <UserIcon size={20} />
-                      <span className="lf-refcard__type">{reference.referenceType.replace('_', ' ')}</span>
+              {isLocked ? (
+                <p className="lf-tile__description">
+                  References are protected in this locked version. Create a new draft version to
+                  make changes.
+                </p>
+              ) : (
+                <p className="lf-tile__description">
+                  Private, workspace-scoped images attached to this draft. Every upload records a
+                  rights acknowledgement — nothing is scanned or analysed.
+                </p>
+              )}
+              {references === null ? (
+                <Skeleton lines={2} />
+              ) : references.length === 0 ? (
+                <p className="lf-tile__description">No references attached yet.</p>
+              ) : (
+                <div className="lf-refgrid">
+                  {references.map((reference) => (
+                    <div key={reference.id} className="lf-refcard">
+                      <ReferenceMedia
+                        service={mediaService}
+                        targetType="model_reference"
+                        reference={reference}
+                        fallbackIcon={<UserIcon size={20} />}
+                        typeLabel={REFERENCE_TYPE_LABELS[reference.referenceType]}
+                      />
+                      <span className="lf-refcard__caption">
+                        {reference.caption || REFERENCE_TYPE_LABELS[reference.referenceType]}
+                      </span>
+                      <UploadStatusChip status={reference.uploadStatus} />
+                      {isDraft ? (
+                        <button
+                          type="button"
+                          className="lf-iconbtn"
+                          aria-label={`Remove ${reference.caption || 'reference'}`}
+                          disabled={referenceBusy}
+                          onClick={() => void handleRemoveReference(reference)}
+                        >
+                          ✕
+                        </button>
+                      ) : null}
                     </div>
-                    <span className="lf-refcard__caption">{reference.caption}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
+              {isDraft ? (
+                <div className="lf-envpanel__actions" style={{ marginTop: 'var(--lf-space-3)' }}>
+                  {isDemoMode ? (
+                    <p className="lf-tile__description" style={{ margin: 0 }}>
+                      Demo mode uses local placeholders — configure Supabase to enable uploads.
+                    </p>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={<PlusIcon size={14} />}
+                      onClick={() => setUploadOpen(true)}
+                    >
+                      Upload reference
+                    </Button>
+                  )}
+                </div>
+              ) : null}
             </div>
           </CardBody>
         </Card>
       </aside>
+
+      {selectedVersion ? (
+        <ReferenceUploadDialog
+          open={uploadOpen}
+          onClose={() => setUploadOpen(false)}
+          service={mediaService}
+          targetType="model_reference"
+          versionId={selectedVersion.id}
+          typeOptions={REFERENCE_TYPE_OPTIONS}
+          onUploaded={() => void refreshReferences()}
+        />
+      ) : null}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — Gallery foundation.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation + functional Library UI, the Content Studio data foundation + functional planning interface, and the Gallery data foundation + functional review/collection UI are in place. Real AI generation, provider integrations, payments, Campaigns/Templates UI and media uploads are intentionally out of scope.
+> **Status — Secure reference uploads.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation + functional Library UI, the Content Studio data foundation + functional planning interface, the Gallery data foundation + functional review/collection UI, and **secure private reference uploads** (Models / Environments / Library) are in place. Real AI generation, provider integrations, payments, Campaigns/Templates UI and image analysis are intentionally out of scope.
 
 ---
 
@@ -44,7 +44,7 @@ Without Supabase env vars the app runs in **demo mode**: authentication is mocke
 | `npm run dev`        | Vite dev server                      |
 | `npm run build`      | Typecheck + production build         |
 | `npm run typecheck`  | `tsc --noEmit`                       |
-| `npm test`           | Vitest suites (domain guards + service rules, Models + Environments) |
+| `npm test`           | Vitest suites (domain guards + service rules + media/upload contracts) |
 | `npm run preview`    | Serve the production build           |
 
 ## Environment variables
@@ -155,9 +155,10 @@ Schema changes live only in versioned files under `supabase/migrations/`:
 - `20260926000000_initial_schema.sql` — profiles, workspaces, memberships, RLS baseline
 - `20260926000001_models_domain.sql` — models, model_versions, character_sheets, model_references, model_asset_shortcuts; RLS; lock-immutability triggers; `create_next_model_version` / `lock_model_version` RPCs; adds `admin`/`member` to `workspace_role`
 - `20260926000002_environments_domain.sql` — environments, environment_versions, environment_specs, environment_references, environment_asset_shortcuts; RLS; lock-immutability triggers; `create_next_environment_version` / `lock_environment_version` RPCs
-- `20260926000003_library_domain.sql` — library_assets, library_asset_versions, library_asset_references, library_asset_tags, library_asset_tag_links, look_details, look_asset_items; RLS; lock-immutability triggers; `create_next_library_asset_version` / `lock_library_asset_version` RPCs; **adds the real foreign keys** from `model_asset_shortcuts.library_asset_id` and `environment_asset_shortcuts.library_asset_id` to `library_assets(id)` (nullable preserved) with workspace-consistency triggers
+- `20260928000002_gallery_domain.sql` — gallery_outputs, gallery_output_reviews, gallery_output_tags, gallery_output_tag_links, gallery_collections, gallery_collection_items, gallery_output_events; RLS + consistency/append-only/state-machine triggers
+- `20260928120000_reference_uploads.sql` — private `lockflow-references` / `lockflow-previews` buckets; extends the three reference tables with workspace scoping, file metadata, rights acknowledgement and `upload_status`; `upload_audit_events` (append-only by RLS); path-derived storage policies; security-definer RPCs `begin_reference_upload` / `complete_reference_upload` / `fail_reference_upload` / `soft_delete_reference` / `log_signed_url_access`; adds the missing DELETE policy on `model_references`
 
-Apply with `supabase migration up` (local) or let the platform apply on push (linked projects).
+Apply with `supabase migration up` (local), let the platform apply on push (linked projects), or run `scripts/apply_migrations.sh "<session-pooler-connection-string>"` — it records history in `supabase_migrations.schema_migrations` (the platform's own tracking table) and is idempotent.
 
 ### Development seed data
 
@@ -207,6 +208,9 @@ A Character Sheet stores **identity traits only**: identity summary, face & feat
 - `src/services/environmentsService.test.ts` — the six Environment product rules at the service boundary: (1) locked environment versions cannot be edited (spec saves, version-draft updates, reference metadata changes — and the same operations succeed on drafts); (2) draft-from-locked copies specs + references without changing the source; (3) version numbers increment safely; (4) cross-workspace reads/updates are prevented; (5) archive is soft-archive only; (6) no model identifier or model-binding API exists anywhere in environment entities.
 - `src/features/environments/envLockReview.test.ts` — the lock-review gates: anchor completeness blocks locking (with product zone explicitly optional), lock requires explicit confirmation and the rights acknowledgement, non-drafts refuse to lock, and the two-version spec diff returns changed **and** unchanged fields.
 - `src/services/libraryService.test.ts` — the Library product rules at the service boundary: (1) locked asset versions cannot be edited; (2) new drafts increment version numbers safely; (3) drafts copy details + references without mutating the source; (4) tags stay workspace-scoped (get-or-create by normalized name, no cross-workspace leaks); (5) `look_details` require the look asset type; (6) Looks link canonical records without duplicating item data (duplicate links and cross-asset pins refused); (7) shortcuts resolve to the one shared Library asset; (8) no Gallery-style output fields or generation APIs exist on Library entities; (9) locking requires the rights acknowledgement and a decided rights status (unknown-rights drafts cannot be locked); (10) `createLook` reads the model but never writes the Character Sheet (sheet stays byte-identical), and partial failures surface honestly. Plus soft-archive coverage.
+
+- `src/features/media/media.test.ts` — upload-validation contracts: magic-byte sniffing (JPEG/PNG/WebP) and declared-MIME cross-checks, size/empty-file limits, SVG/GIF/PDF/executable refusal with human-readable errors, filename sanitization (traversal stripped, unsafe chars replaced, canonical extensions), 256–8192 px dimension limits, canonical storage-path structure + workspace-segment parsing, and the shared-service contract (one service class for all three target types, rights-acknowledgement and locked-version error mapping).
+- `src/features/media/referencesMediaService.test.ts` — service contracts against a mocked Supabase client: rights acknowledgement required before any intent reaches the server; foreign-workspace and locked-version refusals propagate and never reach a storage transfer; transfer failures mark the pending upload failed via `fail_reference_upload`; the happy path runs intent → signed upload → complete in order; signed view URLs are minted only after the access-check RPC succeeds (600 s expiry) and are never persisted; demo mode fails honestly.
 
 ## Environments domain
 
@@ -431,10 +435,29 @@ Content Studio's job tab links back to Gallery with the note that outputs will a
 - `supabase/migrations/20260928000002_gallery_domain.sql` — gallery_outputs, gallery_output_reviews, gallery_output_tags (unique normalized name per workspace), gallery_output_tag_links, gallery_collections, gallery_collection_items, gallery_output_events; RLS on every table via `is_workspace_member`; same-workspace consistency triggers (output↔job↔project, reviews↔output, items↔outputs↔collections); status state-machine trigger with the same transition table; review-history append-only + job-pin protection; append-only events.
 - `src/mock/gallerySeed.ts` — four fictional placeholder outputs on the seeded Morning Skincare Routine job ("Morning Vanity Setup" ready_for_review, "Serum Product Moment" approved video, "Routine Wrap-up Story" rejected with feedback, "Morning Routine Variant" draft with parent link) with tags, the **Morning Skincare Campaign** collection, and output events. All records carry `metadata.placeholder: true` and local `placeholders/gallery/*.svg` paths — this is development placeholder metadata, not generated media.
 
+## Secure reference uploads
+
+Reference images for Models, Environments and Library assets upload to **private** Supabase Storage through one shared service (`src/features/media/`); no UI component touches storage directly and the logic is never duplicated per domain.
+
+| Concern | Design |
+| ------- | ------ |
+| Buckets | `lockflow-references` (all reference images), `lockflow-previews` (reserved for a later preview/thumbnail milestone). Both **private**; no public bucket exists. |
+| Paths | `workspaces/{workspaceId}/models|environments|library/{ownerId}/versions/{versionId}/references/{referenceId}/{safeFilename}` — the reference id is a server-side UUID and filenames are sanitized (`[a-z0-9._-]`, traversal stripped, canonical extension from the verified type). |
+| Authorization | Storage policies derive the workspace **from the object path itself** (`split_part(name,'/',2)`), never from a client-supplied id; RPCs re-check membership, draft status, rights, MIME and size server-side (security definer, `authenticated` only). |
+| Upload flow | Client preflight (magic bytes, size, dimensions) → `begin_reference_upload` (creates the **pending** reference + `upload_requested` audit event) → direct upload to the single signed URL → `complete_reference_upload` (pending → uploaded, records dimensions) or `fail_reference_upload`. Retry starts a fresh intent; pending/failed rows are never treated as available. |
+| Viewing | Signed view URLs (10-minute expiry) minted **only after** `log_signed_url_access` verifies the reference row is member-visible; URLs live in memory, are never persisted, and refresh transparently on expiry. |
+| Draft vs locked | Drafts may add/caption/reorder/remove. Locked and superseded versions are fully read-only — the DB immutability triggers reject every mutation, including status flips; the UI shows "References are protected in this locked version. Create a new draft version to make changes." Removal on drafts is a **soft delete** (records are never hard-deleted). |
+| Rights | Every upload requires the checkbox "I confirm that I have the right to upload and use this reference in LockFlow." It is enforced in the dialog, the service and the RPC, and recorded (`rights_confirmed_at` / `rights_confirmed_by`) plus audited. |
+| Formats & limits | JPEG / PNG / WebP only (verified by file signature, cross-checked against the declared MIME), ≤ 10 MB, 256×256 – 8192×8192 px, empty files and unsafe filenames rejected. SVG/GIF/HEIC/PDF/video are refused. |
+| Audit trail | `upload_audit_events` records upload_requested / upload_completed / upload_failed / metadata_updated / soft_deleted / signed_url_requested per workspace — append-only (no update/delete policies). |
+| Honest limitation | This stack has no server-side image-processing runtime, so file signatures and dimensions are validated **client-side preflight**; the database re-validates MIME/size declaratively. No server-side magic-byte or dimension verification is claimed, and nothing scans, recognises or analyses uploaded images. |
+| Demo mode | Without Supabase env vars the upload surfaces show an honest "demo mode uses local placeholders" gate; seeded placeholder references keep rendering. |
+| Physical cleanup | Deleting uploaded objects is a future **server-side** job for soft-deleted draft-only references; there is no client-side delete path. |
+
 ## Roadmap beyond this milestone
 
 1. Workspace provisioning on first sign-in (create workspace + owner membership).
 2. ~~Model Builder and Environment Builder data models with version + lock tables.~~ Done — Models data foundation + interface, Environments data foundation.
 3. ~~Environment Builder UI~~ Done — the Environment Builder interface (index, profile, editor, references, versions, lock review) ships on the Environments data layer; AI-assisted composition remains out of scope.
-4. Library asset types backed by Supabase Storage (private bucket already provisioned) — the shortcut FK migration has landed; reference uploads to secure storage come next.
+4. Library asset types backed by Supabase Storage (private bucket already provisioned) — ~~reference uploads to secure storage~~ **Done** — private, workspace-scoped reference uploads ship on the `lockflow-references` bucket; remaining: preview/thumbnail generation into `lockflow-previews` and the server-side cleanup job for soft-deleted objects.
 5. Content job pipeline feeding the Gallery — data layer + functional UI done; provider integration and secure media storage remain the boundary.

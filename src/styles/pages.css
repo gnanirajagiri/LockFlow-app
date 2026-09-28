@@ -664,3 +664,65 @@
 .lf-demobanner strong {
   font-weight: var(--lf-font-weight-semibold);
 }
+
+/* ── Reference uploads (secure storage) ─────────────────────────────────── */
+.lf-uploaddrop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lf-space-2);
+  padding: var(--lf-space-5);
+  border: 1px dashed var(--lf-color-border-strong);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-color-surface-muted);
+  text-align: center;
+}
+.lf-uploaddrop--active {
+  border-color: var(--lf-color-accent, var(--lf-color-border-strong));
+  background: color-mix(in srgb, var(--lf-color-surface-muted) 80%, transparent);
+}
+.lf-uploadfile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--lf-space-1);
+}
+.lf-uploadchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lf-space-1);
+  padding: 2px var(--lf-space-2);
+  border-radius: 999px;
+  font-size: var(--lf-text-xs);
+  border: 1px solid var(--lf-color-border);
+}
+.lf-uploadchip--pending {
+  background: var(--lf-color-surface-muted);
+  color: var(--lf-color-ink-muted);
+}
+.lf-uploadchip--ready {
+  background: var(--lf-color-surface-muted);
+  color: var(--lf-color-ink);
+}
+.lf-uploadchip--failed {
+  background: var(--lf-color-danger-bg, var(--lf-color-surface-muted));
+  color: var(--lf-color-danger-text, var(--lf-color-ink));
+  border-color: var(--lf-color-danger-border, var(--lf-color-border));
+}
+.lf-uploadchip--deleted {
+  background: var(--lf-color-surface-muted);
+  color: var(--lf-color-ink-faint);
+}
+.lf-refcard__image {
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  object-fit: cover;
+  border-radius: var(--lf-radius-md);
+  border: 1px solid var(--lf-color-border);
+  background: var(--lf-color-surface-muted);
+}
+.lf-refcard__status {
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-ink-faint);
+}

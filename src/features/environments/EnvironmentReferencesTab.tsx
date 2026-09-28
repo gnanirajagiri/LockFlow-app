@@ -23,6 +23,10 @@ import type {
 } from '../../domain/environments';
 import type { EnvironmentsService } from '../../services/environmentsService';
 import { SEED_ENVIRONMENT_WORKSPACE_ID } from '../../mock/environmentsSeed';
+import { isDemoMode } from '../../lib/env';
+import { ReferencesMediaService } from '../media/referencesMediaService';
+import { ReferenceUploadDialog } from '../media/ReferenceUploadDialog';
+import { ReferenceMedia, UploadStatusChip } from '../media/ReferenceMedia';
 import { findDraftEnvironmentVersion, type EnvironmentState } from './useEnvironmentData';
 
 const REFERENCE_TYPES: Array<{ value: EnvironmentReferenceType | 'all'; label: string }> = [
@@ -47,6 +51,7 @@ export function EnvironmentReferencesTab({ service, versions, data, basePath }: 
   void basePath;
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const mediaService = useMemo(() => new ReferencesMediaService(), []);
 
   const requested = searchParams.get('version');
   const draft = useMemo(() => findDraftEnvironmentVersion(versions), [versions]);
@@ -63,6 +68,7 @@ export function EnvironmentReferencesTab({ service, versions, data, basePath }: 
   const [filter, setFilter] = useState<EnvironmentReferenceType | 'all'>('all');
   const [busy, setBusy] = useState(false);
   const [draftRows, setDraftRows] = useState<Array<{ id: string; type: EnvironmentReferenceType; caption: string; path: string }>>([]);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const editable = selectedVersion?.status === 'draft';
 
@@ -196,8 +202,8 @@ export function EnvironmentReferencesTab({ service, versions, data, basePath }: 
           <CardBody>
             <h3 className="lf-envpanel__heading">Reference metadata (draft)</h3>
             <p className="lf-tile__description">
-              Rename, retype or reorder entries. Paths are local placeholders until uploads are
-              connected — no images are scanned or generated.
+              Rename, retype or reorder entries. Uploaded images stay private to this workspace —
+              nothing is scanned or generated.
             </p>
             <ol className="lf-envform__list">
               {draftRows.map((row, index) => (
@@ -311,9 +317,16 @@ export function EnvironmentReferencesTab({ service, versions, data, basePath }: 
             <ul className="lf-envref__list">
               {visible.map((row) => (
                 <li key={row.id} className="lf-envref__item">
-                  <div className="lf-envref__frame" aria-hidden="true" />
+                  <ReferenceMedia
+                    service={mediaService}
+                    targetType="environment_reference"
+                    reference={row}
+                    fallbackIcon={<EnvironmentIcon size={20} />}
+                    typeLabel={row.referenceType.replace('_', ' ')}
+                  />
                   <div>
                     <strong>{row.caption || 'Untitled reference'}</strong>
+                    <UploadStatusChip status={row.uploadStatus} />
                     <span className="lf-tile__description">
                       {row.referenceType.replace('_', ' ')} · {row.storagePath}
                     </span>
@@ -327,14 +340,58 @@ export function EnvironmentReferencesTab({ service, versions, data, basePath }: 
 
       <Card>
         <CardBody>
-          <div className="lf-envref__upload" aria-disabled="true">
-            <strong>Reference upload will be connected to secure storage next</strong>
-            <span className="lf-tile__description">
-              Until then this page manages reference metadata with local placeholders only.
-            </span>
-          </div>
+          {!editable ? (
+            <div className="lf-envref__upload" aria-disabled="true">
+              <strong>
+                References are protected in this locked version. Create a new draft version to make
+                changes.
+              </strong>
+            </div>
+          ) : isDemoMode ? (
+            <div className="lf-envref__upload" aria-disabled="true">
+              <strong>Demo mode uses local placeholders</strong>
+              <span className="lf-tile__description">
+                Configure Supabase to upload real reference images — private to this workspace,
+                attached to this draft version.
+              </span>
+            </div>
+          ) : (
+            <div className="lf-envpanel__actions">
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                leftIcon={<PlusIcon size={14} />}
+                onClick={() => setUploadOpen(true)}
+              >
+                Upload reference image
+              </Button>
+              <span className="lf-tile__description">
+                Private upload to this draft version. A rights acknowledgement is required; nothing
+                is scanned or analysed.
+              </span>
+            </div>
+          )}
         </CardBody>
       </Card>
+
+      {selectedVersion ? (
+        <ReferenceUploadDialog
+          open={uploadOpen}
+          onClose={() => setUploadOpen(false)}
+          service={mediaService}
+          targetType="environment_reference"
+          versionId={selectedVersion.id}
+          typeOptions={REFERENCE_TYPES.filter((t) => t.value !== 'all') as Array<{ value: string; label: string }>}
+          onUploaded={() => {
+            void (async () => {
+              const fresh = await service.getReferences(selectedVersion.id, SEED_ENVIRONMENT_WORKSPACE_ID);
+              setReferences(fresh);
+              setDraftRows(fresh.map((row) => ({ id: row.id, type: row.referenceType, caption: row.caption, path: row.storagePath })));
+            })();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

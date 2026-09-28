@@ -21,6 +21,10 @@ import type {
 } from '../../domain/library';
 import { REFERENCE_TYPE_LABELS } from './libraryUi';
 import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
+import { isDemoMode } from '../../lib/env';
+import { ReferencesMediaService } from '../media/referencesMediaService';
+import { ReferenceUploadDialog } from '../media/ReferenceUploadDialog';
+import { ReferenceMedia, UploadStatusChip } from '../media/ReferenceMedia';
 import { useLibraryOutletContext } from './tabRoutes';
 import { useSelectedAssetVersion } from './useLibraryData';
 
@@ -31,6 +35,8 @@ export function LibraryAssetReferencesTab() {
   void basePath;
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const mediaService = useMemo(() => new ReferencesMediaService(), []);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const requested = searchParams.get('version');
   const selectedVersion = useSelectedAssetVersion(
@@ -174,9 +180,16 @@ export function LibraryAssetReferencesTab() {
             <ul className="lf-envref__list">
               {visible.map((record) => (
                 <li key={record.id} className="lf-envref__item">
-                  <div className="lf-envref__frame" aria-hidden="true" />
+                  <ReferenceMedia
+                    service={mediaService}
+                    targetType="library_asset_reference"
+                    reference={record}
+                    fallbackIcon={<EnvironmentIcon size={20} />}
+                    typeLabel={REFERENCE_TYPE_LABELS[record.referenceType]}
+                  />
                   <div>
                     <strong>{record.caption || 'Untitled reference'}</strong>
+                    <UploadStatusChip status={record.uploadStatus} />
                     <span className="lf-tile__description">
                       {REFERENCE_TYPE_LABELS[record.referenceType]} · {record.storagePath}
                     </span>
@@ -303,15 +316,58 @@ export function LibraryAssetReferencesTab() {
 
       <Card>
         <CardBody>
-          <div className="lf-envref__upload" aria-disabled="true">
-            <strong>Secure reference upload will be connected next.</strong>
-            <span className="lf-tile__description">
-              Until then this page manages reference metadata with local placeholders only — no
-              image recognition or upload processing exists.
-            </span>
-          </div>
+          {!editable ? (
+            <div className="lf-envref__upload" aria-disabled="true">
+              <strong>
+                References are protected in this locked version. Create a new draft version to make
+                changes.
+              </strong>
+            </div>
+          ) : isDemoMode ? (
+            <div className="lf-envref__upload" aria-disabled="true">
+              <strong>Demo mode uses local placeholders</strong>
+              <span className="lf-tile__description">
+                Configure Supabase to upload real reference images — private to this workspace,
+                attached to this draft version. No image recognition or processing exists.
+              </span>
+            </div>
+          ) : (
+            <div className="lf-envpanel__actions">
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                leftIcon={<PlusIcon size={14} />}
+                onClick={() => setUploadOpen(true)}
+              >
+                Upload reference image
+              </Button>
+              <span className="lf-tile__description">
+                Private upload to this draft version. A rights acknowledgement is required; nothing
+                is scanned or analysed.
+              </span>
+            </div>
+          )}
         </CardBody>
       </Card>
+
+      {selectedVersion ? (
+        <ReferenceUploadDialog
+          open={uploadOpen}
+          onClose={() => setUploadOpen(false)}
+          service={mediaService}
+          targetType="library_asset_reference"
+          versionId={selectedVersion.id}
+          typeOptions={REFERENCE_TYPES.map((type) => ({ value: type, label: REFERENCE_TYPE_LABELS[type] }))}
+          onUploaded={() => {
+            void (async () => {
+              const fresh = await service.getReferences(selectedVersion.id, SEED_LIBRARY_WORKSPACE_ID);
+              setReferences(fresh);
+              setRows(fresh.map((r) => ({ id: r.id, type: r.referenceType, caption: r.caption, path: r.storagePath })));
+            })();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

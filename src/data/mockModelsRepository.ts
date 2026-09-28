@@ -85,6 +85,54 @@ export class MockModelsRepository implements ModelsRepository {
     return structuredClone(this.references.get(versionId) ?? []);
   }
 
+  /** Adds reference metadata to a draft version (guard-checked upstream). */
+  async addReference(
+    versionId: string,
+    input: { storagePath: string; referenceType: ModelReferenceRecord['referenceType']; caption: string },
+  ): Promise<ModelReferenceRecord> {
+    const version = await this.getVersion(versionId);
+    refuseIfLocked(version);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can modify references (status: ${version.status}).`);
+    }
+    const stamp = now();
+    const row: ModelReferenceRecord = {
+      id: crypto.randomUUID(),
+      modelVersionId: versionId,
+      storagePath: input.storagePath,
+      referenceType: input.referenceType,
+      caption: input.caption,
+      sortOrder: (this.references.get(versionId) ?? []).length,
+      createdAt: stamp,
+      updatedAt: stamp,
+    };
+    this.references.set(versionId, [...(this.references.get(versionId) ?? []), row]);
+    return structuredClone(row);
+  }
+
+  /** Updates reference metadata on a draft version (guard-checked upstream). */
+  async updateReference(
+    versionId: string,
+    referenceId: string,
+    patch: { storagePath?: string; referenceType?: ModelReferenceRecord['referenceType']; caption?: string },
+  ): Promise<void> {
+    const version = await this.getVersion(versionId);
+    refuseIfLocked(version);
+    const rows = this.references.get(versionId) ?? [];
+    this.references.set(
+      versionId,
+      rows.map((row) => (row.id === referenceId ? { ...row, ...patch, updatedAt: now() } : row)),
+    );
+  }
+
+  /** Removes a draft version's reference metadata row (guard-checked upstream). */
+  async removeReference(versionId: string, referenceId: string): Promise<void> {
+    const version = await this.getVersion(versionId);
+    refuseIfLocked(version);
+    const rows = this.references.get(versionId) ?? [];
+    this.references.set(versionId, rows.filter((row) => row.id !== referenceId));
+  }
+
   /** Library shortcut pointers for this model (pointers only — canonical records live in the Library). */
   async listAssetShortcuts(modelId: string): Promise<ModelAssetShortcutRecord[]> {
     return structuredClone(this.shortcuts.filter((shortcut) => shortcut.modelId === modelId));

@@ -58,6 +58,49 @@ export class ModelsService {
     return this.repo.getReferences(versionId);
   }
 
+  /** Adds reference metadata to a draft version (guard-checked). */
+  async addReference(
+    versionId: string,
+    input: { storagePath: string; referenceType: ModelReferenceRecord['referenceType']; caption: string },
+    activeWorkspaceId: string,
+  ): Promise<ModelReferenceRecord> {
+    const version = await this.getVersion(versionId, activeWorkspaceId);
+    refuseIfLocked(version);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can modify references (status: ${version.status}).`);
+    }
+    return this.repo.addReference(versionId, input);
+  }
+
+  /** Updates reference metadata on a draft version (guard-checked). */
+  async updateReference(
+    versionId: string,
+    referenceId: string,
+    patch: { storagePath?: string; referenceType?: ModelReferenceRecord['referenceType']; caption?: string },
+    activeWorkspaceId: string,
+  ): Promise<void> {
+    const version = await this.getVersion(versionId, activeWorkspaceId);
+    refuseIfLocked(version);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can modify references (status: ${version.status}).`);
+    }
+    return this.repo.updateReference(versionId, referenceId, patch);
+  }
+
+  /** Removes a draft version's reference metadata row (guard-checked). */
+  async removeReference(
+    versionId: string,
+    referenceId: string,
+    activeWorkspaceId: string,
+  ): Promise<void> {
+    const version = await this.getVersion(versionId, activeWorkspaceId);
+    refuseIfLocked(version);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can modify references (status: ${version.status}).`);
+    }
+    return this.repo.removeReference(versionId, referenceId);
+  }
+
   /** Library shortcut pointers for this model (ids only; resolve via LibraryService). */
   async listAssetShortcuts(
     modelId: string,

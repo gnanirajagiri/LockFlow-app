@@ -70,6 +70,16 @@ export interface ModelReferenceRecord {
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
+  /** Present on real uploads; absent on metadata-only placeholder rows. */
+  storageBucket?: string | null;
+  originalFilename?: string | null;
+  displayFilename?: string | null;
+  mimeType?: string | null;
+  fileSizeBytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+  uploadStatus?: 'pending' | 'uploaded' | 'failed' | 'deleted';
+  rightsConfirmedAt?: string | null;
 }
 
 /**

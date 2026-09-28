@@ -79,6 +79,15 @@ function mapReference(row: Record<string, unknown>): ModelReferenceRecord {
     sortOrder: row.sort_order as number,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    storageBucket: (row.storage_bucket as string | null) ?? null,
+    originalFilename: (row.original_filename as string | null) ?? null,
+    displayFilename: (row.display_filename as string | null) ?? null,
+    mimeType: (row.mime_type as string | null) ?? null,
+    fileSizeBytes: (row.file_size_bytes as number | null) ?? null,
+    width: (row.width as number | null) ?? null,
+    height: (row.height as number | null) ?? null,
+    uploadStatus: (row.upload_status as ModelReferenceRecord['uploadStatus'] | null) ?? 'uploaded',
+    rightsConfirmedAt: (row.rights_confirmed_at as string | null) ?? null,
   };
 }
 
@@ -141,9 +150,7 @@ export class SupabaseModelsRepository implements ModelsRepository {
       .single();
     if (error) throw error;
     return mapSheet(data);
-  }
-
-  async getReferences(versionId: string): Promise<ModelReferenceRecord[]> {
+  }  async getReferences(versionId: string): Promise<ModelReferenceRecord[]> {
     const { data, error } = await this.client
       .from('model_references')
       .select('*')
@@ -151,6 +158,54 @@ export class SupabaseModelsRepository implements ModelsRepository {
       .order('sort_order');
     if (error) throw error;
     return (data ?? []).map(mapReference);
+  }
+
+  /** Adds reference metadata to a draft version (guard-checked upstream). */
+  async addReference(
+    versionId: string,
+    input: { storagePath: string; referenceType: ModelReferenceRecord['referenceType']; caption: string },
+  ): Promise<ModelReferenceRecord> {
+    const { data, error } = await this.client
+      .from('model_references')
+      .insert({
+        model_version_id: versionId,
+        storage_path: input.storagePath,
+        reference_type: input.referenceType,
+        caption: input.caption,
+        sort_order: (await this.getReferences(versionId)).length,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    return mapReference(data);
+  }
+
+  /** Updates reference metadata on a draft version (guard-checked upstream). */
+  async updateReference(
+    versionId: string,
+    referenceId: string,
+    patch: { storagePath?: string; referenceType?: ModelReferenceRecord['referenceType']; caption?: string },
+  ): Promise<void> {
+    const { error } = await this.client
+      .from('model_references')
+      .update({
+        ...(patch.storagePath !== undefined ? { storage_path: patch.storagePath } : {}),
+        ...(patch.referenceType !== undefined ? { reference_type: patch.referenceType } : {}),
+        ...(patch.caption !== undefined ? { caption: patch.caption } : {}),
+      })
+      .eq('model_version_id', versionId)
+      .eq('id', referenceId);
+    if (error) throw error;
+  }
+
+  /** Removes a draft version's reference metadata row (guard-checked upstream). */
+  async removeReference(versionId: string, referenceId: string): Promise<void> {
+    const { error } = await this.client
+      .from('model_references')
+      .delete()
+      .eq('model_version_id', versionId)
+      .eq('id', referenceId);
+    if (error) throw error;
   }
 
   async listAssetShortcuts(modelId: string): Promise<ModelAssetShortcutRecord[]> {

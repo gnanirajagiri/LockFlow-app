@@ -30,6 +30,22 @@ export interface ModelsRepository {
 
   getReferences(versionId: string): Promise<ModelReferenceRecord[]>;
 
+  /** Adds reference metadata to a draft version (guard-checked upstream). */
+  addReference(
+    versionId: string,
+    input: { storagePath: string; referenceType: ModelReferenceRecord['referenceType']; caption: string },
+  ): Promise<ModelReferenceRecord>;
+
+  /** Updates reference metadata on a draft version (guard-checked upstream). */
+  updateReference(
+    versionId: string,
+    referenceId: string,
+    patch: { storagePath?: string; referenceType?: ModelReferenceRecord['referenceType']; caption?: string },
+  ): Promise<void>;
+
+  /** Removes a draft version's reference metadata row (guard-checked upstream). */
+  removeReference(versionId: string, referenceId: string): Promise<void>;
+
   /** Library shortcut pointers attached to this model (canonical ids only). */
   listAssetShortcuts(modelId: string): Promise<ModelAssetShortcutRecord[]>;
 

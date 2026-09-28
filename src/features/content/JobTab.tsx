@@ -126,6 +126,11 @@ export function JobTab() {
                 generation is connected, submitted requests become immutable and outputs appear in
                 Gallery.
               </p>
+              <p className="lf-library__note">
+                Outputs from this job will appear in Gallery once a provider is connected — never in
+                the Library. The exact pinned versions above are the provenance those outputs will
+                carry.
+              </p>
             </>
           ) : (
             <p className="lf-tile__description">
@@ -136,6 +141,9 @@ export function JobTab() {
           <div className="lf-dialogactions" style={{ justifyContent: 'flex-start' }}>
             <Link className="lf-btn lf-btn--secondary lf-btn--sm" to={`${basePath}/review`}>
               Open review
+            </Link>
+            <Link className="lf-btn lf-btn--ghost lf-btn--sm" to="/gallery">
+              View Gallery
             </Link>
             <Button
               variant="primary"

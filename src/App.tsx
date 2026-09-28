@@ -31,6 +31,9 @@ import {
 } from './features/content/tabRoutes';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { GalleryPage } from './pages/GalleryPage';
+import { GalleryOutputDetailPage } from './pages/GalleryOutputDetailPage';
+import { GalleryCollectionsPage } from './pages/GalleryCollectionsPage';
+import { GalleryCollectionDetailPage } from './pages/GalleryCollectionDetailPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { LibraryNewAssetPage } from './pages/LibraryNewAssetPage';
 import { LibraryLooksPage } from './pages/LibraryLooksPage';
@@ -105,6 +108,9 @@ export default function App() {
               </Route>
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="gallery" element={<GalleryPage />} />
+              <Route path="gallery/collections" element={<GalleryCollectionsPage />} />
+              <Route path="gallery/collections/:collectionId" element={<GalleryCollectionDetailPage />} />
+              <Route path="gallery/:outputId" element={<GalleryOutputDetailPage />} />
               <Route path="library" element={<LibraryPage />} />
               <Route path="library/new" element={<LibraryNewAssetPage />} />
               <Route path="library/looks" element={<LibraryLooksPage />} />

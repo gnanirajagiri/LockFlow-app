@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — Content Studio data foundation.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation + functional Library UI, and the Content Studio data foundation (projects, scenes/beats, inputs, draft job requests, version pinning, `/content-studio` foundation UI) are in place. Real AI generation, provider integrations, payments, Gallery/Campaigns/Templates UI and image uploads are intentionally out of scope.
+> **Status — Gallery foundation.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation + functional Library UI, the Content Studio data foundation + functional planning interface, and the Gallery data foundation + functional review/collection UI are in place. Real AI generation, provider integrations, payments, Campaigns/Templates UI and media uploads are intentionally out of scope.
 
 ---
 
@@ -392,10 +392,49 @@ draft → queued → processing → review → completed
 - `supabase/migrations/20260926000004_content_studio_domain.sql` — content_projects, content_project_inputs, content_scenes, content_beats, content_job_requests, content_job_pins, content_job_events; RLS on every table (workspace membership); input-shape + workspace-consistency trigger; draft-editability trigger; job status state-machine + provider-boundary trigger; pins locked-version + immutability triggers; append-only event triggers.
 - `src/mock/contentSeed.ts` — the fictional **Morning Skincare Routine** draft project (Aisha locked v1, Warm Bedroom Studio locked v1, Luma Dew Serum locked v1, Neutral creator outfit **locked** Look v2 with resolved items), three ordered scenes with two ordered beats each, and a draft **content_set** job request (3 variants) with a single `draft_created` event. The Look's locked v2 version was added to `librarySeed` for this purpose.
 
+## Gallery domain
+
+Gallery holds **generated content only**: output records, in-progress jobs, review-ready and approved work, plus collections that group outputs. It is strictly separate from the unified Library.
+
+### Library vs Gallery (contractual)
+
+- The **Library** contains reusable *inputs* — products, props, wardrobe, Looks, scenes, references, brand assets.
+- **Gallery** contains generated *outputs*. An output is never stored as a Library asset and never becomes a reusable source automatically.
+- An output may *reference* the immutable job pins that created it, but nothing flows back into Models, Environments or the Library from a Gallery record.
+
+### Output status & review lifecycle
+
+`draft → processing → ready_for_review → approved | rejected → archived`, plus `failed` from draft/processing. Only the transitions encoded in `GALLERY_OUTPUT_TRANSITIONS` (`src/domain/gallery/guards.ts`) are permitted; restore returns an archived output to its prior reviewable status explicitly. Approval/rejection are **review decisions on an output** — they never rewrite the original job, its pins or source assets. Rejection feedback is preserved for future variant/correction workflows. All archive/restore are soft-state changes; standard flows never hard-delete.
+
+### Provenance & immutable version pins
+
+Every output belongs to exactly one `content_job_request` and inherits its historical context from that job's `content_job_pins` and `plan_snapshot`: pinned model version, environment version, Look version (with items resolved via the Look), and shared Library asset versions. The detail view shows these as a **read-only historical record** — "Version used in this output" — and links to source profiles without offering edits. If a source later gets a newer version, the provenance still shows the exact pinned version.
+
+### Collections
+
+Collections group **Gallery outputs only** — never Library assets. Items are ordered (safe reorder service), removable without deleting the output, and collections soft-archive.
+
+### Provider & storage boundary
+
+No generation provider is connected: there is no working "Generate" action anywhere in Gallery, and normal UI cannot move an output from draft to processing (the guard refuses; dev seed data may contain non-draft statuses so the review UI is testable). Media paths (`media_storage_path`, `thumbnail_storage_path`) are **private placeholder metadata only** — no public URLs, no object-storage uploads, no service credentials in client code. Placeholder records are clearly labelled: "Placeholder preview — provider generation and secure media storage are not connected yet."
+
+### Gallery routes
+
+- `/gallery` — dashboard: summary counts (ready for review / approved / draft+processing / failed), search, type + status + project filters, sort, grid/list, overflow Archive; empty state: "Your generated work will appear here."
+- `/gallery/:outputId` — review page: placeholder preview with dev label, metadata + tags, review history, immutable provenance panel, job timeline, guarded approve/request-changes/reject/archive/restore dialogs.
+- `/gallery/collections`, `/gallery/collections/:collectionId` — collection list + ordered detail (searchable add, move up/down, remove, archive confirm).
+
+Content Studio's job tab links back to Gallery with the note that outputs will appear there once a provider is connected.
+
+### Migrations and seed data (Gallery)
+
+- `supabase/migrations/20260928000002_gallery_domain.sql` — gallery_outputs, gallery_output_reviews, gallery_output_tags (unique normalized name per workspace), gallery_output_tag_links, gallery_collections, gallery_collection_items, gallery_output_events; RLS on every table via `is_workspace_member`; same-workspace consistency triggers (output↔job↔project, reviews↔output, items↔outputs↔collections); status state-machine trigger with the same transition table; review-history append-only + job-pin protection; append-only events.
+- `src/mock/gallerySeed.ts` — four fictional placeholder outputs on the seeded Morning Skincare Routine job ("Morning Vanity Setup" ready_for_review, "Serum Product Moment" approved video, "Routine Wrap-up Story" rejected with feedback, "Morning Routine Variant" draft with parent link) with tags, the **Morning Skincare Campaign** collection, and output events. All records carry `metadata.placeholder: true` and local `placeholders/gallery/*.svg` paths — this is development placeholder metadata, not generated media.
+
 ## Roadmap beyond this milestone
 
 1. Workspace provisioning on first sign-in (create workspace + owner membership).
 2. ~~Model Builder and Environment Builder data models with version + lock tables.~~ Done — Models data foundation + interface, Environments data foundation.
 3. ~~Environment Builder UI~~ Done — the Environment Builder interface (index, profile, editor, references, versions, lock review) ships on the Environments data layer; AI-assisted composition remains out of scope.
 4. Library asset types backed by Supabase Storage (private bucket already provisioned) — the shortcut FK migration has landed; reference uploads to secure storage come next.
-5. Content job pipeline feeding the Gallery.
+5. Content job pipeline feeding the Gallery — data layer + functional UI done; provider integration and secure media storage remain the boundary.

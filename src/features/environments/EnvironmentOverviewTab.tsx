@@ -3,15 +3,71 @@
  * summary, continuity explainer, and the required reusability note.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { EnvironmentIcon, LockIcon } from '../../components/icons';
+import { EnvironmentIcon, LibraryIcon, LockIcon } from '../../components/icons';
+import { LibraryService } from '../../services/libraryService';
+import { getLibraryRepository } from '../../data/libraryFactory';
+import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { jsonToText } from './envDiff';
 import { LOCK_LEVEL_HELP } from './envLockReview';
 import type { useEnvironmentData } from './useEnvironmentData';
-import type { EnvironmentSpecRecord, EnvironmentVersionRecord } from '../../domain/environments';
+import type {
+  EnvironmentAssetShortcutRecord,
+  EnvironmentSpecRecord,
+  EnvironmentVersionRecord,
+} from '../../domain/environments';
+import type { LibraryAssetRecord } from '../../domain/library';
+
+/**
+ * Resolves the environment's Library shortcut pointers against the ONE shared
+ * Library. Shortcuts are reads only — they never copy assets or write here.
+ */
+function useEnvironmentShortcuts(environmentId: string | undefined): Array<{
+  shortcut: EnvironmentAssetShortcutRecord;
+  asset: LibraryAssetRecord | null;
+}> | null {
+  const [rows, setRows] = useState<Array<{
+    shortcut: EnvironmentAssetShortcutRecord;
+    asset: LibraryAssetRecord | null;
+  }> | null>(null);
+
+  useEffect(() => {
+    if (!environmentId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { EnvironmentsService } = await import('../../services/environmentsService');
+        const { getEnvironmentsRepository } = await import('../../data/environmentsFactory');
+        const workspaceId = SEED_LIBRARY_WORKSPACE_ID;
+        const envService = new EnvironmentsService(getEnvironmentsRepository());
+        const libraryService = new LibraryService(getLibraryRepository());
+        const shortcuts = await envService.listAssetShortcuts(environmentId, workspaceId);
+        const resolved = await Promise.all(
+          shortcuts
+            .slice()
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+            .map(async (shortcut) => ({
+              shortcut,
+              asset: shortcut.libraryAssetId
+                ? await libraryService.getAsset(shortcut.libraryAssetId, workspaceId).catch(() => null)
+                : null,
+            })),
+        );
+        if (!cancelled) setRows(resolved);
+      } catch {
+        if (!cancelled) setRows([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [environmentId]);
+
+  return rows;
+}
 
 const REUSABILITY_NOTE =
   'This environment is reusable across models and campaigns. Selecting a model later does not change the environment.';
@@ -44,8 +100,10 @@ export function EnvironmentOverviewTab({
   activeWorkspaceId,
 }: OverviewTabProps) {
   void environmentName; // shown in the page header; kept for panel copy later
+  const { environmentId } = useParams();
   const [spec, setSpec] = useState<EnvironmentSpecRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const shortcutRows = useEnvironmentShortcuts(environmentId);
 
   useEffect(() => {
     if (!activeVersion) return;
@@ -142,6 +200,46 @@ export function EnvironmentOverviewTab({
         <Card>
           <CardBody>
             <p className="lf-envpanel__note">{REUSABILITY_NOTE}</p>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <h3 className="lf-envpanel__heading">Library shortcuts</h3>
+            <p className="lf-tile__description">
+              Quick-access pointers to reusable products, props and lighting assets in the one
+              shared Library. Shortcuts reference canonical records — they never copy them.
+            </p>
+            {shortcutRows === null ? (
+              <Skeleton lines={2} />
+            ) : shortcutRows.length === 0 ? (
+              <p className="lf-tile__description">No shortcuts yet for this environment.</p>
+            ) : (
+              <ul className="lf-envref__list">
+                {shortcutRows.map(({ shortcut, asset }) => (
+                  <li key={shortcut.id} className="lf-envref__item">
+                    {asset ? (
+                      <Link to={`/library/${asset.id}`}>
+                        <strong>{asset.name}</strong>
+                      </Link>
+                    ) : (
+                      <strong>{shortcut.libraryAssetId ?? 'Unlinked shortcut'}</strong>
+                    )}
+                    <span className="lf-tile__description">
+                      Library shortcut · {shortcut.category}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="lf-envpanel__actions">
+              <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/library">
+                <span className="lf-btn__icon" aria-hidden="true">
+                  <LibraryIcon size={14} />
+                </span>
+                Open Library
+              </Link>
+            </div>
           </CardBody>
         </Card>
 

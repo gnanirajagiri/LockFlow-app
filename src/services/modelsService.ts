@@ -15,6 +15,7 @@ import {
 } from '../domain/models';
 import type {
   CharacterSheetRecord,
+  ModelAssetShortcutRecord,
   ModelRecord,
   ModelReferenceRecord,
   ModelVersionRecord,
@@ -55,6 +56,16 @@ export class ModelsService {
   async getReferences(versionId: string, activeWorkspaceId: string): Promise<ModelReferenceRecord[]> {
     await this.getVersion(versionId, activeWorkspaceId);
     return this.repo.getReferences(versionId);
+  }
+
+  /** Library shortcut pointers for this model (ids only; resolve via LibraryService). */
+  async listAssetShortcuts(
+    modelId: string,
+    activeWorkspaceId: string,
+  ): Promise<ModelAssetShortcutRecord[]> {
+    const model = await this.repo.getModel(modelId);
+    isInWorkspaceStrict(model.workspaceId, activeWorkspaceId);
+    return this.repo.listAssetShortcuts(modelId);
   }
 
   async createModel(input: unknown, createdBy: string): Promise<ModelRecord> {

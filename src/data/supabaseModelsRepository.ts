@@ -12,6 +12,7 @@ import type {
   CreateModelInput,
   CreateVersionInput,
   LockVersionInput,
+  ModelAssetShortcutRecord,
   ModelRecord,
   ModelReferenceRecord,
   ModelVersionRecord,
@@ -81,6 +82,18 @@ function mapReference(row: Record<string, unknown>): ModelReferenceRecord {
   };
 }
 
+function mapShortcut(row: Record<string, unknown>): ModelAssetShortcutRecord {
+  return {
+    id: row.id as string,
+    modelId: row.model_id as string,
+    libraryAssetId: (row.library_asset_id as string | null) ?? null,
+    category: row.category as ModelAssetShortcutRecord['category'],
+    sortOrder: row.sort_order as number,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
+
 export class SupabaseModelsRepository implements ModelsRepository {
   constructor(private readonly client: SupabaseClient) {}
 
@@ -138,6 +151,16 @@ export class SupabaseModelsRepository implements ModelsRepository {
       .order('sort_order');
     if (error) throw error;
     return (data ?? []).map(mapReference);
+  }
+
+  async listAssetShortcuts(modelId: string): Promise<ModelAssetShortcutRecord[]> {
+    const { data, error } = await this.client
+      .from('model_asset_shortcuts')
+      .select('*')
+      .eq('model_id', modelId)
+      .order('sort_order');
+    if (error) throw error;
+    return (data ?? []).map(mapShortcut);
   }
 
   async createModel(input: CreateModelInput, createdBy: string): Promise<ModelRecord> {

@@ -10,6 +10,7 @@
  */
 import type {
   CharacterSheetRecord,
+  ModelAssetShortcutRecord,
   ModelRecord,
   ModelReferenceRecord,
   ModelVersionRecord,
@@ -144,7 +145,34 @@ export interface ModelSeed {
   versions: ModelVersionRecord[];
   sheets: Record<string, CharacterSheetRecord>;
   references: Record<string, ModelReferenceRecord[]>;
+  /** Library shortcut pointers (canonical library_asset ids — never copies). */
+  shortcuts?: ModelAssetShortcutRecord[];
 }
+
+/**
+ * Demo shortcuts into the ONE shared Library: Aisha's Closet & Props panel
+ * shows these canonical ids, resolved live from the Library at read time.
+ */
+const AISHA_SHORTCUTS: ModelAssetShortcutRecord[] = [
+  {
+    id: 'shortcut_aisha_blazer',
+    modelId: 'model_aisha',
+    libraryAssetId: 'lib_beige_blazer',
+    category: 'wardrobe',
+    sortOrder: 0,
+    createdAt: '2026-09-26T17:00:00.000Z',
+    updatedAt: '2026-09-26T17:00:00.000Z',
+  },
+  {
+    id: 'shortcut_aisha_earrings',
+    modelId: 'model_aisha',
+    libraryAssetId: 'lib_gold_hoops',
+    category: 'accessory',
+    sortOrder: 1,
+    createdAt: '2026-09-26T17:00:00.000Z',
+    updatedAt: '2026-09-26T17:00:00.000Z',
+  },
+];
 
 export const MODELS_SEED: ModelSeed[] = [
   {
@@ -162,6 +190,7 @@ export const MODELS_SEED: ModelSeed[] = [
       ],
       [V2_ID]: [],
     },
+    shortcuts: AISHA_SHORTCUTS,
   },
   {
     // Second-workspace fixture — used by workspace-isolation tests only. It

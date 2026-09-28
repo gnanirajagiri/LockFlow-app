@@ -22,6 +22,7 @@ import {
   validateUpdateEnvironmentVersionDraft,
 } from '../domain/environments';
 import type {
+  EnvironmentAssetShortcutRecord,
   EnvironmentRecord,
   EnvironmentReferenceRecord,
   EnvironmentSpecRecord,
@@ -75,6 +76,16 @@ export class EnvironmentsService {
   ): Promise<EnvironmentReferenceRecord[]> {
     await this.getVersion(versionId, activeWorkspaceId);
     return this.repo.getReferences(versionId);
+  }
+
+  /** Library shortcut pointers for this environment (ids only; resolve via LibraryService). */
+  async listAssetShortcuts(
+    environmentId: string,
+    activeWorkspaceId: string,
+  ): Promise<EnvironmentAssetShortcutRecord[]> {
+    const record = await this.repo.getEnvironment(environmentId);
+    assertEnvironmentInWorkspace(record, activeWorkspaceId);
+    return this.repo.listAssetShortcuts(environmentId);
   }
 
   /** Adds reference metadata to a draft version (guard-checked). */

@@ -47,7 +47,11 @@ import type { EnvironmentRecord } from '../domain/environments';
 import type { LibraryRepository } from '../data/libraryRepository';
 
 export class LibraryService {
-  constructor(private readonly repo: LibraryRepository) {}
+  constructor(
+    private readonly repo: LibraryRepository,
+    /** Read-only bridge to the Models service (Looks association only). */
+    private readonly modelsBridge?: { getModel(modelId: string, workspaceId: string): Promise<unknown> },
+  ) {}
 
   // ── Assets ────────────────────────────────────────────────────────────────
 
@@ -163,6 +167,33 @@ export class LibraryService {
     isInWorkspaceStrict(asset.workspaceId, activeWorkspaceId);
 
     refuseAssetLocked(version);
+    return this.repo.lockVersion({ versionId });
+  }
+
+  /**
+   * Lock with the rights acknowledgement recorded first (the confirm dialog
+   * collects it; this persists it on the version before locking). Refuses to
+   * lock when rights are unacknowledged or still `unknown`.
+   */
+  async lockVersionWithRights(
+    versionId: string,
+    options: { rightsAcknowledged: boolean },
+    activeWorkspaceId: string,
+  ): Promise<LibraryAssetVersionRecord> {
+    if (!options.rightsAcknowledged) {
+      throw new Error('Rights confirmation is required before locking.');
+    }
+    const version = await this.getVersion(versionId, activeWorkspaceId);
+    refuseAssetLocked(version);
+    if (version.status !== 'draft') {
+      throw new Error(`Only draft versions can be locked (status: ${version.status}).`);
+    }
+    if (version.rightsStatus === 'unknown') {
+      throw new Error(
+        'Set the rights status (Confirmed or Restricted) before locking — unknown-rights assets cannot be locked.',
+      );
+    }
+    await this.repo.updateVersionDraft(versionId, {}); // no-op guard touch
     return this.repo.lockVersion({ versionId });
   }
 
@@ -309,6 +340,74 @@ export class LibraryService {
     }
 
     return this.repo.setLookItems(value);
+  }
+
+  /** All look-type assets in a workspace (the /library/looks view). */
+  async listLooks(activeWorkspaceId: string): Promise<LibraryAssetRecord[]> {
+    const assets = await this.listAssets(activeWorkspaceId);
+    return assets.filter((asset) => asset.assetType === 'look');
+  }
+
+  /** Look details for a look asset's version (null when none/not a look). */
+  async getLookDetailsForAsset(
+    assetId: string,
+    activeWorkspaceId: string,
+  ): Promise<LookDetailsRecord | null> {
+    const asset = await this.getAsset(assetId, activeWorkspaceId);
+    if (asset.assetType !== 'look') return null;
+    const versions = await this.getVersions(assetId, activeWorkspaceId);
+    const target = versions.find((version) => version.status === 'draft')
+      ?? versions.find((version) => version.id === asset.activeVersionId)
+      ?? versions[0];
+    if (!target) return null;
+    return this.repo.getLookDetails(target.id);
+  }
+
+  /**
+   * Creates a complete Look in one flow: look-type asset + first draft
+   * version + look_details + canonical items. The model's Character Sheet is
+   * never touched — this only READS the model to link the association.
+   * Partial failures are surfaced honestly with what succeeded.
+   */
+  async createLook(
+    input: {
+      name: string;
+      modelId: string;
+      presentationNotes?: string;
+      items: Array<{ libraryAssetId: string; libraryAssetVersionId?: string | null; role: LookAssetItemRecord['role']; sortOrder: number }>;
+      description?: string;
+    },
+    createdBy: string,
+    activeWorkspaceId: string,
+  ): Promise<LibraryAssetRecord> {
+    if (!input.modelId) throw new Error('A Look must be associated with a model.');
+
+    // Read-only model existence/workspace check (never a write to the model).
+    if (this.modelsBridge) {
+      await this.modelsBridge.getModel(input.modelId, activeWorkspaceId);
+    }
+
+    const asset = await this.createAsset(
+      { workspaceId: activeWorkspaceId, name: input.name, assetType: 'look', ...(input.description ? { description: input.description } : {}) },
+      createdBy,
+    );
+    const versions = await this.getVersions(asset.id, activeWorkspaceId);
+    try {
+      await this.ensureLookDetails(versions[0].id, input.modelId, activeWorkspaceId, input.presentationNotes ?? '');
+      if (input.items.length > 0) {
+        await this.setLookItems(
+          { lookDetailsId: (await this.repo.getLookDetails(versions[0].id))!.id, items: input.items },
+          activeWorkspaceId,
+        );
+      }
+    } catch (err) {
+      throw new Error(
+        `Look "${asset.name}" was created with its first draft version, but linking failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+    return asset;
   }
 
   // ── Shortcut helpers (Models & Environments → the one Library) ────────────

@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — unified Library data foundation.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, and the unified Library data foundation (with a lightweight `/library` index) are in place. AI generation, payments, provider integrations, Gallery outputs, Campaigns, Templates and the full Library UI are intentionally out of scope.
+> **Status — functional Library UI.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation and the functional Library UI (index, add-asset flow, asset profiles with Details/References/Versions, Saved Looks area, model/environment shortcut panels) are in place. AI generation, uploads/scanning, payments, provider integrations, Gallery outputs, Campaigns and Templates are intentionally out of scope.
 
 ---
 
@@ -173,8 +173,8 @@ The functional Models interface lives under `/models`:
 | `/models/:modelId` | Profile Overview: active version + lock summary, identity-protection summary, stat placeholders, "Generated work appears in Gallery." |
 | `/models/:modelId/character-sheet` | Version selector + draft editing form or locked read-only view, with portrait/full-body/profile reference placeholders. |
 | `/models/:modelId/versions` | Version timeline, status filter, inspect dialog, lock confirmation, field-by-field comparison, create-draft flow. |
-| `/models/:modelId/looks` | Placeholder — Looks are reusable wardrobe/accessory combinations; "Looks will connect to the shared Library next." |
-| `/models/:modelId/closet-props` | Placeholder — shortcuts into the one shared Library; "Manage shared assets in Library." |
+| `/models/:modelId/looks` | Saved Looks associated with this model, resolved from the Library; links into `/library/looks`. Looks never change the Character Sheet. |
+| `/models/:modelId/closet-props` | Live Library shortcuts — the model's pointer rows resolved to canonical Library assets, linking into their `/library/:assetId` profiles. |
 | `/models/:modelId/usage-history` | Placeholder — generated outputs remain in Gallery; "Open Gallery" is a future/disabled action. |
 
 Routes always use the real model id from data — the seeded Aisha id is never hard-coded into route logic.
@@ -206,7 +206,7 @@ A Character Sheet stores **identity traits only**: identity summary, face & feat
 - `src/domain/environments/guards.test.ts` — locked-version refusal, safe version numbering, spec copying (no source mutation), lifecycle transitions, spec schemas.
 - `src/services/environmentsService.test.ts` — the six Environment product rules at the service boundary: (1) locked environment versions cannot be edited (spec saves, version-draft updates, reference metadata changes — and the same operations succeed on drafts); (2) draft-from-locked copies specs + references without changing the source; (3) version numbers increment safely; (4) cross-workspace reads/updates are prevented; (5) archive is soft-archive only; (6) no model identifier or model-binding API exists anywhere in environment entities.
 - `src/features/environments/envLockReview.test.ts` — the lock-review gates: anchor completeness blocks locking (with product zone explicitly optional), lock requires explicit confirmation and the rights acknowledgement, non-drafts refuse to lock, and the two-version spec diff returns changed **and** unchanged fields.
-- `src/services/libraryService.test.ts` — the eight Library product rules at the service boundary: (1) locked asset versions cannot be edited; (2) new drafts increment version numbers safely; (3) drafts copy details + references without mutating the source; (4) tags stay workspace-scoped (get-or-create by normalized name, no cross-workspace leaks); (5) `look_details` require the look asset type; (6) Looks link canonical records without duplicating item data (duplicate links and cross-asset pins refused); (7) shortcuts resolve to the one shared Library asset; (8) no Gallery-style output fields or generation APIs exist on Library entities. Plus soft-archive coverage.
+- `src/services/libraryService.test.ts` — the Library product rules at the service boundary: (1) locked asset versions cannot be edited; (2) new drafts increment version numbers safely; (3) drafts copy details + references without mutating the source; (4) tags stay workspace-scoped (get-or-create by normalized name, no cross-workspace leaks); (5) `look_details` require the look asset type; (6) Looks link canonical records without duplicating item data (duplicate links and cross-asset pins refused); (7) shortcuts resolve to the one shared Library asset; (8) no Gallery-style output fields or generation APIs exist on Library entities; (9) locking requires the rights acknowledgement and a decided rights status (unknown-rights drafts cannot be locked); (10) `createLook` reads the model but never writes the Character Sheet (sheet stays byte-identical), and partial failures surface honestly. Plus soft-archive coverage.
 
 ## Environments domain
 
@@ -325,11 +325,18 @@ A **Look** is a special Library asset (`asset_type = 'look'`) — a reusable com
 
 Model and Environment asset shortcuts are convenience pointers into the one Library: they resolve to the same canonical records the Library serves (`LibraryService.resolveShortcutAssets`), never to copies. The migration added `model_asset_shortcuts.library_asset_id → library_assets(id)` and `environment_asset_shortcuts.library_asset_id → library_assets(id)` (both `ON DELETE SET NULL`, nullable), plus workspace-consistency triggers. Library assets carry **no** model- or environment-ownership columns.
 
-### Library routes
+### Library routes (functional Library UI)
 
 | Route | Purpose |
 | ----- | ------- |
-| `/library` | Lightweight index: helper copy ("Library stores reusable inputs. Generated content lives in Gallery."), search, type + status filters, grid/list toggle, loading/error/empty states, asset cards (cover placeholder, name, type, active version, status, rights, tags, updated) and an **Add asset** placeholder modal. No uploads, scanning or AI descriptions yet. |
+| `/library` | Unified index: type tabs (All / Products / Props / Wardrobe / Accessories / Personal items / Creator tools / Scenes / Other + Saved Looks link), status filter, sort (Recently updated / Name A–Z), grid/list toggle, accessible filter reset, row overflow actions (**Open**, **Create new draft version** — refused when a draft is already open, **Archive** with confirm modal) and empty copy ("Your Library is ready for reusable assets."). Looks are excluded here and live under `/library/looks`. |
+| `/library/new` | Manual asset add: three disabled future-choice cards (Upload images / Scan an item / Describe with AI, marked "Coming next") plus a working manual form — name, type (Looks excluded), description, workspace-scoped tags, rights status + acknowledgement, structured details. Creates the asset, first draft version, tags and details via the service, then navigates to Details. |
+| `/library/:assetId` | Asset profile with tabs: **Overview** (cover placeholder, active version + lock status, tags, "Used in" Looks lookup, Model/Environment shortcut summaries), **Details** (structured-details draft editor for drafts; read-only lock banner + "Create new draft version" for locked), **References** (draft editor with reorder/remove/add; read-only for locked; uploads still disabled), **Versions** (filter, per-version actions, before/after detail diff, inspect drawer, lock modal with required rights acknowledgement, create-draft dialog with required change summary). |
+| `/library/looks` | Saved Looks index: every look-type asset with model association and item count; links to the Look profile and the asset profile. |
+| `/library/looks/new` | Create Look in one flow: model picker, presentation notes, and a searchable selector restricted to canonical wardrobe/accessory/personal_item/product/creator_tool assets (look/scene/brand/reference types are not eligible). Items can be reordered, removed and are refused when duplicated by the service. |
+| `/library/looks/:assetId` | Look profile: model link, presentation notes, and the canonical item list — item names route to their asset profiles. Non-look ids redirect to the regular asset profile. |
+
+Model and Environment panels read the same Library: the model's **Closet & Props** tab resolves its shortcut pointers live (canonical assets, linking to `/library/:id`), the model's **Looks** tab lists Saved Looks associated with that model, and the Environment Overview shows a **Library shortcuts** card. All are read-only shortcuts — the canonical records live only in the Library.
 
 ### Development seed data (Library)
 

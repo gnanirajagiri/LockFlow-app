@@ -234,3 +234,20 @@ export const EnvironmentIcon = (p: IconProps) => (
     <circle cx="16.4" cy="10.2" r="1.1" />
   </Icon>
 );
+
+export const CameraIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.2-1.8h5.4L15.9 6h1.6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" />
+    <circle cx="12" cy="12.4" r="3.2" />
+  </Icon>
+);
+
+export const ScanIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" />
+    <path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" />
+    <path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16" />
+    <path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" />
+    <path d="M4 12h16" />
+  </Icon>
+);

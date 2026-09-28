@@ -16,6 +16,7 @@ import type {
   CreateModelInput,
   CreateVersionInput,
   LockVersionInput,
+  ModelAssetShortcutRecord,
   ModelRecord,
   ModelReferenceRecord,
   ModelVersionRecord,
@@ -36,6 +37,7 @@ export class MockModelsRepository implements ModelsRepository {
   private versions = new Map<string, ModelVersionRecord>();
   private sheets = new Map<string, CharacterSheetRecord>(); // key: versionId
   private references = new Map<string, ModelReferenceRecord[]>(); // key: versionId
+  private shortcuts: ModelAssetShortcutRecord[] = MODELS_SEED.flatMap((seed) => seed.shortcuts ?? []);
 
   constructor() {
     for (const seed of MODELS_SEED) {
@@ -81,6 +83,11 @@ export class MockModelsRepository implements ModelsRepository {
 
   async getReferences(versionId: string): Promise<ModelReferenceRecord[]> {
     return structuredClone(this.references.get(versionId) ?? []);
+  }
+
+  /** Library shortcut pointers for this model (pointers only — canonical records live in the Library). */
+  async listAssetShortcuts(modelId: string): Promise<ModelAssetShortcutRecord[]> {
+    return structuredClone(this.shortcuts.filter((shortcut) => shortcut.modelId === modelId));
   }
 
   async createModel(input: CreateModelInput, createdBy: string): Promise<ModelRecord> {

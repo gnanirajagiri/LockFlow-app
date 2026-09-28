@@ -10,6 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   CreateEnvironmentInput,
   CreateEnvironmentVersionInput,
+  EnvironmentAssetShortcutRecord,
   EnvironmentRecord,
   EnvironmentReferenceRecord,
   EnvironmentSpecRecord,
@@ -85,6 +86,18 @@ function mapReference(row: Record<string, unknown>): EnvironmentReferenceRecord 
   };
 }
 
+function mapShortcut(row: Record<string, unknown>): EnvironmentAssetShortcutRecord {
+  return {
+    id: row.id as string,
+    environmentId: row.environment_id as string,
+    libraryAssetId: (row.library_asset_id as string | null) ?? null,
+    category: row.category as EnvironmentAssetShortcutRecord['category'],
+    sortOrder: row.sort_order as number,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
+
 export class SupabaseEnvironmentsRepository implements EnvironmentsRepository {
   constructor(private readonly client: SupabaseClient) {}
 
@@ -146,6 +159,16 @@ export class SupabaseEnvironmentsRepository implements EnvironmentsRepository {
       .order('sort_order');
     if (error) throw error;
     return (data ?? []).map(mapReference);
+  }
+
+  async listAssetShortcuts(environmentId: string): Promise<EnvironmentAssetShortcutRecord[]> {
+    const { data, error } = await this.client
+      .from('environment_asset_shortcuts')
+      .select('*')
+      .eq('environment_id', environmentId)
+      .order('sort_order');
+    if (error) throw error;
+    return (data ?? []).map(mapShortcut);
   }
 
   /** Adds a reference-metadata row (draft versions only; trigger + RLS guard). */

@@ -1,42 +1,77 @@
 /**
- * Route-aware placeholder panels for Looks, Closet & Props and Usage
- * history. Each explains what will live here without creating records:
- * Looks connect to the shared Library, Closet & Props are shortcuts into
- * that one shared Library, and generated outputs stay in Gallery.
+ * Model profile panels — Closet & Props, Looks and Usage history.
+ *
+ * Closet & Props resolves the model's Library shortcut pointers live against
+ * the ONE shared Library (canonical assets, never copies). Looks lists the
+ * Saved Looks associated with this model from the Library. Usage history
+ * remains a placeholder until Content Studio exists.
  */
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardBody } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { LibraryIcon, GalleryIcon, SparkIcon } from '../../components/icons';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { LibraryIcon, GalleryIcon, PlusIcon, SparkIcon } from '../../components/icons';
+import { LibraryService } from '../../services/libraryService';
+import { getLibraryRepository } from '../../data/libraryFactory';
+import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
+import { LOOK_IDENTITY_NOTE } from '../library/libraryUi';
+import { useModelOutletContext } from './tabRoutes';
+import type { ModelAssetShortcutRecord } from '../../domain/models';
+import type { LibraryAssetRecord } from '../../domain/library';
 
-export function LooksTab() {
-  return (
-    <div className="lf-section">
-      <Card>
-        <CardBody>
-          <div className="lf-sheet__section">
-            <h3>Looks</h3>
-            <p className="lf-tile__description">
-              Looks are reusable combinations of wardrobe and accessories — quick, consistent
-              styling layers for a model. They never change the model's identity.
-            </p>
-            <p className="lf-tile__description">
-              <strong>Looks will connect to the shared Library next.</strong>
-            </p>
-          </div>
-        </CardBody>
-      </Card>
-      <EmptyState
-        borderless
-        icon={<SparkIcon size={22} />}
-        title="No saved looks yet"
-        description="Saved Looks will appear here once Looks connect to the shared Library. No asset records are created in this view."
-      />
-    </div>
-  );
+interface ShortcutRow {
+  shortcut: ModelAssetShortcutRecord;
+  asset: LibraryAssetRecord | null;
+}
+
+/** Resolves shortcut pointers to canonical Library assets (workspace-checked). */
+function useModelShortcuts(modelId: string | undefined): ShortcutRow[] | null {
+  const [rows, setRows] = useState<ShortcutRow[] | null>(null);
+
+  useEffect(() => {
+    if (!modelId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { ModelsService } = await import('../../services/modelsService');
+        const { getModelsRepository } = await import('../../data');
+        const workspaceId = SEED_LIBRARY_WORKSPACE_ID;
+        const modelsService = new ModelsService(getModelsRepository());
+        const libraryService = new LibraryService(getLibraryRepository());
+        const shortcuts: ModelAssetShortcutRecord[] = await modelsService.listAssetShortcuts(
+          modelId,
+          workspaceId,
+        );
+        const resolved: ShortcutRow[] = await Promise.all(
+          shortcuts
+            .slice()
+            .sort((a, b) => a.sortOrder - b.sortOrder)
+            .map(async (shortcut) => ({
+              shortcut,
+              asset: shortcut.libraryAssetId
+                ? await libraryService.getAsset(shortcut.libraryAssetId, workspaceId).catch(() => null)
+                : null,
+            })),
+        );
+        if (!cancelled) setRows(resolved);
+      } catch {
+        if (!cancelled) setRows([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modelId]);
+
+  return rows;
 }
 
 export function ClosetPropsTab() {
+  const { data } = useModelOutletContext();
+  const modelId = data.model?.id;
+  const rows = useModelShortcuts(modelId);
+
   return (
     <div className="lf-section">
       <Card>
@@ -44,12 +79,9 @@ export function ClosetPropsTab() {
           <div className="lf-sheet__section">
             <h3>Closet &amp; Props</h3>
             <p className="lf-tile__description">
-              These are quick-access shortcuts to reusable items in the one shared Library —
-              wardrobe pieces, accessories, props and products. Shortcuts point at Library
-              assets; they never duplicate them into a separate model library.
-            </p>
-            <p className="lf-tile__description">
-              <strong>Manage shared assets in Library.</strong>
+              Quick-access shortcuts to reusable items in the one shared Library — wardrobe
+              pieces, accessories, props and products. Shortcuts point at Library assets; they
+              never duplicate them into a separate model library.
             </p>
             <div className="lf-modelprofile__actions-row" style={{ justifyContent: 'flex-start' }}>
               <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/library">
@@ -58,16 +90,133 @@ export function ClosetPropsTab() {
                 </span>
                 Open Library
               </Link>
+              <Link className="lf-btn lf-btn--ghost lf-btn--sm" to="/library/new">
+                <span className="lf-btn__icon" aria-hidden="true">
+                  <PlusIcon size={14} />
+                </span>
+                Add asset in Library
+              </Link>
             </div>
           </div>
         </CardBody>
       </Card>
-      <EmptyState
-        borderless
-        icon={<LibraryIcon size={22} />}
-        title="No shortcuts yet"
-        description="Shortcut assets will appear here once the shared Library lands. Nothing is stored on the model itself."
-      />
+
+      {rows === null ? (
+        <Skeleton lines={3} />
+      ) : rows.length === 0 ? (
+        <EmptyState
+          borderless
+          icon={<LibraryIcon size={22} />}
+          title="No shortcuts yet"
+          description="Shortcuts added to this model will appear here, resolved against the shared Library. Nothing is stored on the model itself."
+        />
+      ) : (
+        <ul className="lf-envref__list">
+          {rows.map(({ shortcut, asset }) => (
+            <li key={shortcut.id} className="lf-envref__item">
+              {asset ? (
+                <Link to={`/library/${asset.id}`}>
+                  <strong>{asset.name}</strong>
+                </Link>
+              ) : (
+                <strong>{shortcut.libraryAssetId ?? 'Unlinked shortcut'}</strong>
+              )}
+              <span className="lf-tile__description">
+                Library shortcut · {shortcut.category}
+                {asset && asset.assetType.replace('_', ' ') !== shortcut.category
+                  ? ` · ${asset.assetType.replace('_', ' ')}`
+                  : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <p className="lf-tile__description" style={{ marginTop: 'var(--lf-space-3)' }}>
+        Each shortcut opens the canonical asset profile under <Link to="/library">/library</Link>,
+        where versions, details, references and lock history live.
+      </p>
+    </div>
+  );
+}
+
+export function LooksTab() {
+  const { data } = useModelOutletContext();
+  const modelId = data.model?.id;
+  const [looks, setLooks] = useState<Array<{ id: string; name: string; status: string }> | null>(null);
+
+  useEffect(() => {
+    if (!modelId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const libraryService = new LibraryService(getLibraryRepository());
+        const workspaceId = SEED_LIBRARY_WORKSPACE_ID;
+        const all = await libraryService.listLooks(workspaceId);
+        const mine: Array<{ id: string; name: string; status: string }> = [];
+        for (const look of all) {
+          const details = await libraryService.getLookDetailsForAsset(look.id, workspaceId);
+          if (details?.modelId === modelId) mine.push({ id: look.id, name: look.name, status: look.status });
+        }
+        if (!cancelled) setLooks(mine);
+      } catch {
+        if (!cancelled) setLooks([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modelId]);
+
+  return (
+    <div className="lf-section">
+      <Card>
+        <CardBody>
+          <div className="lf-sheet__section">
+            <h3>Looks</h3>
+            <p className="lf-tile__description">
+              Reusable combinations of wardrobe and accessories — quick, consistent styling
+              layers for this model. {LOOK_IDENTITY_NOTE}
+            </p>
+            <div className="lf-modelprofile__actions-row" style={{ justifyContent: 'flex-start' }}>
+              <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/library/looks">
+                <span className="lf-btn__icon" aria-hidden="true">
+                  <SparkIcon size={14} />
+                </span>
+                All Saved Looks
+              </Link>
+              <Link className="lf-btn lf-btn--ghost lf-btn--sm" to="/library/looks/new">
+                <span className="lf-btn__icon" aria-hidden="true">
+                  <PlusIcon size={14} />
+                </span>
+                New Look in Library
+              </Link>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
+
+      {looks === null ? (
+        <Skeleton lines={2} />
+      ) : looks.length === 0 ? (
+        <EmptyState
+          borderless
+          icon={<SparkIcon size={22} />}
+          title="No saved Looks for this model yet"
+          description="Looks created in the Library for this model will appear here. No asset records are created in this view."
+        />
+      ) : (
+        <ul className="lf-envref__list">
+          {looks.map((look) => (
+            <li key={look.id} className="lf-envref__item">
+              <Link to={`/library/looks/${look.id}`}>
+                <strong>{look.name}</strong>
+              </Link>
+              <span className="lf-tile__description">Saved Look · {look.status}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@
 import type {
   CreateEnvironmentInput,
   CreateEnvironmentVersionInput,
+  EnvironmentAssetShortcutRecord,
   EnvironmentRecord,
   EnvironmentReferenceRecord,
   EnvironmentSpecRecord,
@@ -29,6 +30,9 @@ export interface EnvironmentsRepository {
   getSpec(versionId: string): Promise<EnvironmentSpecRecord>;
 
   getReferences(versionId: string): Promise<EnvironmentReferenceRecord[]>;
+
+  /** Library shortcut pointers attached to this environment (canonical ids only). */
+  listAssetShortcuts(environmentId: string): Promise<EnvironmentAssetShortcutRecord[]>;
 
   /** Adds a reference-metadata row to a draft version. */
   addReference(

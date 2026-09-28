@@ -11,6 +11,7 @@
  * workspace-isolation tests, mirroring the Models seed convention.
  */
 import type {
+  EnvironmentAssetShortcutRecord,
   EnvironmentRecord,
   EnvironmentReferenceRecord,
   EnvironmentSpecRecord,
@@ -149,7 +150,31 @@ export interface EnvironmentSeed {
   versions: EnvironmentVersionRecord[];
   specs: Record<string, EnvironmentSpecRecord>;
   references: Record<string, EnvironmentReferenceRecord[]>;
+  /** Library shortcut pointers (canonical library_asset ids — never copies). */
+  shortcuts?: EnvironmentAssetShortcutRecord[];
 }
+
+/** Demo shortcuts into the ONE shared Library for Warm Bedroom Studio. */
+const WBS_SHORTCUTS: EnvironmentAssetShortcutRecord[] = [
+  {
+    id: 'shortcut_wbs_serum',
+    environmentId: 'env_warm_bedroom_studio',
+    libraryAssetId: 'lib_luma_serum',
+    category: 'product',
+    sortOrder: 0,
+    createdAt: '2026-09-26T17:00:00.000Z',
+    updatedAt: '2026-09-26T17:00:00.000Z',
+  },
+  {
+    id: 'shortcut_wbs_laptop',
+    environmentId: 'env_warm_bedroom_studio',
+    libraryAssetId: 'lib_silver_laptop',
+    category: 'lighting',
+    sortOrder: 1,
+    createdAt: '2026-09-26T17:00:00.000Z',
+    updatedAt: '2026-09-26T17:00:00.000Z',
+  },
+];
 
 export const ENVIRONMENTS_SEED: EnvironmentSeed[] = [
   {
@@ -167,6 +192,7 @@ export const ENVIRONMENTS_SEED: EnvironmentSeed[] = [
       ],
       [V2_ID]: [],
     },
+    shortcuts: WBS_SHORTCUTS,
   },
   {
     // Second-workspace fixture — used by workspace-isolation tests only. It

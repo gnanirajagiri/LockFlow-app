@@ -21,6 +21,17 @@ import { StudioPage } from './pages/StudioPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { GalleryPage } from './pages/GalleryPage';
 import { LibraryPage } from './pages/LibraryPage';
+import { LibraryNewAssetPage } from './pages/LibraryNewAssetPage';
+import { LibraryLooksPage } from './pages/LibraryLooksPage';
+import { LibraryNewLookPage } from './pages/LibraryNewLookPage';
+import { LibraryLookProfilePage } from './pages/LibraryLookProfilePage';
+import { LibraryAssetProfileLayout } from './features/library/LibraryAssetProfileLayout';
+import {
+  LibraryDetailsRoute,
+  LibraryOverviewRoute,
+  LibraryReferencesRoute,
+  LibraryVersionsRoute,
+} from './features/library/tabRoutes';
 import { CampaignsPage } from './pages/CampaignsPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -74,6 +85,16 @@ export default function App() {
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="gallery" element={<GalleryPage />} />
               <Route path="library" element={<LibraryPage />} />
+              <Route path="library/new" element={<LibraryNewAssetPage />} />
+              <Route path="library/looks" element={<LibraryLooksPage />} />
+              <Route path="library/looks/new" element={<LibraryNewLookPage />} />
+              <Route path="library/looks/:assetId" element={<LibraryLookProfilePage />} />
+              <Route path="library/:assetId" element={<LibraryAssetProfileLayout />}>
+                <Route index element={<LibraryOverviewRoute />} />
+                <Route path="details" element={<LibraryDetailsRoute />} />
+                <Route path="references" element={<LibraryReferencesRoute />} />
+                <Route path="versions" element={<LibraryVersionsRoute />} />
+              </Route>
               <Route path="campaigns" element={<CampaignsPage />} />
               <Route path="workspace" element={<WorkspacePage />} />
               <Route path="settings" element={<SettingsPage />} />

@@ -14,6 +14,7 @@ import {
 import type {
   CreateEnvironmentInput,
   CreateEnvironmentVersionInput,
+  EnvironmentAssetShortcutRecord,
   EnvironmentRecord,
   EnvironmentReferenceRecord,
   EnvironmentSpecRecord,
@@ -37,6 +38,7 @@ export class MockEnvironmentsRepository implements EnvironmentsRepository {
   private versions = new Map<string, EnvironmentVersionRecord>();
   private specs = new Map<string, EnvironmentSpecRecord>(); // key: versionId
   private references = new Map<string, EnvironmentReferenceRecord[]>(); // key: versionId
+  private shortcuts: EnvironmentAssetShortcutRecord[] = ENVIRONMENTS_SEED.flatMap((seed) => seed.shortcuts ?? []);
 
   constructor() {
     for (const seed of ENVIRONMENTS_SEED) {
@@ -82,6 +84,11 @@ export class MockEnvironmentsRepository implements EnvironmentsRepository {
 
   async getReferences(versionId: string): Promise<EnvironmentReferenceRecord[]> {
     return structuredClone(this.references.get(versionId) ?? []);
+  }
+
+  /** Library shortcut pointers for this environment (pointers only — canonical records live in the Library). */
+  async listAssetShortcuts(environmentId: string): Promise<EnvironmentAssetShortcutRecord[]> {
+    return structuredClone(this.shortcuts.filter((shortcut) => shortcut.environmentId === environmentId));
   }
 
   /** Adds a reference-metadata row (draft versions only). */

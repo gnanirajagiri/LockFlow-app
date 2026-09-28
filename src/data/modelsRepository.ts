@@ -9,6 +9,7 @@ import type {
   CreateModelInput,
   CreateVersionInput,
   LockVersionInput,
+  ModelAssetShortcutRecord,
   ModelRecord,
   ModelReferenceRecord,
   ModelVersionRecord,
@@ -28,6 +29,9 @@ export interface ModelsRepository {
   getCharacterSheet(versionId: string): Promise<CharacterSheetRecord>;
 
   getReferences(versionId: string): Promise<ModelReferenceRecord[]>;
+
+  /** Library shortcut pointers attached to this model (canonical ids only). */
+  listAssetShortcuts(modelId: string): Promise<ModelAssetShortcutRecord[]>;
 
   createModel(input: CreateModelInput, createdBy: string): Promise<ModelRecord>;
 

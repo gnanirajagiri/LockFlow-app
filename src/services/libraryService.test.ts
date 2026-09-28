@@ -259,6 +259,132 @@ describe('rule 6 — Looks link canonical records, never duplicates', () => {
   });
 });
 
+describe('rule 9 — locking requires rights acknowledgement and a decided rights status', () => {
+  it('refuses to lock without the acknowledgement checkbox', async () => {
+    const { versionId } = await createTestAsset('Needs acknowledgement');
+    await service.updateVersionDraft(versionId, { rightsStatus: 'confirmed' }, workspaceId);
+    await expect(service.lockVersionWithRights(versionId, { rightsAcknowledged: false }, workspaceId)).rejects.toThrow(
+      /Rights confirmation is required/,
+    );
+    // The refusal must not have locked the version as a side effect.
+    const version = await service.getVersion(versionId, workspaceId);
+    expect(version.status).toBe('draft');
+  });
+
+  it('refuses to lock while rights status is unknown, even with acknowledgement', async () => {
+    const { versionId } = await createTestAsset('Unknown rights');
+    await expect(service.lockVersionWithRights(versionId, { rightsAcknowledged: true }, workspaceId)).rejects.toThrow(
+      /unknown-rights assets cannot be locked/i,
+    );
+    const version = await service.getVersion(versionId, workspaceId);
+    expect(version.status).toBe('draft');
+  });
+
+  it('locks cleanly once rights are confirmed and acknowledged', async () => {
+    const { versionId } = await createTestAsset('Ready to lock');
+    await service.updateVersionDraft(versionId, { rightsStatus: 'restricted' }, workspaceId);
+    const locked = await service.lockVersionWithRights(versionId, { rightsAcknowledged: true }, workspaceId);
+    expect(locked.status).toBe('locked');
+    expect(locked.rightsStatus).toBe('restricted');
+    // And the locked version is thereafter uneditable (rule 1). (locked)
+    await expect(
+      service.updateVersionDraft(versionId, { structuredDetails: { sneaky: true } }, workspaceId),
+    ).rejects.toThrow(/locked and cannot be edited/);
+  });
+
+  it('refuses to lock non-draft versions through the rights-aware path', async () => {
+    // A locked version hits the immutability guard before the draft check.
+    await expect(
+      service.lockVersionWithRights(VERSIONS.serum, { rightsAcknowledged: true }, workspaceId),
+    ).rejects.toThrow(/locked and cannot be edited/);
+  });
+});
+
+describe('rule 10 — createLook reads the model but never writes the Character Sheet', () => {
+  it('creates the look asset + draft version + details + canonical items in one flow', async () => {
+    const asset = await service.createLook(
+      {
+        name: 'Studio minimal look',
+        modelId: 'model_aisha',
+        presentationNotes: 'Clean lines, neutral palette.',
+        items: [
+          { libraryAssetId: ASSETS.blazer, libraryAssetVersionId: VERSIONS.blazer, role: 'wardrobe', sortOrder: 0 },
+          { libraryAssetId: ASSETS.earrings, role: 'accessory', sortOrder: 1 },
+        ],
+        description: 'A test look.',
+      },
+      'tester',
+      workspaceId,
+    );
+    expect(asset.assetType).toBe('look');
+
+    const versions = await service.getVersions(asset.id, workspaceId);
+    expect(versions.length).toBe(1);
+    expect(versions[0].status).toBe('draft');
+
+    const details = await service.getLookDetailsForAsset(asset.id, workspaceId);
+    expect(details?.modelId).toBe('model_aisha');
+    const items = await service.getLookItems(details!.id, workspaceId);
+    expect(items.map((item) => item.libraryAssetId)).toEqual([ASSETS.blazer, ASSETS.earrings]);
+  });
+
+  it('leaves the model\u2019s Character Sheet byte-identical after createLook', async () => {
+    const { ModelsService } = await import('./modelsService');
+    const { getModelsRepository, resetModelsRepository } = await import('../data');
+    const modelsService = new ModelsService(getModelsRepository());
+    const versions = await modelsService.getVersions('model_aisha', workspaceId);
+    const sheetBefore = await modelsService.getCharacterSheet(versions[0].id, workspaceId);
+
+    await service.createLook(
+      {
+        name: 'Identity probe look',
+        modelId: 'model_aisha',
+        items: [{ libraryAssetId: ASSETS.blazer, role: 'wardrobe', sortOrder: 0 }],
+      },
+      'tester',
+      workspaceId,
+    );
+
+    resetModelsRepository(); // fresh repo, same seed data
+    const freshModelsService = new ModelsService(getModelsRepository());
+    const freshVersions = await freshModelsService.getVersions('model_aisha', workspaceId);
+    const sheetAfter = await freshModelsService.getCharacterSheet(freshVersions[0].id, workspaceId);
+    expect(sheetAfter).toEqual(sheetBefore);
+  });
+
+  it('refuses createLook without a model association', async () => {
+    await expect(
+      service.createLook(
+        {
+          name: 'Orphan look',
+          modelId: '',
+          items: [],
+        },
+        'tester',
+        workspaceId,
+      ),
+    ).rejects.toThrow(/must be associated with a model/);
+  });
+
+  it('surfaces partial failure honestly: asset survives, linking error is reported', async () => {
+    // A cross-workspace item makes setLookItems fail after the asset exists.
+    await expect(
+      service.createLook(
+        {
+          name: 'Broken look',
+          modelId: 'model_aisha',
+          items: [{ libraryAssetId: ASSETS.otherWs, role: 'other', sortOrder: 0 }],
+        },
+        'tester',
+        workspaceId,
+      ),
+    ).rejects.toThrow(/linking failed/);
+    // The asset was still created (honest partial state, nothing silently lost).
+    const looks = await service.listLooks(workspaceId);
+    expect(looks.some((look) => look.name === 'Broken look')).toBe(true);
+  });
+});
+
 describe('rule 7 — shortcuts resolve to the one shared Library asset', () => {
   it('resolves canonical asset records for shortcut ids', async () => {
     const resolved = await service.resolveShortcutAssets([ASSETS.blazer, ASSETS.earrings], workspaceId);

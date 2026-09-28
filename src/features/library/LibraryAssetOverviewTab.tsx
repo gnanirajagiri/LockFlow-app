@@ -1,7 +1,8 @@
 /**
  * Library asset Overview tab — summary, tags, rights, version/lock summary,
- * the "Used in" placeholder, and Model/Environment shortcut summaries when
- * links exist. No Gallery outputs here.
+ * a real read-only "Used in" summary (content plans + generated outputs),
+ * and Model/Environment shortcut summaries when links exist. No Gallery
+ * outputs are copied here — they are linked, never stored.
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -9,6 +10,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { LibraryIcon, LockIcon } from '../../components/icons';
+import { useUsageSummary, usageSentence } from '../usage/useUsageSummary';
 import { ModelsService } from '../../services/modelsService';
 import { EnvironmentsService } from '../../services/environmentsService';
 import { getModelsRepository } from '../../data';
@@ -19,8 +21,6 @@ import { RIGHTS_LABELS } from './libraryUi';
 import { useLibraryOutletContext } from './tabRoutes';
 import type { EnvironmentAssetShortcutRecord } from '../../domain/environments';
 import type { ModelAssetShortcutRecord } from '../../domain/models';
-
-const USAGE_PANEL_COPY = 'Usage tracking will appear when Content Studio is available.';
 
 function useShortcutSummary(
   libraryService: LibraryService,
@@ -81,6 +81,10 @@ export function LibraryAssetOverviewTab() {
   const asset = data.asset;
   const activeVersion = data.activeVersion;
   const { byAsset } = useShortcutSummary(service, SEED_LIBRARY_WORKSPACE_ID);
+  const usage = useUsageSummary(
+    asset?.assetType === 'look' ? 'look' : 'library_asset',
+    asset?.id,
+  );
 
   const [usedByLooks, setUsedByLooks] = useState<string[] | null>(null);
 
@@ -155,7 +159,39 @@ export function LibraryAssetOverviewTab() {
       <Card>
         <CardBody>
           <h3 className="lf-envpanel__heading">Used in</h3>
-          <p className="lf-tile__description">{USAGE_PANEL_COPY}</p>
+          {usage === null ? (
+            <Skeleton lines={2} />
+          ) : (
+            <>
+              <p className="lf-tile__description">{usageSentence(usage, 'asset')}</p>
+              {usage.plans.length > 0 ? (
+                <p className="lf-tile__description">
+                  Content plans:{' '}
+                  {usage.plans.map((plan, index) => (
+                    <span key={plan.path}>
+                      {index > 0 ? ', ' : ''}
+                      <Link to={plan.path}>
+                        <strong>{plan.name}</strong>
+                      </Link>
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+              {usage.outputs.length > 0 ? (
+                <p className="lf-tile__description">
+                  Generated outputs (pinned via job provenance, stored in Gallery):{' '}
+                  {usage.outputs.map((output, index) => (
+                    <span key={output.id}>
+                      {index > 0 ? ', ' : ''}
+                      <Link to={output.path}>
+                        <strong>{output.title}</strong>
+                      </Link>
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+            </>
+          )}
           {usedByLooks === null ? (
             <Skeleton lines={1} />
           ) : usedByLooks.length > 0 ? (

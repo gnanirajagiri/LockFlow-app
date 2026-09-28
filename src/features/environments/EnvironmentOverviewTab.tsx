@@ -13,6 +13,7 @@ import { getLibraryRepository } from '../../data/libraryFactory';
 import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { jsonToText } from './envDiff';
 import { LOCK_LEVEL_HELP } from './envLockReview';
+import { useUsageSummary } from '../usage/useUsageSummary';
 import type { useEnvironmentData } from './useEnvironmentData';
 import type {
   EnvironmentAssetShortcutRecord,
@@ -101,6 +102,8 @@ export function EnvironmentOverviewTab({
 }: OverviewTabProps) {
   void environmentName; // shown in the page header; kept for panel copy later
   const { environmentId } = useParams();
+
+  const usage = useUsageSummary('environment', environmentId);
   const [spec, setSpec] = useState<EnvironmentSpecRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const shortcutRows = useEnvironmentShortcuts(environmentId);
@@ -246,10 +249,47 @@ export function EnvironmentOverviewTab({
         <Card>
           <CardBody>
             <h3 className="lf-envpanel__heading">Recent generated output</h3>
-            <p className="lf-tile__description">
-              Generated outputs appear in Gallery. This panel shows a lightweight summary only —
-              no outputs are created or stored here.
-            </p>
+            {usage === null ? (
+              <p className="lf-tile__description">Loading usage…</p>
+            ) : usage.outputs.length === 0 ? (
+              <p className="lf-tile__description">
+                Generated outputs appear in Gallery. This panel shows a lightweight summary
+                only — no outputs are created or stored here.
+              </p>
+            ) : (
+              <>
+                <p className="lf-tile__description">
+                  Pinned by {usage.outputs.length} generated output
+                  {usage.outputs.length === 1 ? '' : 's'} (via job provenance, stored in
+                  Gallery):
+                </p>
+                <ul className="lf-envref__list">
+                  {usage.outputs.map((output) => (
+                    <li key={output.id} className="lf-envref__item">
+                      <Link to={output.path}>
+                        <strong>{output.title}</strong>
+                      </Link>
+                      <span className="lf-tile__description">
+                        Gallery · {output.status.replace(/_/g, ' ')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {usage !== null && usage.plans.length > 0 ? (
+              <p className="lf-tile__description">
+                Selected by:{' '}
+                {usage.plans.map((plan, index) => (
+                  <span key={plan.path}>
+                    {index > 0 ? ', ' : ''}
+                    <Link to={plan.path}>
+                      <strong>{plan.name}</strong>
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            ) : null}
           </CardBody>
         </Card>
       </div>

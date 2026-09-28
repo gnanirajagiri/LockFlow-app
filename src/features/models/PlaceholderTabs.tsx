@@ -3,8 +3,8 @@
  *
  * Closet & Props resolves the model's Library shortcut pointers live against
  * the ONE shared Library (canonical assets, never copies). Looks lists the
- * Saved Looks associated with this model from the Library. Usage history
- * remains a placeholder until Content Studio exists.
+ * Saved Looks associated with this model from the Library. Usage history is a
+ * lightweight read model over Content Studio plans + Gallery provenance pins.
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -16,6 +16,7 @@ import { LibraryService } from '../../services/libraryService';
 import { getLibraryRepository } from '../../data/libraryFactory';
 import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { LOOK_IDENTITY_NOTE } from '../library/libraryUi';
+import { useUsageSummary, usageSentence } from '../usage/useUsageSummary';
 import { useModelOutletContext } from './tabRoutes';
 import type { ModelAssetShortcutRecord } from '../../domain/models';
 import type { LibraryAssetRecord } from '../../domain/library';
@@ -221,38 +222,82 @@ export function LooksTab() {
   );
 }
 
+/**
+ * Usage history tab — where this model's identity has been used.
+ *
+ * Read-only summary over Content Studio plan selections and Gallery output
+ * provenance pins. Nothing is created or stored here; outputs stay in Gallery
+ * and are linked, never copied.
+ */
 export function UsageHistoryTab() {
+  const { data } = useModelOutletContext();
+  const usage = useUsageSummary('model', data.model?.id);
   return (
     <div className="lf-section">
       <Card>
         <CardBody>
           <div className="lf-sheet__section">
             <h3>Usage history</h3>
-            <p className="lf-tile__description">
-              Generated outputs remain in Gallery — this panel only ever shows a lightweight
-              historical summary of where this model's identity was used. No content-job
-              records are created here.
-            </p>
+            {usage === null ? (
+              <p className="lf-tile__description">Loading usage…</p>
+            ) : (
+              <p className="lf-tile__description">{usageSentence(usage, 'model')}</p>
+            )}
           </div>
         </CardBody>
       </Card>
+      {usage !== null && usage.outputs.length > 0 ? (
+        <Card>
+          <CardBody>
+            <div className="lf-sheet__section">
+              <h3>Generated outputs using this model</h3>
+              <ul className="lf-envref__list">
+                {usage.outputs.map((output) => (
+                  <li key={output.id} className="lf-envref__item">
+                    <Link to={output.path}>
+                      <strong>{output.title}</strong>
+                    </Link>
+                    <span className="lf-tile__description">
+                      Gallery · {output.status.replace(/_/g, ' ')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
+      {usage !== null && usage.plans.length > 0 ? (
+        <Card>
+          <CardBody>
+            <div className="lf-sheet__section">
+              <h3>Content plans selecting this model</h3>
+              <ul className="lf-envref__list">
+                {usage.plans.map((plan) => (
+                  <li key={plan.path} className="lf-envref__item">
+                    <Link to={plan.path}>
+                      <strong>{plan.name}</strong>
+                    </Link>
+                    <span className="lf-tile__description">Content Studio plan</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </CardBody>
+        </Card>
+      ) : null}
       <EmptyState
         borderless
         icon={<GalleryIcon size={22} />}
         title="No usage recorded yet"
-        description="Once content jobs run, a summary of generated outputs that used this model will appear here."
+        description="Once content plans select this model and jobs pin it, a summary of generated outputs will appear here."
         actions={
-          <span
-            className="lf-btn lf-btn--secondary lf-btn--sm"
-            aria-disabled="true"
-            style={{ opacity: 0.55, cursor: 'not-allowed' }}
-            title="Gallery opens in a later milestone"
-          >
+          <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/gallery">
             <span className="lf-btn__icon" aria-hidden="true">
               <GalleryIcon size={14} />
             </span>
             Open Gallery
-          </span>
+          </Link>
         }
       />
     </div>

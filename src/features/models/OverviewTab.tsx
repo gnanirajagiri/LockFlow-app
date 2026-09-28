@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardBody } from '../../components/ui/Card';
 import { LockIcon, ModelIcon } from '../../components/icons';
+import { useUsageSummary } from '../usage/useUsageSummary';
 import type { ModelVersionRecord } from '../../domain/models';
 
 interface OverviewTabProps {
@@ -18,8 +19,9 @@ interface OverviewTabProps {
   basePath: string;
 }
 
-export function OverviewTab({ modelName, activeVersion, basePath }: OverviewTabProps) {
+export function OverviewTab({ modelId, modelName, activeVersion, basePath }: OverviewTabProps) {
   const locked = activeVersion?.status === 'locked';
+  const usage = useUsageSummary('model', modelId);
 
   return (
     <div className="lf-section" style={{ gap: 'var(--lf-space-4)' }}>
@@ -76,7 +78,11 @@ export function OverviewTab({ modelName, activeVersion, basePath }: OverviewTabP
         <StatCard label="Saved looks" value="—" note="Looks arrive with the shared Library" />
         <StatCard label="Shortcut assets" value="—" note="Managed in the shared Library" />
         <StatCard label="Linked environments" value="—" note="Environments are separate reusable assets" />
-        <StatCard label="Generated outputs" value="—" note="Generated work appears in Gallery." />
+        <StatCard
+          label="Generated outputs"
+          value={usage === null ? '…' : String(usage.outputs.length)}
+          note="Pinned via job provenance in Gallery"
+        />
       </div>
 
       <Card>
@@ -101,9 +107,41 @@ export function OverviewTab({ modelName, activeVersion, basePath }: OverviewTabP
         <CardBody>
           <div className="lf-sheet__section">
             <h3>Recent generated output</h3>
-            <p className="lf-tile__description" data-testid="gallery-placeholder">
-              Generated work appears in Gallery.
-            </p>
+            {usage === null ? null : usage.outputs.length === 0 ? (
+              <p className="lf-tile__description" data-testid="gallery-placeholder">
+                Generated work appears in Gallery.
+              </p>
+            ) : (
+              <>
+                <p className="lf-tile__description">
+                  Pinned by {usage.outputs.length} generated output
+                  {usage.outputs.length === 1 ? '' : 's'} (via job provenance, stored in Gallery):
+                </p>
+                <ul className="lf-envref__list">
+                  {usage.outputs.map((output) => (
+                    <li key={output.id} className="lf-envref__item">
+                      <Link to={output.path}>
+                        <strong>{output.title}</strong>
+                      </Link>
+                      <span className="lf-tile__description">Gallery · {output.status.replace(/_/g, ' ')}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {usage && usage.plans.length > 0 ? (
+              <p className="lf-tile__description">
+                Selected by:{' '}
+                {usage.plans.map((plan, index) => (
+                  <span key={plan.path}>
+                    {index > 0 ? ', ' : ''}
+                    <Link to={plan.path}>
+                      <strong>{plan.name}</strong>
+                    </Link>
+                  </span>
+                ))}
+              </p>
+            ) : null}
             <span className="lf-versionrow__dates">
               This area shows a lightweight historical summary only — no outputs are created or
               stored here.

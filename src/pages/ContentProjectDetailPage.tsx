@@ -35,6 +35,7 @@ interface DetailState {
   beats: Record<string, ContentBeatRecord[]>;
   modelNames: Record<string, string>;
   environmentNames: Record<string, string>;
+  assetNames: Record<string, string>;
 }
 
 export function ContentProjectDetailPage() {
@@ -50,6 +51,7 @@ export function ContentProjectDetailPage() {
   );
   const modelsService = useMemo(() => new ModelsService(getModelsRepository()), []);
   const environmentsService = useMemo(() => new EnvironmentsService(getEnvironmentsRepository()), []);
+  const libraryService = useMemo(() => new LibraryService(getLibraryRepository()), []);
 
   const [state, setState] = useState<'loading' | 'error' | 'ready'>('loading');
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +74,7 @@ export function ContentProjectDetailPage() {
       }
       const modelNames: Record<string, string> = {};
       const environmentNames: Record<string, string> = {};
+      const assetNames: Record<string, string> = {};
       for (const input of inputs) {
         if (input.inputType === 'model' && !modelNames[input.modelId!]) {
           const model = await modelsService.getModel(input.modelId!, workspaceId).catch(() => null);
@@ -83,14 +86,24 @@ export function ContentProjectDetailPage() {
             .catch(() => null);
           environmentNames[input.environmentId!] = environment?.name ?? input.environmentId!;
         }
+        if (
+          (input.inputType === 'library_asset' || input.inputType === 'look') &&
+          input.libraryAssetId &&
+          !assetNames[input.libraryAssetId]
+        ) {
+          const asset = await libraryService
+            .getAsset(input.libraryAssetId, workspaceId)
+            .catch(() => null);
+          assetNames[input.libraryAssetId] = asset?.name ?? input.libraryAssetId;
+        }
       }
-      setDetail({ project, inputs, scenes, beats, modelNames, environmentNames });
+      setDetail({ project, inputs, scenes, beats, modelNames, environmentNames, assetNames });
       setState('ready');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this content plan.');
       setState('error');
     }
-  }, [environmentsService, modelsService, projectId, service]);
+  }, [environmentsService, libraryService, modelsService, projectId, service]);
 
   useEffect(() => {
     void load();
@@ -123,7 +136,7 @@ export function ContentProjectDetailPage() {
     );
   }
 
-  const { project, inputs, scenes, beats, modelNames, environmentNames } = detail;
+  const { project, inputs, scenes, beats, modelNames, environmentNames, assetNames } = detail;
 
   return (
     <div className="lf-page">
@@ -190,7 +203,9 @@ export function ContentProjectDetailPage() {
                       ? modelNames[input.modelId] ?? input.modelId
                       : input.inputType === 'environment' && input.environmentId
                         ? environmentNames[input.environmentId] ?? input.environmentId
-                        : input.libraryAssetId ?? input.inputType}
+                        : input.libraryAssetId
+                          ? assetNames[input.libraryAssetId] ?? input.libraryAssetId
+                          : input.inputType}
                   </strong>
                   <span className="lf-tile__description">
                     {input.inputType} · role: {input.role} · version{' '}

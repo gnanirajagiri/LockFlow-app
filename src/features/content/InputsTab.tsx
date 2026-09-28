@@ -663,6 +663,11 @@ export function InputsTab() {
                   <SharedAssetRow
                     key={input.id}
                     input={input}
+                    name={
+                      (libraryAssets ?? []).find((asset) => asset.id === input.libraryAssetId)?.name ??
+                      input.libraryAssetId ??
+                      input.id
+                    }
                     index={index}
                     total={sharedInputs.length}
                     disabled={!isDraft || busy}
@@ -719,7 +724,7 @@ export function InputsTab() {
               <ul className="lf-envref__list">
                 {resolved.map((entry) => (
                   <li key={entry.input.id} className="lf-envref__item">
-                    <strong>{entryVersionLabel(entry)}</strong>
+                    <strong>{inputDisplayName(entry, models, environments, libraryAssets)}</strong>
                     <span className="lf-tile__description">
                       {entry.input.inputType} · role: {entry.input.role} ·{' '}
                       {entry.versionStatus === 'locked' ? 'locked ✓' : `${entry.versionStatus} — must be locked`}
@@ -750,12 +755,28 @@ const ROLE_FOR_TYPE: Partial<Record<string, ContentInputRole>> = {
   reference: 'reference',
 };
 
-function entryVersionLabel(entry: ResolvedProjectInput): string {
-  return entry.input.modelId ?? entry.input.environmentId ?? entry.input.libraryAssetId ?? entry.input.inputType;
+function inputDisplayName(
+  entry: ResolvedProjectInput,
+  models: ModelRecord[] | null,
+  environments: EnvironmentRecord[] | null,
+  assets: LibraryAssetRecord[] | null,
+): string {
+  const { input } = entry;
+  if (input.inputType === 'model' && input.modelId) {
+    return models?.find((model) => model.id === input.modelId)?.name ?? input.modelId;
+  }
+  if (input.inputType === 'environment' && input.environmentId) {
+    return environments?.find((environment) => environment.id === input.environmentId)?.name ?? input.environmentId;
+  }
+  if ((input.inputType === 'library_asset' || input.inputType === 'look') && input.libraryAssetId) {
+    return assets?.find((asset) => asset.id === input.libraryAssetId)?.name ?? input.libraryAssetId;
+  }
+  return input.inputType;
 }
 
 function SharedAssetRow({
   input,
+  name,
   index,
   total,
   disabled,
@@ -763,6 +784,7 @@ function SharedAssetRow({
   onReorder,
 }: {
   input: ContentProjectInputRecord;
+  name: string;
   index: number;
   total: number;
   disabled: boolean;
@@ -774,7 +796,7 @@ function SharedAssetRow({
       <span className="lf-library__lookitemnum" aria-hidden="true">{index + 1}</span>
       <span className="lf-library__lookitembody">
         <Link to={`/library/${input.libraryAssetId}`}>
-          <strong>{input.libraryAssetId}</strong>
+          <strong>{name}</strong>
         </Link>
         <span className="lf-library__lookitemmeta">
           role: {input.role} · version {input.libraryAssetVersionId}

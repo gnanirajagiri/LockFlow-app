@@ -30,6 +30,10 @@ function mapProject(row: Record<string, unknown>): ContentProjectRecord {
     objective: (row.objective as string | null) ?? null,
     audience: (row.audience as string | null) ?? null,
     brandVoice: (row.brand_voice as string | null) ?? null,
+    plannedOutputType: (row.planned_output_type as ContentProjectRecord['plannedOutputType'] | null) ?? null,
+    requestedVariants: (row.requested_variants as number | null) ?? 1,
+    creativeDirection: (row.creative_direction as string | null) ?? null,
+    storyboardDirection: (row.storyboard_direction as string | null) ?? null,
     createdBy: row.created_by as string,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
@@ -178,6 +182,8 @@ export class SupabaseContentRepository implements ContentRepository {
         ...(input.objective !== undefined ? { objective: input.objective } : {}),
         ...(input.audience !== undefined ? { audience: input.audience } : {}),
         ...(input.brandVoice !== undefined ? { brand_voice: input.brandVoice } : {}),
+        ...(input.plannedOutputType !== undefined ? { planned_output_type: input.plannedOutputType } : {}),
+        ...(input.requestedVariants !== undefined ? { requested_variants: input.requestedVariants } : {}),
         created_by: createdBy,
       })
       .select('*')
@@ -196,6 +202,10 @@ export class SupabaseContentRepository implements ContentRepository {
     if (patch.objective !== undefined) payload.objective = patch.objective;
     if (patch.audience !== undefined) payload.audience = patch.audience;
     if (patch.brandVoice !== undefined) payload.brand_voice = patch.brandVoice;
+    if (patch.plannedOutputType !== undefined) payload.planned_output_type = patch.plannedOutputType;
+    if (patch.requestedVariants !== undefined) payload.requested_variants = patch.requestedVariants;
+    if (patch.creativeDirection !== undefined) payload.creative_direction = patch.creativeDirection;
+    if (patch.storyboardDirection !== undefined) payload.storyboard_direction = patch.storyboardDirection;
     const { data, error } = await this.client
       .from('content_projects')
       .update(payload)

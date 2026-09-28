@@ -99,10 +99,21 @@ export function validateCreateContentProject(
   const objective = raw.objective === undefined ? undefined : str(raw.objective).slice(0, 1000);
   const audience = raw.audience === undefined ? undefined : str(raw.audience).slice(0, 1000);
   const brandVoice = raw.brandVoice === undefined ? undefined : str(raw.brandVoice).slice(0, 1000);
+  const plannedOutputType = raw.plannedOutputType === undefined ? undefined : raw.plannedOutputType;
+  const requestedVariants = raw.requestedVariants === undefined ? undefined : raw.requestedVariants;
 
   if (!workspaceId) errors.push('workspaceId is required');
   if (name.length < 1 || name.length > 80) errors.push('name must be 1–80 characters');
   if (!SLUG_RE.test(slug)) errors.push('slug must be kebab-case (a–z, 0–9, hyphens)');
+  if (plannedOutputType !== undefined && !isContentOutputType(plannedOutputType)) {
+    errors.push('plannedOutputType must be photo, video, story or content_set');
+  }
+  if (
+    requestedVariants !== undefined &&
+    (typeof requestedVariants !== 'number' || !Number.isInteger(requestedVariants) || requestedVariants < 1 || requestedVariants > 10)
+  ) {
+    errors.push('requestedVariants must be an integer between 1 and 10');
+  }
 
   return errors.length
     ? { ok: false, errors }
@@ -116,6 +127,8 @@ export function validateCreateContentProject(
           ...(objective !== undefined ? { objective } : {}),
           ...(audience !== undefined ? { audience } : {}),
           ...(brandVoice !== undefined ? { brandVoice } : {}),
+          ...(plannedOutputType !== undefined ? { plannedOutputType: plannedOutputType as ContentOutputType } : {}),
+          ...(requestedVariants !== undefined ? { requestedVariants: requestedVariants as number } : {}),
         },
       };
 }
@@ -132,9 +145,22 @@ export function validateUpdateContentProjectDraft(
     if (name.length < 1 || name.length > 80) errors.push('name must be 1–80 characters');
     else out.name = name;
   }
-  for (const key of ['campaignBrief', 'objective', 'audience', 'brandVoice'] as const) {
+  for (const key of ['campaignBrief', 'objective', 'audience', 'brandVoice', 'creativeDirection', 'storyboardDirection'] as const) {
     if (raw[key] !== undefined) {
       out[key] = raw[key] === null ? null : str(raw[key]).slice(0, 4000);
+    }
+  }
+  if (raw.plannedOutputType !== undefined) {
+    if (raw.plannedOutputType === null) out.plannedOutputType = null;
+    else if (isContentOutputType(raw.plannedOutputType)) out.plannedOutputType = raw.plannedOutputType;
+    else errors.push('plannedOutputType must be photo, video, story or content_set');
+  }
+  if (raw.requestedVariants !== undefined) {
+    const variants = raw.requestedVariants;
+    if (typeof variants === 'number' && Number.isInteger(variants) && variants >= 1 && variants <= 10) {
+      out.requestedVariants = variants;
+    } else {
+      errors.push('requestedVariants must be an integer between 1 and 10');
     }
   }
   if (Object.keys(out).length === 0) errors.push('at least one field must be provided');

@@ -1,10 +1,10 @@
 /**
- * Content Studio index — content plans (draft projects). Content Studio
- * assembles approved reusable inputs; it owns nothing and generates nothing:
- * generated work appears in Gallery.
+ * Content Studio index — the content-plans dashboard. Plans assemble approved
+ * reusable inputs; they own nothing and generate nothing: generated work
+ * appears in Gallery.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -14,7 +14,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
-import { StudioIcon } from '../components/icons';
+import { GridViewIcon, ListViewIcon, SearchIcon, StudioIcon } from '../components/icons';
 import { ContentStudioService } from '../services/contentService';
 import { LibraryService } from '../services/libraryService';
 import { ModelsService } from '../services/modelsService';
@@ -25,9 +25,26 @@ import { getModelsRepository } from '../data';
 import { getEnvironmentsRepository } from '../data/environmentsFactory';
 import { SEED_CONTENT_WORKSPACE_ID } from '../mock/contentSeed';
 import { STUDIO_HELPER_COPY } from '../features/content/contentUi';
-import type { ContentProjectRecord } from '../domain/content';
+import type { ContentProjectStatus } from '../domain/content';
+import type { ContentProjectSummary } from '../data/contentRepository';
 
 type LoadState = 'loading' | 'error' | 'ready';
+type StatusFilter = 'all' | ContentProjectStatus;
+type SortKey = 'updated' | 'name';
+type ViewMode = 'grid' | 'list';
+
+const STATUS_FILTERS: Array<{ value: StatusFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'ready', label: 'Ready' },
+  { value: 'archived', label: 'Archived' },
+];
+
+const STATUS_TONE = {
+  draft: 'neutral',
+  ready: 'success',
+  archived: 'warning',
+} as const;
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -37,12 +54,7 @@ function formatDate(iso: string): string {
   });
 }
 
-interface ProjectRow {
-  project: ContentProjectRecord;
-}
-
 export function ContentStudioPage() {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const service = useMemo(
     () =>
@@ -56,22 +68,19 @@ export function ContentStudioPage() {
 
   const [state, setState] = useState<LoadState>('loading');
   const [error, setError] = useState<string | null>(null);
-  const [rows, setRows] = useState<ProjectRow[]>([]);
+  const [summaries, setSummaries] = useState<ContentProjectSummary[]>([]);
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createName, setCreateName] = useState('');
-  const [createBrief, setCreateBrief] = useState('');
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sort, setSort] = useState<SortKey>('updated');
+  const [view, setView] = useState<ViewMode>('grid');
+  const [archiving, setArchiving] = useState<ContentProjectSummary | null>(null);
 
   const load = useCallback(async () => {
     setState('loading');
     setError(null);
     try {
-      const workspaceId = SEED_CONTENT_WORKSPACE_ID;
-      const projects = await service.listProjects(workspaceId);
-      const loaded: ProjectRow[] = projects.map((project) => ({ project }));
-      setRows(loaded);
+      setSummaries(await service.listProjectSummaries(SEED_CONTENT_WORKSPACE_ID));
       setState('ready');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load Content Studio.');
@@ -83,31 +92,30 @@ export function ContentStudioPage() {
     void load();
   }, [load]);
 
-  async function handleCreate() {
-    setCreating(true);
-    setCreateError(null);
+  const filtered = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    const list = summaries.filter((summary) => {
+      if (statusFilter !== 'all' && summary.project.status !== statusFilter) return false;
+      if (needle && !summary.project.name.toLowerCase().includes(needle)) return false;
+      return true;
+    });
+    if (sort === 'name') return [...list].sort((a, b) => a.project.name.localeCompare(b.project.name));
+    return [...list].sort((a, b) => b.project.updatedAt.localeCompare(a.project.updatedAt));
+  }, [search, sort, statusFilter, summaries]);
+
+  async function handleArchive() {
+    if (!archiving) return;
     try {
-      const project = await service.createProject(
-        {
-          workspaceId: SEED_CONTENT_WORKSPACE_ID,
-          name: createName,
-          ...(createBrief.trim() ? { campaignBrief: createBrief.trim() } : {}),
-        },
-        'demo-user',
-      );
-      toast({
-        title: 'Content plan created',
-        description: `${project.name} starts as a draft — assemble inputs, scenes and beats next.`,
-        tone: 'success',
-      });
-      setCreateOpen(false);
-      setCreateName('');
-      setCreateBrief('');
-      navigate(`/content-studio/${project.id}`);
+      await service.archiveProject(archiving.project.id, SEED_CONTENT_WORKSPACE_ID);
+      toast({ title: 'Plan archived', description: `${archiving.project.name} was archived.`, tone: 'success' });
+      setArchiving(null);
+      await load();
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : 'Could not create the content plan.');
-    } finally {
-      setCreating(false);
+      toast({
+        title: 'Archive failed',
+        description: err instanceof Error ? err.message : 'Something went wrong.',
+        tone: 'error',
+      });
     }
   }
 
@@ -118,9 +126,9 @@ export function ContentStudioPage() {
         title="Content Studio"
         description="Plan consistent photos, videos and stories with approved reusable inputs."
         actions={
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>
+          <Link className="lf-btn lf-btn--primary" to="/content-studio/new">
             New content plan
-          </Button>
+          </Link>
         }
       />
 
@@ -148,94 +156,156 @@ export function ContentStudioPage() {
       ) : null}
 
       {state === 'ready' ? (
-        rows.length === 0 ? (
-          <EmptyState
-            icon={<StudioIcon size={22} />}
-            title="No content plans yet"
-            description="Create a content plan to assemble approved models, environments, assets and Looks into scenes and beats — then prepare a job when everything is locked."
-            actions={
-              <Button variant="primary" onClick={() => setCreateOpen(true)}>
-                New content plan
-              </Button>
-            }
-          />
-        ) : (
-          <div className="lf-envgrid" role="list">
-            {rows.map(({ project }: { project: ContentProjectRecord }) => (
-              <Card key={project.id} role="listitem">
-                <CardBody>
-                  <div className="lf-envcard">
-                    <div className="lf-envcard__cover" aria-hidden="true">
-                      <StudioIcon size={24} />
-                    </div>
-                    <div className="lf-envcard__body">
-                      <div className="lf-envcard__title">
-                        <h2>
-                          <Link to={`/content-studio/${project.id}`}>{project.name}</Link>
-                        </h2>
-                        <span className="lf-envcard__slug">/{project.slug}</span>
-                      </div>
-                      <div className="lf-envcard__badges">
-                        <Badge tone={project.status === 'ready' ? 'success' : project.status === 'archived' ? 'warning' : 'neutral'} dot>
-                          {project.status}
-                        </Badge>
-                        <Badge tone="neutral">Content plan</Badge>
-                        <Badge tone="neutral">output type: TBD at job</Badge>
-                      </div>
-                      {project.objective ? <p className="lf-envcard__summary">{project.objective}</p> : null}
-                      <p className="lf-envcard__updated">Updated {formatDate(project.updatedAt)}</p>
-                    </div>
-                    <div className="lf-envcard__actions">
-                      <Link className="lf-btn lf-btn--secondary lf-btn--sm" to={`/content-studio/${project.id}`}>
-                        Open
-                      </Link>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            ))}
+        <>
+          <div className="lf-models-toolbar" role="search">
+            <div className="lf-models-toolbar__search">
+              <span className="lf-models-toolbar__search-icon" aria-hidden="true">
+                <SearchIcon size={16} />
+              </span>
+              <Input
+                label="Search content plans"
+                hideLabel
+                placeholder="Search by name"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                type="search"
+              />
+            </div>
+            <div className="lf-models-toolbar__filter">
+              <label className="lf-field__label" htmlFor="studio-status-filter">Status</label>
+              <select
+                id="studio-status-filter"
+                className="lf-input"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              >
+                {STATUS_FILTERS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="lf-models-toolbar__filter">
+              <label className="lf-field__label" htmlFor="studio-sort">Sort</label>
+              <select
+                id="studio-sort"
+                className="lf-input"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as SortKey)}
+              >
+                <option value="updated">Recently updated</option>
+                <option value="name">Name A–Z</option>
+              </select>
+            </div>
+            <div className="lf-viewtoggle" role="group" aria-label="Display mode">
+              <button
+                type="button"
+                className={`lf-viewtoggle__btn${view === 'grid' ? ' lf-viewtoggle__btn--active' : ''}`}
+                aria-pressed={view === 'grid'}
+                onClick={() => setView('grid')}
+              >
+                <GridViewIcon size={16} />
+                <span className="lf-visually-hidden">Grid view</span>
+              </button>
+              <button
+                type="button"
+                className={`lf-viewtoggle__btn${view === 'list' ? ' lf-viewtoggle__btn--active' : ''}`}
+                aria-pressed={view === 'list'}
+                onClick={() => setView('list')}
+              >
+                <ListViewIcon size={16} />
+                <span className="lf-visually-hidden">List view</span>
+              </button>
+            </div>
           </div>
-        )
+
+          {summaries.length === 0 ? (
+            <EmptyState
+              icon={<StudioIcon size={22} />}
+              title="Start your first content plan."
+              description="Build a brief, select approved reusable inputs, then prepare a version-pinned generation job."
+              actions={
+                <Link className="lf-btn lf-btn--primary" to="/content-studio/new">
+                  New content plan
+                </Link>
+              }
+            />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              icon={<SearchIcon size={22} />}
+              title="No content plans match"
+              description="Try a different search term or status filter."
+            />
+          ) : (
+            <div className={view === 'grid' ? 'lf-envgrid' : 'lf-envlist'} role="list">
+              {filtered.map((summary) => {
+                const { project } = summary;
+                return (
+                  <Card key={project.id} role="listitem">
+                    <CardBody>
+                      <div className="lf-envcard">
+                        <div className="lf-envcard__cover" aria-hidden="true">
+                          <StudioIcon size={24} />
+                        </div>
+                        <div className="lf-envcard__body">
+                          <div className="lf-envcard__title">
+                            <h2>
+                              <Link to={`/content-studio/${project.id}`}>{project.name}</Link>
+                            </h2>
+                            <span className="lf-envcard__slug">/{project.slug}</span>
+                          </div>
+                          <div className="lf-envcard__badges">
+                            <Badge tone={STATUS_TONE[project.status]} dot>{project.status}</Badge>
+                            <Badge tone="neutral">
+                              {project.plannedOutputType ? project.plannedOutputType.replace('_', ' ') : 'output TBD'}
+                            </Badge>
+                            <Badge tone="neutral">
+                              {summary.sceneCount} scene{summary.sceneCount === 1 ? '' : 's'}
+                            </Badge>
+                          </div>
+                          <p className="lf-envcard__summary">
+                            {project.campaignBrief ?? 'No campaign brief yet.'}
+                          </p>
+                          <p className="lf-envcard__summary">
+                            Model: {summary.modelName ?? '—'} · Environment: {summary.environmentName ?? '—'}
+                          </p>
+                          <p className="lf-envcard__updated">Updated {formatDate(project.updatedAt)}</p>
+                        </div>
+                        <div className="lf-envcard__actions">
+                          <Link className="lf-btn lf-btn--secondary lf-btn--sm" to={`/content-studio/${project.id}`}>
+                            Open
+                          </Link>
+                          <Button size="sm" variant="ghost" onClick={() => setArchiving(summary)}>
+                            Archive
+                          </Button>
+                        </div>
+                      </div>
+                    </CardBody>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </>
       ) : null}
 
       <Modal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        title="New content plan"
+        open={archiving !== null}
+        onClose={() => setArchiving(null)}
+        title={archiving ? `Archive ${archiving.project.name}?` : 'Archive plan'}
         size="sm"
         footer={
           <div className="lf-dialogactions">
-            <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={() => void handleCreate()} disabled={creating || createName.trim() === ''}>
-              {creating ? 'Creating…' : 'Create draft plan'}
+            <Button onClick={() => setArchiving(null)}>Cancel</Button>
+            <Button variant="danger" onClick={() => void handleArchive()}>
+              Archive plan
             </Button>
           </div>
         }
       >
         <p>
-          Start a working brief. You will assemble approved models, environments, assets and
-          Looks into scenes and beats, then pin exact versions when preparing a job.
-        </p>
-        <Input
-          label="Project name"
-          value={createName}
-          onChange={(event) => setCreateName(event.target.value)}
-          error={createError ?? undefined}
-          required
-          hint="e.g. Morning Skincare Routine"
-        />
-        <label className="lf-field" style={{ marginTop: 'var(--lf-space-3)' }}>
-          <span className="lf-field__label">Campaign brief (optional)</span>
-          <textarea
-            className="lf-input lf-envform__textarea"
-            rows={3}
-            value={createBrief}
-            onChange={(event) => setCreateBrief(event.target.value)}
-          />
-        </label>
-        <p className="lf-tile__description">
-          {STUDIO_HELPER_COPY} No generation is configured yet — plans stay drafts until a
-          provider is connected.
+          <strong>{archiving?.project.name}</strong> will be marked archived and hidden from the
+          default list. This is a soft archive — the plan, its scenes and beats are preserved, and
+          nothing is deleted.
         </p>
       </Modal>
     </div>

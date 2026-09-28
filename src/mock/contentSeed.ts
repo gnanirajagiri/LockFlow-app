@@ -41,6 +41,11 @@ function project(): ContentProjectRecord {
     objective: 'Demonstrate a simple morning skincare routine.',
     audience: 'Skincare-focused social viewers.',
     brandVoice: 'Warm, practical, calm.',
+    plannedOutputType: 'content_set',
+    requestedVariants: 3,
+    creativeDirection:
+      'Calm morning skincare routine, warm window light, confident and practical tone.',
+    storyboardDirection: null,
     createdBy: 'demo-user',
     createdAt: '2026-09-27T10:00:00.000Z',
     updatedAt: '2026-09-27T10:00:00.000Z',

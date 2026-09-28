@@ -16,6 +16,16 @@ import type {
   UpdateContentProjectDraftInput,
 } from '../domain/content';
 
+/** Lightweight dashboard row: project plus denormalized plan facts. */
+export interface ContentProjectSummary {
+  project: ContentProjectRecord;
+  inputCount: number;
+  sceneCount: number;
+  beatCount: number;
+  modelName: string | null;
+  environmentName: string | null;
+}
+
 export interface ContentRepository {
   // Projects
   listProjects(workspaceId: string): Promise<ContentProjectRecord[]>;

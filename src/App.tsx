@@ -19,7 +19,16 @@ import {
 import { EnvironmentLockPage } from './features/environments/EnvironmentLockPage';
 import { StudioPage } from './pages/StudioPage';
 import { ContentStudioPage } from './pages/ContentStudioPage';
+import { ContentStudioNewPlanPage } from './pages/ContentStudioNewPlanPage';
 import { ContentProjectDetailPage } from './pages/ContentProjectDetailPage';
+import { ContentProjectLayout } from './features/content/ContentProjectLayout';
+import {
+  ContentBriefRoute,
+  ContentInputsRoute,
+  ContentJobRoute,
+  ContentReviewRoute,
+  ContentStoryboardRoute,
+} from './features/content/tabRoutes';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { GalleryPage } from './pages/GalleryPage';
 import { LibraryPage } from './pages/LibraryPage';
@@ -85,7 +94,15 @@ export default function App() {
               </Route>
               <Route path="studio" element={<StudioPage />} />
               <Route path="content-studio" element={<ContentStudioPage />} />
-              <Route path="content-studio/:projectId" element={<ContentProjectDetailPage />} />
+              <Route path="content-studio/new" element={<ContentStudioNewPlanPage />} />
+              <Route path="content-studio/:projectId" element={<ContentProjectLayout />}>
+                <Route index element={<ContentProjectDetailPage />} />
+                <Route path="brief" element={<ContentBriefRoute />} />
+                <Route path="inputs" element={<ContentInputsRoute />} />
+                <Route path="storyboard" element={<ContentStoryboardRoute />} />
+                <Route path="review" element={<ContentReviewRoute />} />
+                <Route path="job" element={<ContentJobRoute />} />
+              </Route>
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="gallery" element={<GalleryPage />} />
               <Route path="library" element={<LibraryPage />} />

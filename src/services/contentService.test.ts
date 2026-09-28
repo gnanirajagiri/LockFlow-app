@@ -181,7 +181,9 @@ describe('rule 4 — execution readiness requires locked versions', () => {
     );
 
     const problems = await service.validateExecutionReadiness(CONTENT_PROJECT_ID, workspaceId);
-    expect(problems.some((message) => /Environment version is still a draft/i.test(message))).toBe(true);
+    expect(
+      problems.some((message) => /Warm Bedroom Studio v\d+ is still a draft.*lock it in Environments/i.test(message)),
+    ).toBe(true);
   });
 
   it('is clean for the fully locked seed selection', async () => {
@@ -288,6 +290,69 @@ describe('rule 7 — a Look resolves canonical item versions without duplicating
         workspaceId,
       ),
     ).rejects.toThrow(/Look inputs must select a look-type Library asset/);
+  });
+});
+
+describe('planning fields, summaries and the look-model match rule', () => {
+  it('persists planned output type, variants and direction fields on a draft', async () => {
+    const updated = await service.updateProjectDraft(
+      CONTENT_PROJECT_ID,
+      {
+        plannedOutputType: 'video',
+        requestedVariants: 4,
+        creativeDirection: 'Soft warm tones throughout.',
+        storyboardDirection: 'Slow push-in on the pump.',
+      },
+      workspaceId,
+    );
+    expect(updated.plannedOutputType).toBe('video');
+    expect(updated.requestedVariants).toBe(4);
+    expect(updated.creativeDirection).toBe('Soft warm tones throughout.');
+    expect(updated.storyboardDirection).toBe('Slow push-in on the pump.');
+
+    // Range validation.
+    await expect(
+      service.updateProjectDraft(CONTENT_PROJECT_ID, { requestedVariants: 11 }, workspaceId),
+    ).rejects.toThrow(/between 1 and 10/);
+  });
+
+  it('refuses a Look whose associated model differs from the primary model', async () => {
+    // Create a second model + a look for it in the Library bridge workspace.
+    const modelsService = new ModelsService(getModelsRepository());
+    const second = await modelsService.createModel({ workspaceId, name: 'Bea Test' }, 'tester');
+
+    const library = new LibraryService(getLibraryRepository());
+    const lookAsset = await library.createLook(
+      { name: 'Bea look', modelId: second.id, items: [] },
+      'tester',
+      workspaceId,
+    );
+    const lookVersions = await library.getVersions(lookAsset.id, workspaceId);
+
+    await expect(
+      service.addProjectInput(
+        {
+          contentProjectId: CONTENT_PROJECT_ID,
+          inputType: 'look',
+          libraryAssetId: lookAsset.id,
+          libraryAssetVersionId: lookVersions[0].id,
+          role: 'look',
+        },
+        workspaceId,
+      ),
+    ).rejects.toThrow(/different model/);
+  });
+
+  it('builds dashboard summaries with counts and resolved model/environment names', async () => {
+    const summaries = await service.listProjectSummaries(workspaceId);
+    const seeded = summaries.find((summary) => summary.project.id === CONTENT_PROJECT_ID);
+    expect(seeded).toBeDefined();
+    expect(seeded!.modelName).toBe('Aisha');
+    expect(seeded!.environmentName).toBe('Warm Bedroom Studio');
+    expect(seeded!.inputCount).toBe(4);
+    expect(seeded!.sceneCount).toBe(3);
+    expect(seeded!.beatCount).toBe(6);
+    expect(seeded!.project.plannedOutputType).toBe('content_set');
   });
 });
 

@@ -49,6 +49,14 @@ export interface ContentProjectRecord {
   objective: string | null;
   audience: string | null;
   brandVoice: string | null;
+  /** Phase-1 planned format — captured on the plan, not the job. */
+  plannedOutputType: ContentOutputType | null;
+  /** Requested variants per planned output (1–10). */
+  requestedVariants: number;
+  /** Natural-language creative direction captured via the intent bar. */
+  creativeDirection: string | null;
+  /** Natural-language storyboard direction captured via the intent bar. */
+  storyboardDirection: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -167,6 +175,8 @@ export interface CreateContentProjectInput {
   objective?: string;
   audience?: string;
   brandVoice?: string;
+  plannedOutputType?: ContentOutputType;
+  requestedVariants?: number;
 }
 
 export interface UpdateContentProjectDraftInput {
@@ -175,6 +185,10 @@ export interface UpdateContentProjectDraftInput {
   objective?: string | null;
   audience?: string | null;
   brandVoice?: string | null;
+  plannedOutputType?: ContentOutputType | null;
+  requestedVariants?: number;
+  creativeDirection?: string | null;
+  storyboardDirection?: string | null;
 }
 
 export interface CreateContentProjectInputPayload {

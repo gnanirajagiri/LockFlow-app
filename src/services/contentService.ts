@@ -48,7 +48,7 @@ import {
 import { LibraryService } from './libraryService';
 import { ModelsService } from './modelsService';
 import { EnvironmentsService } from './environmentsService';
-import type { ContentRepository } from '../data/contentRepository';
+import type { ContentProjectSummary, ContentRepository } from '../data/contentRepository';
 import type {
   LibraryAssetRecord,
   LibraryAssetVersionRecord,
@@ -73,6 +73,38 @@ export class ContentStudioService {
 
   async listProjects(workspaceId: string): Promise<ContentProjectRecord[]> {
     return this.repo.listProjects(workspaceId);
+  }
+
+  /**
+   * Dashboard summaries: project plus denormalized facts (counts and the
+   * selected primary model / environment names resolved via the bridges —
+   * canonical records, read-only).
+   */
+  async listProjectSummaries(workspaceId: string): Promise<ContentProjectSummary[]> {
+    const projects = await this.repo.listProjects(workspaceId);
+    const summaries: ContentProjectSummary[] = [];
+    for (const project of projects) {
+      const [inputs, scenes] = await Promise.all([
+        this.repo.listInputs(project.id).catch(() => []),
+        this.repo.listScenes(project.id).catch(() => []),
+      ]);
+      let beatCount = 0;
+      for (const scene of scenes) {
+        beatCount += (await this.repo.listBeats(scene.id).catch(() => [])).length;
+      }
+      let modelName: string | null = null;
+      let environmentName: string | null = null;
+      const modelInput = inputs.find((input) => input.inputType === 'model' && input.modelId);
+      const environmentInput = inputs.find((input) => input.inputType === 'environment' && input.environmentId);
+      if (modelInput?.modelId) {
+        modelName = await this.bridges.models.getModel(modelInput.modelId, workspaceId).then((m) => m.name).catch(() => modelInput.modelId!);
+      }
+      if (environmentInput?.environmentId) {
+        environmentName = await this.bridges.environments.getEnvironment(environmentInput.environmentId, workspaceId).then((e) => e.name).catch(() => environmentInput.environmentId!);
+      }
+      summaries.push({ project, inputCount: inputs.length, sceneCount: scenes.length, beatCount, modelName, environmentName });
+    }
+    return summaries;
   }
 
   async getProject(projectId: string, activeWorkspaceId: string): Promise<ContentProjectRecord> {
@@ -146,6 +178,21 @@ export class ContentStudioService {
         throw new Error('Look inputs must select a look-type Library asset.');
       }
       await this.assertLibraryVersion(asset, value.libraryAssetVersionId!);
+      // A Look belongs to one model; it must match the plan's primary model.
+      if (value.inputType === 'look') {
+        const details = await this.bridges.library.getLookDetails(value.libraryAssetVersionId!, activeWorkspaceId);
+        if (details) {
+          const modelInput = (await this.repo.listInputs(value.contentProjectId)).find(
+            (entry) => entry.inputType === 'model' && entry.modelId,
+          );
+          if (modelInput?.modelId && details.modelId !== modelInput.modelId) {
+            const model = await this.bridges.models.getModel(modelInput.modelId, activeWorkspaceId).catch(() => null);
+            throw new Error(
+              `The selected Look is associated with a different model — choose a Look for ${model?.name ?? 'the primary model'}.`,
+            );
+          }
+        }
+      }
     }
 
     const existing = await this.repo.listInputs(value.contentProjectId);
@@ -517,7 +564,8 @@ export class ContentStudioService {
   /**
    * Execution-readiness check with human-readable failures. Returns the list
    * of problems (empty when ready). A job cannot become execution-ready if a
-   * selected input uses a draft or missing version.
+   * selected input uses a draft or missing version, or when no primary model
+   * is selected at all.
    */
   async validateExecutionReadiness(
     projectId: string,
@@ -531,22 +579,35 @@ export class ContentStudioService {
       return [err instanceof Error ? err.message : 'Could not resolve the project inputs.'];
     }
 
+    // A primary Model is required for any execution-ready job.
+    const inputs = resolved.map((entry) => entry.input);
+    if (!inputs.some((input) => input.inputType === 'model' && input.role === 'primary_model')) {
+      problems.push('A primary Model is required.');
+    }
+
     for (const entry of resolved) {
       const { input } = entry;
+      const resolvedLabel = await this.resolvedInputName(entry, activeWorkspaceId);
       if (input.inputType === 'model' && entry.versionStatus !== 'locked') {
         problems.push('Select a locked Model version before preparing this job.');
       } else if (input.inputType === 'environment' && entry.versionStatus !== 'locked') {
-        problems.push(`The selected Environment version is still a ${entry.versionStatus}.`);
+        problems.push(
+          `${resolvedLabel} v${entry.versionNumber} is still a ${entry.versionStatus}. Select a locked version or lock it in Environments.`,
+        );
       } else if (input.inputType === 'library_asset' && entry.versionStatus !== 'locked') {
-        problems.push(`The selected Library asset version is still a ${entry.versionStatus}.`);
+        problems.push(
+          `${resolvedLabel} v${entry.versionNumber} is still a ${entry.versionStatus}. Select a locked version or lock it in the Library.`,
+        );
       } else if (input.inputType === 'look') {
         if (entry.versionStatus !== 'locked') {
-          problems.push(`The selected Look version is still a ${entry.versionStatus}.`);
+          problems.push(
+            `${resolvedLabel} v${entry.versionNumber} is still a ${entry.versionStatus}. Select a locked version or lock it in the Library.`,
+          );
         }
         for (const item of entry.lookItems ?? []) {
           const version = await this.bridges.library.getVersion(item.libraryAssetVersionId, activeWorkspaceId).catch(() => null);
           if (!version) {
-            problems.push('A Look contains an unavailable asset version.');
+            problems.push(`${resolvedLabel} contains an unavailable asset version.`);
           } else if (version.status !== 'locked') {
             problems.push(
               `A Look item version is still a ${version.status} — lock the item's approved version first.`,
@@ -556,6 +617,25 @@ export class ContentStudioService {
       }
     }
     return problems;
+  }
+
+  /** Display name for a resolved input ("Warm Bedroom Studio", "Aisha"…). */
+  private async resolvedInputName(entry: ResolvedProjectInput, activeWorkspaceId: string): Promise<string> {
+    const { input } = entry;
+    try {
+      if (input.inputType === 'model' && input.modelId) {
+        return (await this.bridges.models.getModel(input.modelId, activeWorkspaceId)).name;
+      }
+      if (input.inputType === 'environment' && input.environmentId) {
+        return (await this.bridges.environments.getEnvironment(input.environmentId, activeWorkspaceId)).name;
+      }
+      if ((input.inputType === 'library_asset' || input.inputType === 'look') && input.libraryAssetId) {
+        return (await this.bridges.library.getAsset(input.libraryAssetId, activeWorkspaceId)).name;
+      }
+    } catch {
+      // Fall through to ids below.
+    }
+    return input.modelId ?? input.environmentId ?? input.libraryAssetId ?? input.inputType;
   }
 
   /**

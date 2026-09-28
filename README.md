@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — Image generation (fake provider).** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation + functional Library UI, the Content Studio data foundation + functional planning interface, the Gallery data foundation + functional review/collection UI, and **secure private reference uploads** (Models / Environments / Library) are in place. Real AI generation, provider integrations, payments, Campaigns/Templates UI and image analysis are intentionally out of scope.
+> **Status — Short-form video generation (fake provider).** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation + functional Library UI, the Content Studio data foundation + functional planning interface, the Gallery data foundation + functional review/collection UI, and **secure private reference uploads** (Models / Environments / Library) are in place. Real AI generation, provider integrations, payments, Campaigns/Templates UI and image analysis are intentionally out of scope.
 
 ---
 
@@ -479,10 +479,22 @@ These are read by the server-side worker only (never `VITE_`-prefixed, never in 
 
 In demo mode the fake provider is enabled automatically (`development-fake`): the job tab shows a readiness checklist, requires the rights/allowance acknowledgement, and on Generate produces clearly marked placeholder outputs in Gallery through the exact production state machine. No real provider call is ever simulated.
 
+## Short-form video generation (Phase 1, image architecture reused)
+
+Video generation extends the Prompt-12 Generation domain with a provider-neutral `VideoGenerationProvider` — **no real video adapter ships yet** (`DevelopmentFakeVideoProvider` only; production fails closed). Phase-1 contract: **4/6/8-second** clips, **9:16 / 1:1 / 16:9** aspect ratios, **mp4/webm** outputs only, for Video and Story plans. No long-form timelines, audio, speech, lip sync or voice cloning exist, and overlay/dialogue text is guidance only. Multi-scene long-form studio production belongs to Phase 2.
+
+| Concern | Design |
+| ------- | ------ |
+| Beat-aware runs | Each clip may target one Scene + Beat; immutable `scene_snapshot` / `beat_snapshot` are frozen at submission (later storyboard edits never change a submitted clip), stored on `generation_provider_runs` (`generation_kind='video'`) and copied into output metadata. Workspace/scene/beat consistency is DB-enforced. |
+| Separate quotas | `generation_video_quota_usage` tracks jobs **and total requested seconds** per workspace/user month (auditable guard, not billing), with separate configurable limits (`VIDEO_MAX_*`). |
+| Ingestion | Clips land in the private `lockflow-gallery-media` bucket under `runs/{run}/videos/{output}/`; provider-supplied thumbnails under `runs/{run}/thumbnails/{output}/`. No transcoding/FFmpeg infrastructure. Gallery outputs carry `output_type=video\|story`, `ready_for_review`, duration/dimensions/mime and scene/beat provenance columns. |
+| Env vars (names only) | `VIDEO_PROVIDER_NAME` · `VIDEO_PROVIDER_API_KEY` · `VIDEO_PROVIDER_WEBHOOK_SECRET` (callback-capable providers only) · `VIDEO_GENERATION_ENABLED` · `VIDEO_MAX_OUTPUTS_PER_JOB` · `VIDEO_MAX_JOBS_PER_USER_PER_PERIOD` · `VIDEO_MAX_JOBS_PER_WORKSPACE_PER_PERIOD` · `VIDEO_MAX_SECONDS_PER_USER_PER_PERIOD` · `VIDEO_MAX_SECONDS_PER_WORKSPACE_PER_PERIOD` · `VIDEO_SIGNED_REFERENCE_URL_TTL_SECONDS` · `VIDEO_WORKER_CONCURRENCY` |
+| UI | The job tab's video panel offers scene/beat/duration/aspect/count selection, the video allowance acknowledgement, live status and safe retry; Gallery detail marks generated clips and links exact pinned versions. |
+
 ## Roadmap beyond this milestone
 
 1. Workspace provisioning on first sign-in (create workspace + owner membership).
 2. ~~Model Builder and Environment Builder data models with version + lock tables.~~ Done — Models data foundation + interface, Environments data foundation.
 3. ~~Environment Builder UI~~ Done — the Environment Builder interface (index, profile, editor, references, versions, lock review) ships on the Environments data layer; AI-assisted composition remains out of scope.
 4. Library asset types backed by Supabase Storage (private bucket already provisioned) — ~~reference uploads to secure storage~~ **Done** — private, workspace-scoped reference uploads ship on the `lockflow-references` bucket; remaining: preview/thumbnail generation into `lockflow-previews` and the server-side cleanup job for soft-deleted objects.
-5. Content job pipeline feeding the Gallery — data layer + functional UI done; ~~secure media storage~~ done; provider integration: **abstraction + development fake provider shipped, production adapter pending selection** (video generation is not included yet).
+5. Content job pipeline feeding the Gallery — data layer + functional UI done; ~~secure media storage~~ done; provider integration: **image + short-form video abstractions and development fake providers shipped, production adapters pending selection**.

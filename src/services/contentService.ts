@@ -284,6 +284,13 @@ export class ContentStudioService {
     return this.repo.reorderScenes(projectId, result.value);
   }
 
+  /** Workspace-checked single-scene read (generation snapshot resolver). */
+  async getScene(sceneId: string, activeWorkspaceId: string): Promise<ContentSceneRecord> {
+    const scene = await this.repo.getScene(sceneId);
+    await this.getProject(scene.contentProjectId, activeWorkspaceId);
+    return scene;
+  }
+
   // ── Beats ──────────────────────────────────────────────────────────────────
 
   async listBeats(sceneId: string, activeWorkspaceId: string): Promise<ContentBeatRecord[]> {
@@ -337,6 +344,14 @@ export class ContentStudioService {
     const result = validateReorder(order);
     if (!result.ok) throw new Error(`Invalid beat reorder: ${result.errors.join('; ')}`);
     return this.repo.reorderBeats(sceneId, result.value);
+  }
+
+  /** Workspace-checked single-beat read (generation snapshot resolver). */
+  async getBeat(beatId: string, activeWorkspaceId: string): Promise<ContentBeatRecord> {
+    const beat = await this.repo.getBeat(beatId);
+    const scene = await this.repo.getScene(beat.contentSceneId);
+    await this.getProject(scene.contentProjectId, activeWorkspaceId);
+    return beat;
   }
 
   // ── Job requests ───────────────────────────────────────────────────────────

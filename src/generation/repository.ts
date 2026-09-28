@@ -32,6 +32,14 @@ export interface GenerationProviderRunRecord {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Video milestone: kind + scene/beat provenance + requested settings. */
+  generationKind?: 'image' | 'video';
+  contentSceneId?: string | null;
+  contentBeatId?: string | null;
+  sceneSnapshot?: Record<string, unknown> | null;
+  beatSnapshot?: Record<string, unknown> | null;
+  requestedAspectRatio?: string | null;
+  requestedDurationSeconds?: number | null;
 }
 
 export interface GenerationQuotaUsageRecord {
@@ -53,6 +61,14 @@ export interface GenerationConfigRecord {
   imageMaxOutputsPerJob: number;
   imageMaxJobsPerUserPerPeriod: number;
   imageMaxJobsPerWorkspacePerPeriod: number;
+  /** Video milestone: separate fail-closed configuration. */
+  videoGenerationEnabled: boolean;
+  videoProviderName: string;
+  videoMaxOutputsPerJob: number;
+  videoMaxJobsPerUserPerPeriod: number;
+  videoMaxJobsPerWorkspacePerPeriod: number;
+  videoMaxSecondsPerUserPerPeriod: number;
+  videoMaxSecondsPerWorkspacePerPeriod: number;
 }
 
 export interface GenerationAuditEventRecord {
@@ -85,6 +101,14 @@ export interface CreateProviderRunInput {
   providerName: string;
   idempotencyKey: string;
   requestSnapshot: Record<string, unknown>;
+  /** Video milestone extensions (omit for image runs). */
+  generationKind?: 'image' | 'video';
+  contentSceneId?: string | null;
+  contentBeatId?: string | null;
+  sceneSnapshot?: Record<string, unknown> | null;
+  beatSnapshot?: Record<string, unknown> | null;
+  requestedAspectRatio?: string | null;
+  requestedDurationSeconds?: number | null;
 }
 
 export interface GenerationRepository {
@@ -115,6 +139,29 @@ export interface GenerationRepository {
   getOrCreateQuota(workspaceId: string, userId: string, periodStart: string, periodEnd: string): Promise<GenerationQuotaUsageRecord>;
   incrementQuota(workspaceId: string, userId: string, periodStart: string, periodEnd: string, outputsRequested: number): Promise<void>;
   quotaTotalsForWorkspace(workspaceId: string, periodStart: string): Promise<{ jobs: number; outputs: number }>;
+
+  // ── Video milestone ─────────────────────────────────────────────────────
+  latestVideoRunForJob(jobId: string): Promise<GenerationProviderRunRecord | null>;
+  createVideoRun(input: CreateProviderRunInput): Promise<GenerationProviderRunRecord>;
+  incrementVideoQuota(workspaceId: string, userId: string, secondsRequested: number): Promise<void>;
+  /** Merges live quota counters into the configured limits for evaluation. */
+  getVideoQuotaView(workspaceId: string, userId: string, limits: {
+    maxOutputsPerJob: number;
+    maxJobsPerUserPerPeriod: number;
+    maxJobsPerWorkspacePerPeriod: number;
+    maxSecondsPerUserPerPeriod: number;
+    maxSecondsPerWorkspacePerPeriod: number;
+  }): Promise<{
+    maxOutputsPerJob: number;
+    maxJobsPerUserPerPeriod: number;
+    maxJobsPerWorkspacePerPeriod: number;
+    maxSecondsPerUserPerPeriod: number;
+    maxSecondsPerWorkspacePerPeriod: number;
+    userJobsThisPeriod: number;
+    workspaceJobsThisPeriod: number;
+    userSecondsThisPeriod: number;
+    workspaceSecondsThisPeriod: number;
+  }>;
 
   // Config (single row)
   getConfig(): Promise<GenerationConfigRecord>;

@@ -449,6 +449,13 @@ export function GalleryOutputDetailPage() {
                 {statusLabel(provenance?.job.status ?? 'draft')} · requested output:{' '}
                 {provenance?.job.requestedOutputType.replace(/_/g, ' ')}
               </p>
+              {(output.metadata as { generation_kind?: string } | null)?.generation_kind === 'video' ? (
+                <div className="lf-library__note">
+                  <strong>Clip source.</strong> Scene and Beat snapshots are frozen from the storyboard
+                  at submission time — later storyboard edits never change a submitted clip. Overlay
+                  text is guidance only; no speech, audio or lip sync is generated.
+                </div>
+              ) : null}
               {provenance && provenance.pins.length > 0 ? (
                 <ul className="lf-envref__list">
                   {provenance.pins.map((pin) => (

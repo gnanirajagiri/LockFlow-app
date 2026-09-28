@@ -1,0 +1,336 @@
+/**
+ * Video generation panel — short-form Phase 1 (4/6/8 s clips for Video and
+ * Story plans). Scene/Beat selection is beat-aware; duration and aspect are
+ * constrained to the Phase-1 contract; a separate video acknowledgement is
+ * required; live status and safe retry follow the image panel's patterns.
+ *
+ * Calls only the VideoGenerationService — never a provider adapter.
+ * Dialogue/overlay text is guidance only; no audio/speech/lip-sync claims.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Card, CardBody } from '../../components/ui/Card';
+import { useToast } from '../../components/ui/Toast';
+import { isDemoMode } from '../../lib/env';
+import { createVideoGenerationService, DEMO_GENERATION_CONFIG } from '../../generation/factory';
+import { SEED_CONTENT_WORKSPACE_ID } from '../../mock/contentSeed';
+import { ALLOWED_DURATIONS, ALLOWED_ASPECT_RATIOS } from '../../generation/videoTypes';
+import type { AllowedAspectRatio, AllowedDuration } from '../../generation/videoTypes';
+
+const VIDEO_ACKNOWLEDGEMENT =
+  'I confirm I have rights to use the selected references and understand this uses my workspace video allowance.';
+
+const STATUS_LABEL: Record<string, string> = {
+  created: 'Preparing',
+  submitted: 'Queued',
+  queued: 'Queued',
+  processing: 'Generating',
+  review: 'Ready for review',
+  completed: 'Completed',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  draft: 'Draft',
+};
+
+export interface VideoGenerationPanelProps {
+  jobId: string | null;
+  jobStatus: string;
+  requestedOutputType: string;
+  projectId: string;
+  pinsLoaded: boolean;
+  onSubmitted: () => void;
+}
+
+export function VideoGenerationPanel({
+  jobId,
+  jobStatus,
+  requestedOutputType,
+  projectId,
+  pinsLoaded,
+  onSubmitted,
+}: VideoGenerationPanelProps) {
+  const { toast } = useToast();
+  const { service, repo } = useMemo(() => createVideoGenerationService(), []);
+
+  const [config, setConfig] = useState(DEMO_GENERATION_CONFIG);
+  const [scenes, setScenes] = useState<Array<{ id: string; title: string }>>([]);
+  const [beatsByScene, setBeatsByScene] = useState<Record<string, Array<{ id: string; title: string }>>>({});
+  const [sceneId, setSceneId] = useState('');
+  const [beatId, setBeatId] = useState('');
+  const [duration, setDuration] = useState<AllowedDuration>(6);
+  const [aspect, setAspect] = useState<AllowedAspectRatio>(requestedOutputType === 'story' ? '9:16' : '9:16');
+  const [outputCount, setOutputCount] = useState(1);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [runStatus, setRunStatus] = useState<string | null>(null);
+  const [outputsReady, setOutputsReady] = useState(0);
+  const [blocking, setBlocking] = useState<string[]>([]);
+
+  useEffect(() => {
+    void repo.getConfig().then(setConfig).catch(() => undefined);
+  }, [repo]);
+
+  // Scenes/beats for beat-aware selection (project-scoped read).
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getContentRepository } = await import('../../data/contentFactory');
+        const { ContentStudioService: ContentService } = await import('../../services/contentService');
+        const { LibraryService } = await import('../../services/libraryService');
+        const { ModelsService } = await import('../../services/modelsService');
+        const { EnvironmentsService } = await import('../../services/environmentsService');
+        const { getLibraryRepository } = await import('../../data/libraryFactory');
+        const { getModelsRepository } = await import('../../data');
+        const { getEnvironmentsRepository } = await import('../../data/environmentsFactory');
+        const content = new ContentService(getContentRepository(), {
+          library: new LibraryService(getLibraryRepository()),
+          models: new ModelsService(getModelsRepository()),
+          environments: new EnvironmentsService(getEnvironmentsRepository()),
+        });
+        const sceneRows = await content.listScenes(projectId, SEED_CONTENT_WORKSPACE_ID);
+        if (cancelled) return;
+        setScenes(sceneRows.map((scene) => ({ id: scene.id, title: `Scene ${scene.sceneOrder}: ${scene.title}` })));
+        const beatMap: Record<string, Array<{ id: string; title: string }>> = {};
+        for (const scene of sceneRows) {
+          const beats = await content.listBeats(scene.id, SEED_CONTENT_WORKSPACE_ID);
+          beatMap[scene.id] = beats.map((beat) => ({ id: beat.id, title: `Beat ${beat.beatOrder}: ${beat.title}` }));
+        }
+        if (!cancelled) setBeatsByScene(beatMap);
+      } catch {
+        if (!cancelled) setScenes([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  const refreshStatus = useCallback(async () => {
+    if (!jobId) {
+      setRunStatus(null);
+      return;
+    }
+    try {
+      const status = await service.getRunStatus(jobId, SEED_CONTENT_WORKSPACE_ID);
+      setRunStatus(status.run?.status ?? null);
+      setOutputsReady(status.outputsReady);
+    } catch {
+      setRunStatus(null);
+    }
+  }, [jobId, service]);
+
+  useEffect(() => {
+    void refreshStatus();
+  }, [refreshStatus, jobStatus]);
+
+  const providerConfigured = config.videoGenerationEnabled && config.videoProviderName !== 'none';
+  const isRunning = ['created', 'submitted', 'queued', 'processing'].includes(runStatus ?? '');
+  const isFailed = runStatus === 'failed' || jobStatus === 'failed';
+  const completedInReview = runStatus === 'completed' || jobStatus === 'review' || jobStatus === 'completed';
+  const isDraftJob = jobStatus === 'draft' && !isRunning && runStatus !== 'completed';
+  const eligibleType = ['video', 'story', 'content_set'].includes(requestedOutputType);
+  const buttonLabel = requestedOutputType === 'story' ? 'Generate story clip' : 'Generate clip';
+
+  async function handleSubmit(isRetry: boolean) {
+    if (!jobId || submitting) return;
+    setSubmitting(true);
+    try {
+      const selection = {
+        sceneId: sceneId || null,
+        beatId: beatId || null,
+        durationSeconds: duration,
+        aspectRatio: aspect,
+        outputCount,
+      };
+      const result = isRetry
+        ? await service.retryVideoGeneration(jobId, SEED_CONTENT_WORKSPACE_ID, 'demo-user')
+        : await service.submitVideoGeneration(jobId, SEED_CONTENT_WORKSPACE_ID, 'demo-user', { selection, prompt: 'LockFlow demo video generation run' });
+      if (!result.eligible) {
+        setBlocking(result.blocking);
+        toast({ title: 'Clip is not eligible for generation', description: result.blocking[0], tone: 'error' });
+        return;
+      }
+      setBlocking([]);
+      toast({
+        title: isRetry ? 'Video retry submitted' : 'Video generation submitted',
+        description: 'Clips will appear in Gallery when ingestion completes.',
+        tone: 'success',
+      });
+      await refreshStatus();
+      onSubmitted();
+    } catch (error) {
+      toast({
+        title: 'Could not start video generation',
+        description: error instanceof Error ? error.message : 'Something went wrong.',
+        tone: 'error',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!eligibleType) return null;
+
+  return (
+    <Card>
+      <CardBody>
+        <h3 className="lf-envpanel__heading">Generate clip</h3>
+
+        <div className="lf-envcard__badges" style={{ marginBottom: 'var(--lf-space-3)' }}>
+          <Badge tone={providerConfigured ? 'success' : 'neutral'}>
+            {providerConfigured ? `Video provider: ${config.videoProviderName}` : 'No video provider configured'}
+          </Badge>
+          <Badge tone="neutral">4 / 6 / 8 s clips</Badge>
+          <Badge tone="neutral">Short-form only — no audio or lip sync</Badge>
+        </div>
+
+        {!providerConfigured ? (
+          <p className="lf-tile__description">
+            Video generation is fail-closed: no production provider is configured for this deployment.
+            {isDemoMode ? ' Demo mode uses the development fake video provider with clearly marked placeholder clips.' : ''}
+          </p>
+        ) : null}
+
+        {runStatus && !isDraftJob ? (
+          <div className="lf-envref__state" style={{ marginBottom: 'var(--lf-space-3)' }}>
+            <Badge tone={isFailed ? 'danger' : completedInReview ? 'success' : 'primary'} dot>
+              {completedInReview ? 'Ready for review' : STATUS_LABEL[runStatus] ?? runStatus}
+            </Badge>
+            {outputsReady > 0 ? (
+              <span className="lf-tile__description">{outputsReady} clip(s) ingested — see Gallery.</span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {blocking.length > 0 ? (
+          <ul className="lf-alertbox" role="alert" style={{ margin: 0, paddingLeft: '1.2em' }}>
+            {blocking.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        ) : null}
+
+        {isDraftJob && providerConfigured ? (
+          <>
+            <div className="lf-sheet__section">
+              <label className="lf-field__label" htmlFor="lf-vid-scene">Scene</label>
+              <select
+                id="lf-vid-scene"
+                className="lf-input"
+                value={sceneId}
+                onChange={(event) => {
+                  setSceneId(event.target.value);
+                  setBeatId('');
+                }}
+              >
+                <option value="">No specific scene (single-clip plan)</option>
+                {scenes.map((scene) => (
+                  <option key={scene.id} value={scene.id}>{scene.title}</option>
+                ))}
+              </select>
+            </div>
+
+            {sceneId && (beatsByScene[sceneId]?.length ?? 0) > 0 ? (
+              <div className="lf-sheet__section">
+                <label className="lf-field__label" htmlFor="lf-vid-beat">Beat</label>
+                <select
+                  id="lf-vid-beat"
+                  className="lf-input"
+                  value={beatId}
+                  onChange={(event) => setBeatId(event.target.value)}
+                >
+                  <option value="">Whole scene</option>
+                  {(beatsByScene[sceneId] ?? []).map((beat) => (
+                    <option key={beat.id} value={beat.id}>{beat.title}</option>
+                  ))}
+                </select>
+                <span className="lf-field__hint">
+                  The scene and beat snapshot is frozen at submission — later storyboard edits never
+                  change a submitted clip. Overlay text is guidance only; no speech is generated.
+                </span>
+              </div>
+            ) : null}
+
+            <div className="lf-envcard__badges" style={{ gap: 'var(--lf-space-4)' }}>
+              <div className="lf-sheet__section">
+                <label className="lf-field__label" htmlFor="lf-vid-duration">Duration</label>
+                <select
+                  id="lf-vid-duration"
+                  className="lf-input"
+                  value={duration}
+                  onChange={(event) => setDuration(Number(event.target.value) as AllowedDuration)}
+                >
+                  {ALLOWED_DURATIONS.map((seconds) => (
+                    <option key={seconds} value={seconds}>{seconds} seconds</option>
+                  ))}
+                </select>
+              </div>
+              <div className="lf-sheet__section">
+                <label className="lf-field__label" htmlFor="lf-vid-aspect">Aspect ratio</label>
+                <select
+                  id="lf-vid-aspect"
+                  className="lf-input"
+                  value={aspect}
+                  onChange={(event) => setAspect(event.target.value as AllowedAspectRatio)}
+                >
+                  {ALLOWED_ASPECT_RATIOS.map((ratio) => (
+                    <option key={ratio} value={ratio}>{ratio}{ratio === '9:16' ? ' (vertical)' : ratio === '16:9' ? ' (landscape)' : ' (square)'}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="lf-sheet__section">
+                <label className="lf-field__label" htmlFor="lf-vid-count">Clips</label>
+                <select
+                  id="lf-vid-count"
+                  className="lf-input"
+                  value={outputCount}
+                  onChange={(event) => setOutputCount(Number(event.target.value))}
+                >
+                  {Array.from({ length: config.videoMaxOutputsPerJob }, (_, index) => index + 1).map((count) => (
+                    <option key={count} value={count}>{count}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <label className="lf-envlock__rights" htmlFor="lf-vid-ack">
+              <input
+                id="lf-vid-ack"
+                type="checkbox"
+                checked={acknowledged}
+                onChange={(event) => setAcknowledged(event.target.checked)}
+              />
+              <span>{VIDEO_ACKNOWLEDGEMENT}</span>
+            </label>
+
+            <div className="lf-dialogactions" style={{ justifyContent: 'flex-start', marginTop: 'var(--lf-space-3)' }}>
+              <Button
+                variant="primary"
+                disabled={!acknowledged || submitting || !pinsLoaded}
+                onClick={() => void handleSubmit(false)}
+              >
+                {submitting ? 'Submitting…' : buttonLabel}
+              </Button>
+            </div>
+          </>
+        ) : null}
+
+        {isFailed && !isRunning ? (
+          <div className="lf-dialogactions" style={{ justifyContent: 'flex-start' }}>
+            <Button variant="secondary" onClick={() => void handleSubmit(true)} disabled={submitting}>
+              {submitting ? 'Retrying…' : 'Retry failed run'}
+            </Button>
+          </div>
+        ) : null}
+
+        <p className="lf-library__note">
+          Clips are private, workspace-scoped media ingested into Gallery with scene/beat provenance —
+          never added to the Library. Long-form studio video belongs to a later phase.
+        </p>
+      </CardBody>
+    </Card>
+  );
+}

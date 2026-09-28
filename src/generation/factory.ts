@@ -7,6 +7,8 @@
  */
 import { GenerationService } from './generationService';
 import type { GenerationDependencies } from './generationService';
+import { VideoGenerationService } from './videoGenerationService';
+import type { VideoGenerationDependencies } from './videoGenerationService';
 import type { GenerationRepository } from './repository';
 import { MockGenerationRepository } from './mockGenerationRepository';
 import { getSupabase } from '../lib/supabase';
@@ -29,6 +31,13 @@ export const DEMO_GENERATION_CONFIG = {
   imageMaxOutputsPerJob: 4,
   imageMaxJobsPerUserPerPeriod: 5,
   imageMaxJobsPerWorkspacePerPeriod: 20,
+  videoGenerationEnabled: true,
+  videoProviderName: 'development-fake-video',
+  videoMaxOutputsPerJob: 2,
+  videoMaxJobsPerUserPerPeriod: 3,
+  videoMaxJobsPerWorkspacePerPeriod: 10,
+  videoMaxSecondsPerUserPerPeriod: 48,
+  videoMaxSecondsPerWorkspacePerPeriod: 240,
 };
 
 let repoInstance: GenerationRepository | null = null;
@@ -147,4 +156,104 @@ export function createGenerationService(options?: {
   };
 
   return { service: new GenerationService(repo, deps), repo };
+}
+
+/**
+ * Builds the video dependency seam. The fake video provider completes runs
+ * synchronously in demo mode through the exact production path.
+ */
+export function createVideoGenerationService(options?: {
+  repo?: GenerationRepository;
+  content?: ContentStudioService;
+  gallery?: GalleryService;
+}): { service: VideoGenerationService; repo: GenerationRepository } {
+  const repo = options?.repo ?? getGenerationRepository();
+  const content =
+    options?.content ??
+    new ContentStudioService(getContentRepository(), {
+      library: new LibraryService(getLibraryRepository()),
+      models: new ModelsService(getModelsRepository()),
+      environments: new EnvironmentsService(getEnvironmentsRepository()),
+    });
+  const gallery = options?.gallery ?? new GalleryService(getGalleryRepository(), content, 'ws_demo');
+
+  const deps: VideoGenerationDependencies = {
+    content: {
+      getJobRequest: (jobId, workspaceId) => content.getJobRequest(jobId, workspaceId),
+      transitionJobRequest: (jobId, to, workspaceId, transitionOptions) =>
+        content.transitionJobRequest(jobId, to as never, workspaceId, transitionOptions),
+      listScenes: (projectId, workspaceId) => content.listScenes(projectId, workspaceId),
+      getSceneSnapshot: async (sceneId, workspaceId) => {
+        const scene = await content.getScene(sceneId, workspaceId);
+        return scene
+          ? { id: scene.id, title: scene.title, purpose: scene.purpose, sceneOrder: scene.sceneOrder, settingNotes: scene.settingNotes, shotNotes: scene.shotNotes }
+          : null;
+      },
+      getBeatSnapshot: async (beatId, workspaceId) => {
+        const beat = await content.getBeat(beatId, workspaceId);
+        return beat
+          ? { id: beat.id, contentSceneId: beat.contentSceneId, title: beat.title, beatOrder: beat.beatOrder, actionDescription: beat.actionDescription, dialogueOrOverlay: beat.dialogueOrOverlay, cameraDirection: beat.cameraDirection }
+          : null;
+      },
+    },
+    gallery: {
+      createGeneratedOutput: (input) =>
+        gallery.createGeneratedOutput(input, 'generation-worker', input.workspaceId),
+      attachMedia: (outputId, patch) =>
+        getGalleryRepository().updateOutputMetadata(outputId, {
+          mediaStoragePath: patch.mediaStoragePath,
+          thumbnailStoragePath: patch.thumbnailStoragePath,
+          fileSizeBytes: patch.fileSizeBytes,
+          mimeType: patch.mimeType,
+          generationProviderRunId: patch.generationProviderRunId,
+        }),
+      appendEvent: (outputId, eventType, message, metadata) =>
+        gallery.appendOutputEvent(outputId, eventType, message, metadata),
+      nextOutputIndex: (jobId) => gallery.nextOutputIndexForJob(jobId),
+    },
+    media: {
+      fetchBytes: async (urlOrDataUrl) => {
+        if (urlOrDataUrl.startsWith('data:')) {
+          const base64 = urlOrDataUrl.split(',')[1] ?? '';
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+          const mime = urlOrDataUrl.slice(5, urlOrDataUrl.indexOf(';'));
+          return { bytes, contentType: mime };
+        }
+        const response = await fetch(urlOrDataUrl);
+        if (!response.ok) throw new Error(`fetch failed with ${response.status}`);
+        return {
+          bytes: new Uint8Array(await response.arrayBuffer()),
+          contentType: response.headers.get('content-type') ?? 'application/octet-stream',
+        };
+      },
+      put: async (bucket, path, bytes, contentType) => {
+        const client = getSupabase();
+        if (!client) {
+          await mediaStore.put(bucket, path, bytes, contentType);
+          return;
+        }
+        const { error } = await client.storage.from(bucket).upload(path, bytes, { contentType, upsert: false });
+        if (error) throw error;
+      },
+      resolvePinnedReferences: async () => [],
+    },
+    loadPinsForJob: async (jobId) => {
+      const pins = await content.listJobPins(jobId, 'ws_demo');
+      return pins.map((pin) => ({
+        pinType: pin.pinType as 'model' | 'environment' | 'library_asset' | 'look',
+        sourceRecordId: pin.sourceRecordId,
+        sourceVersionId: pin.sourceVersionId,
+        resolvedDetails: pin.resolvedDetails as {
+          versionStatus?: string;
+          versionNumber?: number;
+          resolvedVia?: string;
+        },
+      }));
+    },
+    actorId: 'generation-worker',
+  };
+
+  return { service: new VideoGenerationService(repo, deps), repo };
 }

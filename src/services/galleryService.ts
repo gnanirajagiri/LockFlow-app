@@ -158,14 +158,18 @@ export class GalleryService {
       workspaceId: string;
       contentJobRequestId: string;
       title: string;
-      outputType: 'image';
+      outputType: 'image' | 'video' | 'story';
       status: 'ready_for_review';
       mediaStoragePath: string;
+      thumbnailStoragePath?: string;
       width?: number;
       height?: number;
+      durationSeconds?: number;
       fileSizeBytes?: number;
       mimeType?: string;
       outputIndex?: number;
+      contentSceneId?: string;
+      contentBeatId?: string;
       metadata: Record<string, unknown>;
     },
     createdBy: string,
@@ -184,6 +188,8 @@ export class GalleryService {
         outputType: input.outputType,
         status: input.status,
         mediaStoragePath: input.mediaStoragePath,
+        thumbnailStoragePath: input.thumbnailStoragePath,
+        durationSeconds: input.durationSeconds,
         width: input.width,
         height: input.height,
         fileSizeBytes: input.fileSizeBytes,

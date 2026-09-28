@@ -117,6 +117,13 @@ async function enabledService(overrides: Partial<GenerationDependencies> = {}) {
     imageMaxOutputsPerJob: 4,
     imageMaxJobsPerUserPerPeriod: 5,
     imageMaxJobsPerWorkspacePerPeriod: 20,
+    videoGenerationEnabled: false,
+    videoProviderName: 'none',
+    videoMaxOutputsPerJob: 2,
+    videoMaxJobsPerUserPerPeriod: 3,
+    videoMaxJobsPerWorkspacePerPeriod: 10,
+    videoMaxSecondsPerUserPerPeriod: 48,
+    videoMaxSecondsPerWorkspacePerPeriod: 240,
   });
   const { deps, store, transitions } = makeDeps(overrides);
   return { service: new GenerationService(repo, deps), repo, store, transitions };
@@ -350,6 +357,13 @@ describe('failure handling + retry', () => {
       imageMaxOutputsPerJob: 4,
       imageMaxJobsPerUserPerPeriod: 5,
       imageMaxJobsPerWorkspacePerPeriod: 20,
+      videoGenerationEnabled: false,
+      videoProviderName: 'none',
+      videoMaxOutputsPerJob: 2,
+      videoMaxJobsPerUserPerPeriod: 3,
+      videoMaxJobsPerWorkspacePerPeriod: 10,
+      videoMaxSecondsPerUserPerPeriod: 48,
+      videoMaxSecondsPerWorkspacePerPeriod: 240,
     });
     const { deps } = makeDeps();
     const service = new GenerationService(repo, deps);

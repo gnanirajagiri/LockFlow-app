@@ -25,6 +25,7 @@ import { SEED_CONTENT_WORKSPACE_ID } from '../../mock/contentSeed';
 import type { ContentJobPinRecord } from '../../domain/content';
 import { useContentProjectOutletContext } from './tabRoutes';
 import { GenerationPanel } from './GenerationPanel';
+import { VideoGenerationPanel } from './VideoGenerationPanel';
 
 export function JobTab() {
   const { toast } = useToast();
@@ -161,6 +162,18 @@ export function JobTab() {
         jobStatus={job?.status ?? 'draft'}
         requestedVariants={job?.requestedVariants ?? project.requestedVariants}
         pins={pins}
+        onSubmitted={() => {
+          void data.reload();
+          void loadPins();
+        }}
+      />
+
+      <VideoGenerationPanel
+        jobId={job?.id ?? null}
+        jobStatus={job?.status ?? 'draft'}
+        requestedOutputType={job?.requestedOutputType ?? project.plannedOutputType ?? 'photo'}
+        projectId={project.id}
+        pinsLoaded={(pins?.length ?? 0) > 0}
         onSubmitted={() => {
           void data.reload();
           void loadPins();

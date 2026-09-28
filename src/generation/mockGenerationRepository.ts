@@ -43,13 +43,21 @@ export class MockGenerationRepository implements GenerationRepository {
     imageMaxOutputsPerJob: 4,
     imageMaxJobsPerUserPerPeriod: 5,
     imageMaxJobsPerWorkspacePerPeriod: 20,
+    videoGenerationEnabled: false,
+    videoProviderName: 'none',
+    videoMaxOutputsPerJob: 2,
+    videoMaxJobsPerUserPerPeriod: 3,
+    videoMaxJobsPerWorkspacePerPeriod: 10,
+    videoMaxSecondsPerUserPerPeriod: 48,
+    videoMaxSecondsPerWorkspacePerPeriod: 240,
   };
 
   // ── Runs ──────────────────────────────────────────────────────────────────
   async createRun(input: CreateProviderRunInput): Promise<GenerationProviderRunRecord> {
+    const kind = input.generationKind ?? 'image';
     const attempt =
       [...this.runs.values()]
-        .filter((run) => run.contentJobRequestId === input.contentJobRequestId)
+        .filter((run) => run.contentJobRequestId === input.contentJobRequestId && (run.generationKind ?? 'image') === kind)
         .reduce((max, run) => Math.max(max, run.attemptNumber), 0) + 1;
     const record: GenerationProviderRunRecord = {
       id: crypto.randomUUID(),
@@ -70,6 +78,13 @@ export class MockGenerationRepository implements GenerationRepository {
       completedAt: null,
       createdAt: now(),
       updatedAt: now(),
+      generationKind: kind,
+      contentSceneId: input.contentSceneId ?? null,
+      contentBeatId: input.contentBeatId ?? null,
+      sceneSnapshot: input.sceneSnapshot ?? null,
+      beatSnapshot: input.beatSnapshot ?? null,
+      requestedAspectRatio: input.requestedAspectRatio ?? null,
+      requestedDurationSeconds: input.requestedDurationSeconds ?? null,
     };
     this.runs.set(record.id, record);
     return structuredClone(record);
@@ -154,6 +169,79 @@ export class MockGenerationRepository implements GenerationRepository {
       }
     }
     return { jobs, outputs };
+  }
+
+  // ── Video milestone ──────────────────────────────────────────────────────
+
+  private videoQuota = new Map<
+    string,
+    { workspaceId: string; userId: string; periodStart: string; periodEnd: string; jobs: number; seconds: number }
+  >();
+
+  async latestVideoRunForJob(jobId: string): Promise<GenerationProviderRunRecord | null> {
+    const all = [...this.runs.values()]
+      .filter((run) => run.contentJobRequestId === jobId && run.generationKind === 'video')
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return all[all.length - 1] ? structuredClone(all[all.length - 1]) : null;
+  }
+
+  async createVideoRun(input: CreateProviderRunInput): Promise<GenerationProviderRunRecord> {
+    return this.createRun({ ...input, generationKind: 'video' });
+  }
+
+  async incrementVideoQuota(workspaceId: string, userId: string, secondsRequested: number): Promise<void> {
+    const { periodStart, periodEnd } = currentPeriod();
+    const key = `${workspaceId}:${userId}:${periodStart}`;
+    const row = this.videoQuota.get(key) ?? {
+      workspaceId,
+      userId,
+      periodStart,
+      periodEnd,
+      jobs: 0,
+      seconds: 0,
+    };
+    row.jobs += 1;
+    row.seconds += secondsRequested;
+    this.videoQuota.set(key, row);
+  }
+
+  async getVideoQuotaView(
+    workspaceId: string,
+    userId: string,
+    limits: {
+      maxOutputsPerJob: number;
+      maxJobsPerUserPerPeriod: number;
+      maxJobsPerWorkspacePerPeriod: number;
+      maxSecondsPerUserPerPeriod: number;
+      maxSecondsPerWorkspacePerPeriod: number;
+    },
+  ): Promise<{
+    maxOutputsPerJob: number;
+    maxJobsPerUserPerPeriod: number;
+    maxJobsPerWorkspacePerPeriod: number;
+    maxSecondsPerUserPerPeriod: number;
+    maxSecondsPerWorkspacePerPeriod: number;
+    userJobsThisPeriod: number;
+    workspaceJobsThisPeriod: number;
+    userSecondsThisPeriod: number;
+    workspaceSecondsThisPeriod: number;
+  }> {
+    const { periodStart } = currentPeriod();
+    let userJobs = 0;
+    let userSeconds = 0;
+    let workspaceJobs = 0;
+    let workspaceSeconds = 0;
+    for (const row of this.videoQuota.values()) {
+      if (row.workspaceId === workspaceId && row.periodStart === periodStart) {
+        workspaceJobs += row.jobs;
+        workspaceSeconds += row.seconds;
+        if (row.userId === userId) {
+          userJobs = row.jobs;
+          userSeconds = row.seconds;
+        }
+      }
+    }
+    return { ...limits, userJobsThisPeriod: userJobs, workspaceJobsThisPeriod: workspaceJobs, userSecondsThisPeriod: userSeconds, workspaceSecondsThisPeriod: workspaceSeconds };
   }
 
   // ── Config ────────────────────────────────────────────────────────────────

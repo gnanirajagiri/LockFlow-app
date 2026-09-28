@@ -39,6 +39,7 @@ const VERSION_IDS = {
   blazer: 'libver_blazer_v1',
   earrings: 'libver_earrings_v1',
   look: 'libver_look_v1',
+  lookV2: 'libver_look_v2',
   otherWs: 'libver_other_v1',
 } as const;
 
@@ -162,10 +163,10 @@ export const LOOK_ASSET = asset(
   'Neutral creator outfit',
   'neutral-creator-outfit',
   'look',
-  'draft',
+  'ready',
   'Aisha\u2019s neutral creator look: blazer and gold hoops, soft presentation.',
-  '2026-09-26T16:00:00.000Z',
-  VERSION_IDS.look,
+  '2026-09-27T09:00:00.000Z',
+  VERSION_IDS.lookV2,
 );
 
 export const OTHER_WS_ASSET: LibraryAssetRecord = {
@@ -248,6 +249,25 @@ export const LOOK_V1: LibraryAssetVersionRecord = {
   updatedAt: '2026-09-26T16:00:00.000Z',
 };
 
+/** The approved Look version — locked, and the one Content Studio pins. */
+export const LOOK_V2: LibraryAssetVersionRecord = {
+  id: VERSION_IDS.lookV2,
+  libraryAssetId: ASSET_IDS.look,
+  versionNumber: 2,
+  status: 'locked',
+  changeSummary: 'Approved neutral creator look',
+  coverImagePath: null,
+  structuredDetails: {
+    mood: 'clean, warm, professional',
+    grooming: 'natural, minimal',
+  },
+  rightsStatus: 'confirmed',
+  lockedAt: '2026-09-27T09:00:00.000Z',
+  createdBy: 'demo-user',
+  createdAt: '2026-09-27T08:00:00.000Z',
+  updatedAt: '2026-09-27T09:00:00.000Z',
+};
+
 export const OTHER_WS_V1 = lockedVersion(
   VERSION_IDS.otherWs,
   ASSET_IDS.otherWs,
@@ -288,6 +308,41 @@ export const LOOK_ITEMS: LookAssetItemRecord[] = [
     sortOrder: 1,
     createdAt: '2026-09-26T15:00:00.000Z',
     updatedAt: '2026-09-26T15:00:00.000Z',
+  },
+];
+
+// ── Locked Look details + items (v2, the version Content Studio pins) ───────
+
+export const LOOK_DETAILS_V2: LookDetailsRecord = {
+  id: 'lookdetails_neutral_outfit_v2',
+  libraryAssetVersionId: VERSION_IDS.lookV2,
+  modelId: 'model_aisha',
+  presentationNotes:
+    'Approved cut: blazer over a simple top, sleeves pushed up, gold hoops as the only jewellery. Presentation only.',
+  createdAt: '2026-09-27T08:00:00.000Z',
+  updatedAt: '2026-09-27T09:00:00.000Z',
+};
+
+export const LOOK_ITEMS_V2: LookAssetItemRecord[] = [
+  {
+    id: 'lookitem_blazer_v2',
+    lookDetailsId: LOOK_DETAILS_V2.id,
+    libraryAssetId: ASSET_IDS.blazer,
+    libraryAssetVersionId: VERSION_IDS.blazer, // exact approved version pinned
+    role: 'wardrobe',
+    sortOrder: 0,
+    createdAt: '2026-09-27T08:00:00.000Z',
+    updatedAt: '2026-09-27T08:00:00.000Z',
+  },
+  {
+    id: 'lookitem_earrings_v2',
+    lookDetailsId: LOOK_DETAILS_V2.id,
+    libraryAssetId: ASSET_IDS.earrings,
+    libraryAssetVersionId: null, // follows the asset's active (locked) version
+    role: 'accessory',
+    sortOrder: 1,
+    createdAt: '2026-09-27T08:00:00.000Z',
+    updatedAt: '2026-09-27T08:00:00.000Z',
   },
 ];
 
@@ -361,7 +416,7 @@ export const REFERENCES: Record<string, LibraryReferenceRecord[]> = {
 export interface LibraryAssetSeed {
   asset: LibraryAssetRecord;
   versions: LibraryAssetVersionRecord[];
-  look?: { details: LookDetailsRecord; items: LookAssetItemRecord[] };
+  looks?: Array<{ details: LookDetailsRecord; items: LookAssetItemRecord[] }>;
   tagIds: string[];
 }
 
@@ -370,7 +425,7 @@ export const LIBRARY_SEED: LibraryAssetSeed[] = [
   { asset: LAPTOP_ASSET, versions: [LAPTOP_V1], tagIds: ['tag_desk', 'tag_technology', 'tag_creator'] },
   { asset: BLAZER_ASSET, versions: [BLAZER_V1], tagIds: ['tag_neutral', 'tag_tailored', 'tag_creator'] },
   { asset: EARRINGS_ASSET, versions: [EARRINGS_V1], tagIds: ['tag_gold', 'tag_minimal'] },
-  { asset: LOOK_ASSET, versions: [LOOK_V1], look: { details: LOOK_DETAILS, items: LOOK_ITEMS }, tagIds: ['tag_neutral', 'tag_creator'] },
+  { asset: LOOK_ASSET, versions: [LOOK_V1, LOOK_V2], looks: [{ details: LOOK_DETAILS, items: LOOK_ITEMS }, { details: LOOK_DETAILS_V2, items: LOOK_ITEMS_V2 }], tagIds: ['tag_neutral', 'tag_creator'] },
   { asset: OTHER_WS_ASSET, versions: [OTHER_WS_V1], tagIds: ['tag_other_ws'] },
 ];
 

@@ -56,9 +56,9 @@ export class MockLibraryRepository implements LibraryRepository {
         this.versions.set(version.id, version);
         this.references.set(version.id, LIBRARY_REFERENCES[version.id] ?? []);
       }
-      if (seed.look) {
-        this.lookDetails.set(seed.look.details.libraryAssetVersionId, seed.look.details);
-        this.lookItems.set(seed.look.details.id, seed.look.items);
+      for (const look of seed.looks ?? []) {
+        this.lookDetails.set(look.details.libraryAssetVersionId, structuredClone(look.details));
+        this.lookItems.set(look.details.id, structuredClone(look.items));
       }
     }
   }

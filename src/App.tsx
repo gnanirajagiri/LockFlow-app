@@ -18,6 +18,8 @@ import {
 } from './features/environments/tabRoutes';
 import { EnvironmentLockPage } from './features/environments/EnvironmentLockPage';
 import { StudioPage } from './pages/StudioPage';
+import { ContentStudioPage } from './pages/ContentStudioPage';
+import { ContentProjectDetailPage } from './pages/ContentProjectDetailPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 import { GalleryPage } from './pages/GalleryPage';
 import { LibraryPage } from './pages/LibraryPage';
@@ -82,6 +84,8 @@ export default function App() {
                 <Route path="usage-history" element={<ModelUsageHistoryRoute />} />
               </Route>
               <Route path="studio" element={<StudioPage />} />
+              <Route path="content-studio" element={<ContentStudioPage />} />
+              <Route path="content-studio/:projectId" element={<ContentProjectDetailPage />} />
               <Route path="templates" element={<TemplatesPage />} />
               <Route path="gallery" element={<GalleryPage />} />
               <Route path="library" element={<LibraryPage />} />

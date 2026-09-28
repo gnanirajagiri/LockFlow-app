@@ -54,7 +54,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Models', to: '/models', icon: <ModelIcon /> },
       { label: 'Environments', to: '/environments', icon: <EnvironmentIcon /> },
-      { label: 'Content Studio', to: '/studio', icon: <StudioIcon /> },
+      { label: 'Content Studio', to: '/content-studio', icon: <StudioIcon /> },
       { label: 'Templates', to: '/templates', icon: <TemplateIcon /> },
       { label: 'Gallery', to: '/gallery', icon: <GalleryIcon /> },
       { label: 'Library', to: '/library', icon: <LibraryIcon /> },

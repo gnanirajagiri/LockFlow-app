@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — functional Library UI.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation and the functional Library UI (index, add-asset flow, asset profiles with Details/References/Versions, Saved Looks area, model/environment shortcut panels) are in place. AI generation, uploads/scanning, payments, provider integrations, Gallery outputs, Campaigns and Templates are intentionally out of scope.
+> **Status — Content Studio data foundation.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation + functional Library UI, and the Content Studio data foundation (projects, scenes/beats, inputs, draft job requests, version pinning, `/content-studio` foundation UI) are in place. Real AI generation, provider integrations, payments, Gallery/Campaigns/Templates UI and image uploads are intentionally out of scope.
 
 ---
 
@@ -341,6 +341,56 @@ Model and Environment panels read the same Library: the model's **Closet & Props
 ### Development seed data (Library)
 
 `src/mock/librarySeed.ts` provides five fictional assets: **Luma Dew Serum Bottle** (product, v1 locked, rights confirmed, tags skincare/bottle/countertop), **Silver creator laptop** (creator tool, v1 locked), **Oversized beige blazer** (wardrobe, v1 locked), **Gold hoop earrings** (accessory, v1 locked), and **Neutral creator outfit** — a Saved Look for Aisha (v1 draft) linking the blazer (version-pinned) and earrings as canonical items with presentation notes; Aisha's Character Sheet is untouched. A sixth asset in another workspace exists for scoping tests. Local placeholder paths only.
+
+## Content Studio domain
+
+Content Studio **assembles approved reusable inputs into content plans and future generation jobs**. It owns nothing: Models, Environments, Library assets and Looks stay canonical and independently reusable — a plan records selections with roles, and a job pins exact versions. Generated outputs are **never** Content Studio records; they belong to Gallery.
+
+### Content Project vs Content Job Request
+
+| | Content Project (`content_projects`) | Content Job Request (`content_job_requests`) |
+| - | ------------------------------------ | -------------------------------------------- |
+| Purpose | A campaign-style **plan / working brief** | The future **generation request** |
+| Edits | Draft projects are fully editable (inputs, scenes, beats) | Draft requests only; snapshots immutable after submission |
+| Version policy | Draft **or** locked versions may be selected while experimenting | Execution-ready jobs require **locked** versions only |
+| Structure | Scenes → Beats with explicit, unique order | `brief_snapshot` + `plan_snapshot` captured at creation |
+| Outputs | None — it is not a generated-output record | None in this phase — no provider, no media |
+
+### Version-pinning rules (and why)
+
+- An execution-ready job must pin a specific **locked** model version, a locked environment version (when an environment is selected), and exact **locked** Library asset versions where assets are selected.
+- A Look may be selected only via a **locked Look version**; its linked item versions are **resolved and pinned at job-creation time** (a pinned item uses that version; an unpinned item resolves to the asset's current locked active version).
+- **Why:** reproducibility and consent. Locked versions are immutable approved configurations with acknowledged rights; silently substituting a newer version would change the model's identity, the environment's anchors, or the asset's approved configuration after the fact. `content_job_pins.resolved_details` stores a minimal immutable context snapshot (names, version numbers, `locked_at`) — never a duplicate of the source record, and no permanent model ↔ environment relationship is created.
+- Human-readable readiness errors: "Select a locked Model version before preparing this job.", "The selected Environment version is still a draft.", "A Look contains an unavailable asset version."
+
+### Scene & Beat ordering
+
+- A project holds one or more scenes (`unique (content_project_id, scene_order)`); a scene holds one or more beats (`unique (content_scene_id, beat_order)`). Both constraints are `DEFERRABLE INITIALLY DEFERRED` so reorders are transaction-safe.
+- Reorders pass the **complete** id list; the service validates it and rewrites compact 0..n-1 orders. Deletes compact sibling order. Beats cascade on scene delete.
+- Scenes and beats (and project inputs) are structurally editable **only while the project is draft** — enforced by the service guard (`assertProjectDraftEditable`) and a DB trigger; executing/completed/archived jobs preserve their historic pinned inputs and plan snapshot.
+
+### Job states and the provider boundary
+
+```
+draft → queued → processing → review → completed
+              ↘ cancelled        ↘ failed → draft (future retry)
+```
+
+- Only **draft** job requests can be created in this phase. `queued`/`processing`/`review` are refused by both the service (`refuseJobStatusWithoutProvider`) and a DB trigger while no provider integration exists (`provider_name` is null).
+- Transitions are strict (see `JOB_STATUS_TRANSITIONS`); `content_job_events` is an append-only audit timeline (`draft_created` is the only event written today).
+- **Generated outputs will live in Gallery** — Content Studio and the Library never store or display generated media.
+
+### Content Studio routes
+
+| Route | Purpose |
+| ----- | ------- |
+| `/content-studio` | Draft-project list (title, status, selected model/environment, output-type placeholder, updated date) with loading/empty/error states and a **New content plan** modal (name required, optional campaign brief) that creates a draft project through the service layer. |
+| `/content-studio/:projectId` | Lightweight plan detail placeholder: brief, audience/voice, planned inputs (canonical records with roles and exact selected versions), and the scene/beat structure. Full editing UI comes next. |
+
+### Migrations and seed data (Content Studio)
+
+- `supabase/migrations/20260926000004_content_studio_domain.sql` — content_projects, content_project_inputs, content_scenes, content_beats, content_job_requests, content_job_pins, content_job_events; RLS on every table (workspace membership); input-shape + workspace-consistency trigger; draft-editability trigger; job status state-machine + provider-boundary trigger; pins locked-version + immutability triggers; append-only event triggers.
+- `src/mock/contentSeed.ts` — the fictional **Morning Skincare Routine** draft project (Aisha locked v1, Warm Bedroom Studio locked v1, Luma Dew Serum locked v1, Neutral creator outfit **locked** Look v2 with resolved items), three ordered scenes with two ordered beats each, and a draft **content_set** job request (3 variants) with a single `draft_created` event. The Look's locked v2 version was added to `librarySeed` for this purpose.
 
 ## Roadmap beyond this milestone
 

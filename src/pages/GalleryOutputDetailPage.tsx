@@ -112,6 +112,7 @@ export function GalleryOutputDetailPage() {
   const [dialog, setDialog] = useState<DialogKind>(null);
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!outputId) return;
@@ -131,6 +132,24 @@ export function GalleryOutputDetailPage() {
       setReviews(reviewRows);
       setEvents(eventRows);
       setTags(tagRows);
+      // Generated outputs: fetch a short-lived signed preview URL (never a
+      // permanent public URL, never persisted). Placeholders keep their frame.
+      const isGenerated = Boolean((record.metadata as { provider_generated?: boolean } | null)?.provider_generated)
+        && Boolean(record.mediaStoragePath);
+      if (isGenerated) {
+        const { getSupabase } = await import('../lib/supabase');
+        const client = getSupabase();
+        if (client) {
+          const { data, error: signError } = await client.storage
+            .from('lockflow-gallery-media')
+            .createSignedUrl(record.mediaStoragePath as string, 600);
+          setPreviewUrl(signError ? null : (data?.signedUrl ?? null));
+        } else {
+          setPreviewUrl(null);
+        }
+      } else {
+        setPreviewUrl(null);
+      }
       setState('ready');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load this output.');
@@ -318,8 +337,9 @@ export function GalleryOutputDetailPage() {
       />
 
       <div className="lf-library__note" role="status">
-        Placeholder preview — this is development placeholder metadata, not a real generated image
-        or video. Generated work appears in Gallery, never in the Library.
+        {(output.metadata as { provider_generated?: boolean } | null)?.provider_generated
+          ? 'Generated media — private to this workspace, previewed through a short-lived signed URL. Generated work appears in Gallery, never in the Library.'
+          : 'Placeholder preview — this is development placeholder metadata, not a real generated image or video. Generated work appears in Gallery, never in the Library.'}
       </div>
 
       <div className="lf-envlock__layout">
@@ -327,16 +347,25 @@ export function GalleryOutputDetailPage() {
           {/* Preview + metadata ─────────────────────────────────────────── */}
           <Card>
             <CardBody>
-              <div className="lf-envprofile__preview lf-envprofile__preview--lg" aria-hidden="true">
-                <GalleryIcon size={28} />
-                <span>
-                  {output.outputType === 'image'
-                    ? 'Image placeholder'
-                    : output.outputType === 'video'
-                      ? `Video placeholder${output.durationSeconds != null ? ` · ${output.durationSeconds}s` : ''}`
-                      : 'Story placeholder'}
-                </span>
-              </div>
+              {previewUrl ? (
+                <img
+                  className="lf-refcard__image"
+                  style={{ maxWidth: '100%', borderRadius: 'var(--lf-radius-md)' }}
+                  src={previewUrl}
+                  alt={output.title}
+                />
+              ) : (
+                <div className="lf-envprofile__preview lf-envprofile__preview--lg" aria-hidden="true">
+                  <GalleryIcon size={28} />
+                  <span>
+                    {output.outputType === 'image'
+                      ? 'Image placeholder'
+                      : output.outputType === 'video'
+                        ? `Video placeholder${output.durationSeconds != null ? ` · ${output.durationSeconds}s` : ''}`
+                        : 'Story placeholder'}
+                  </span>
+                </div>
+              )}
               <div className="lf-envcard__badges" style={{ marginTop: 'var(--lf-space-3)' }}>
                 <Badge tone="neutral">{output.outputType}</Badge>
                 <Badge tone={STATUS_TONE[status]} dot>

@@ -2,7 +2,7 @@
 
 The AI content-creation workspace built on **continuity**: reusable models, environments and assets are versioned and independently locked before use in content jobs.
 
-> **Status — Secure reference uploads.** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation + functional Library UI, the Content Studio data foundation + functional planning interface, the Gallery data foundation + functional review/collection UI, and **secure private reference uploads** (Models / Environments / Library) are in place. Real AI generation, provider integrations, payments, Campaigns/Templates UI and image analysis are intentionally out of scope.
+> **Status — Image generation (fake provider).** The authenticated app shell, design system, the Models data foundation + interface, the Environments data foundation + Builder interface, the unified Library data foundation + functional Library UI, the Content Studio data foundation + functional planning interface, the Gallery data foundation + functional review/collection UI, and **secure private reference uploads** (Models / Environments / Library) are in place. Real AI generation, provider integrations, payments, Campaigns/Templates UI and image analysis are intentionally out of scope.
 
 ---
 
@@ -454,10 +454,35 @@ Reference images for Models, Environments and Library assets upload to **private
 | Demo mode | Without Supabase env vars the upload surfaces show an honest "demo mode uses local placeholders" gate; seeded placeholder references keep rendering. |
 | Physical cleanup | Deleting uploaded objects is a future **server-side** job for soft-deleted draft-only references; there is no client-side delete path. |
 
+## Image generation (provider-agnostic, image only)
+
+Image generation runs through a dedicated Generation domain (`src/generation/`) behind one provider-neutral adapter interface. **No real provider adapter ships yet** — the registry contains only `DevelopmentFakeImageProvider` (local dev/tests: clearly marked placeholder SVGs, zero network calls), and production **fails closed**: with no configured provider the Generate action stays unavailable with a configuration message.
+
+| Concern | Design |
+| ------- | ------ |
+| Adapter boundary | `ImageGenerationProvider` (submit / status / isConfigured). UI components never import adapters; the `GenerationService` resolves the configured name from the registry and refuses unknown/unconfigured providers. |
+| Server-side execution | Submission, provider calls, quota changes and ingestion are privileged server-side paths (security-definer RPCs in `20260928130000_generation_domain.sql`; the deployed worker uses the service role). No provider SDK or key ever reaches the browser. |
+| Job/run state | `generation_provider_runs` records every attempt (idempotency key unique; snapshots exclude secrets and signed URLs; failures append attempts, never overwrite). Jobs follow the existing guarded state machine: draft → queued → processing → review/completed/failed (failed → draft on retry). |
+| Eligibility | All pins must be locked versions; model/environment/library/look sources must not be archived; library rights must be `confirmed`; pending/failed/deleted reference uploads block submission; output type must be image-compatible (photo/content_set); quotas enforced server-side before any provider contact. |
+| Quota & idempotency | `generation_quota_usage` tracks per workspace/user monthly jobs+outputs (auditable guard, not billing). One active run per job: duplicate submissions reuse it; completed runs are returned, never silently resubmitted; retry = new attempt number, same immutable pins. |
+| Ingestion | Results are fetched server-side, stored in the **private** `lockflow-gallery-media` bucket (`workspaces/{ws}/jobs/{job}/runs/{run}/outputs/{output}/{file}`), and each image becomes a Gallery output (`output_type=image`, `ready_for_review`, `generation_provider_run_id` provenance). Gallery only — never the Library. Signed URLs are never persisted. |
+| Safety & rights | References resolve only from exact pinned versions through short-lived signed URLs; rights-unknown/restricted sources are refused; provider safety blocks map to a safe user message with protected technical detail retained server-side only; no face-swap/impersonation features exist. |
+| Observability | `generation_audit_events` records submission_requested, eligibility_failed, quota_denied, provider_run_created, provider_request_accepted, status_update_received, result_ingested, provider_error, retry_requested, output_created — workspace-scoped, read-only for members. |
+
+### Server-only environment variables (names only)
+
+`IMAGE_PROVIDER_NAME` · `IMAGE_PROVIDER_API_KEY` · `IMAGE_GENERATION_ENABLED` · `IMAGE_MAX_OUTPUTS_PER_JOB` · `IMAGE_MAX_JOBS_PER_USER_PER_PERIOD` · `IMAGE_MAX_JOBS_PER_WORKSPACE_PER_PERIOD` · `IMAGE_SIGNED_REFERENCE_URL_TTL_SECONDS` · `IMAGE_WORKER_CONCURRENCY`
+
+These are read by the server-side worker only (never `VITE_`-prefixed, never in Git, logs or error messages); the worker syncs the non-secret limits into `generation_config` via `sync_generation_config`.
+
+### Development fake provider
+
+In demo mode the fake provider is enabled automatically (`development-fake`): the job tab shows a readiness checklist, requires the rights/allowance acknowledgement, and on Generate produces clearly marked placeholder outputs in Gallery through the exact production state machine. No real provider call is ever simulated.
+
 ## Roadmap beyond this milestone
 
 1. Workspace provisioning on first sign-in (create workspace + owner membership).
 2. ~~Model Builder and Environment Builder data models with version + lock tables.~~ Done — Models data foundation + interface, Environments data foundation.
 3. ~~Environment Builder UI~~ Done — the Environment Builder interface (index, profile, editor, references, versions, lock review) ships on the Environments data layer; AI-assisted composition remains out of scope.
 4. Library asset types backed by Supabase Storage (private bucket already provisioned) — ~~reference uploads to secure storage~~ **Done** — private, workspace-scoped reference uploads ship on the `lockflow-references` bucket; remaining: preview/thumbnail generation into `lockflow-previews` and the server-side cleanup job for soft-deleted objects.
-5. Content job pipeline feeding the Gallery — data layer + functional UI done; provider integration and secure media storage remain the boundary.
+5. Content job pipeline feeding the Gallery — data layer + functional UI done; ~~secure media storage~~ done; provider integration: **abstraction + development fake provider shipped, production adapter pending selection** (video generation is not included yet).

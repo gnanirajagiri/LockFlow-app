@@ -127,6 +127,11 @@ export class MockGalleryRepository implements GalleryRepository {
       ...(patch.durationSeconds !== undefined ? { durationSeconds: patch.durationSeconds } : {}),
       ...(patch.width !== undefined ? { width: patch.width } : {}),
       ...(patch.height !== undefined ? { height: patch.height } : {}),
+      ...(patch.mediaStoragePath !== undefined ? { mediaStoragePath: patch.mediaStoragePath } : {}),
+      ...(patch.thumbnailStoragePath !== undefined ? { thumbnailStoragePath: patch.thumbnailStoragePath } : {}),
+      ...(patch.fileSizeBytes !== undefined ? { fileSizeBytes: patch.fileSizeBytes } : {}),
+      ...(patch.mimeType !== undefined ? { mimeType: patch.mimeType } : {}),
+      ...(patch.generationProviderRunId !== undefined ? { generationProviderRunId: patch.generationProviderRunId } : {}),
       ...(patch.metadata !== undefined
         ? { metadata: { ...output.metadata, ...patch.metadata } }
         : {}),

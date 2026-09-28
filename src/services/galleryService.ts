@@ -147,6 +147,74 @@ export class GalleryService {
     return created;
   }
 
+  /**
+   * Creates a GENERATED output from a completed provider run (the only
+   * non-placeholder creation path). Workspace-consistency is re-verified;
+   * the record carries provider provenance metadata and lands straight in
+   * ready_for_review. Never adds anything to the Library.
+   */
+  async createGeneratedOutput(
+    input: {
+      workspaceId: string;
+      contentJobRequestId: string;
+      title: string;
+      outputType: 'image';
+      status: 'ready_for_review';
+      mediaStoragePath: string;
+      width?: number;
+      height?: number;
+      fileSizeBytes?: number;
+      mimeType?: string;
+      outputIndex?: number;
+      metadata: Record<string, unknown>;
+    },
+    createdBy: string,
+    activeWorkspaceId: string,
+  ): Promise<GalleryOutputRecord> {
+    const job = await this.content.getJobRequest(input.contentJobRequestId, activeWorkspaceId);
+    isInWorkspace(job.workspaceId, activeWorkspaceId);
+    if (input.workspaceId !== job.workspaceId) {
+      throw new Error('Gallery outputs must belong to the same workspace as their job.');
+    }
+    const created = await this.repo.createOutput(
+      {
+        workspaceId: input.workspaceId,
+        contentJobRequestId: input.contentJobRequestId,
+        title: input.title,
+        outputType: input.outputType,
+        status: input.status,
+        mediaStoragePath: input.mediaStoragePath,
+        width: input.width,
+        height: input.height,
+        fileSizeBytes: input.fileSizeBytes,
+        mimeType: input.mimeType,
+        outputIndex: input.outputIndex ?? (await this.repo.nextOutputIndex(input.contentJobRequestId)),
+        metadata: { ...input.metadata, placeholder: false },
+      },
+      createdBy,
+    );
+    await this.appendEvent(created.id, 'output_created', `Generated output "${created.title}" registered against the job.`, {
+      provider_run_id: (input.metadata as { provider_run_id?: string }).provider_run_id ?? null,
+      contentJobRequestId: created.contentJobRequestId,
+    });
+    return created;
+  }
+
+  /** Public output-index helper for the generation ingestion path. */
+  async nextOutputIndexForJob(jobId: string): Promise<number> {
+    return this.repo.nextOutputIndex(jobId);
+  }
+
+  /** Public output-event helper for the generation ingestion path. */
+  async appendOutputEvent(
+    outputId: string,
+    eventType: string,
+    message: string,
+    metadata: Record<string, unknown> = {},
+  ): Promise<GalleryOutputEventRecord> {
+    return this.appendEvent(outputId, eventType, message, metadata);
+  }
+
   /** Permitted metadata updates only — never status, never provenance. */
   async updateOutputMetadata(
     outputId: string,

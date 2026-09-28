@@ -128,6 +128,12 @@ export interface UpdateGalleryOutputInput {
   width?: number | null;
   height?: number | null;
   metadata?: Record<string, unknown>;
+  /** Generation ingestion only: the private media path (never a public URL). */
+  mediaStoragePath?: string;
+  thumbnailStoragePath?: string;
+  fileSizeBytes?: number;
+  mimeType?: string;
+  generationProviderRunId?: string;
 }
 
 export interface SubmitGalleryReviewInput {

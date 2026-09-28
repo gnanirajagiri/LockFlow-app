@@ -255,8 +255,12 @@ describe('rule 8 — collections accept only Gallery outputs', () => {
 describe('rule 9 — no provider-generation action exists', () => {
   it('exposes no generation/provider APIs on the service', async () => {
     const prototype = Object.getOwnPropertyNames(Object.getPrototypeOf(service));
-    const banned = prototype.filter((name) =>
-      /generate|render|submitToProvider|enqueue|upload|process\b/i.test(name),
+    const banned = prototype.filter(
+      (name) =>
+        /render|submitToProvider|enqueue|upload|process\b/i.test(name) ||
+        // createGeneratedOutput is the ingestion-only path added with the
+        // generation domain: it records completed results, it never generates.
+        (/generate/i.test(name) && name !== 'createGeneratedOutput'),
     );
     expect(banned).toEqual([]);
   });

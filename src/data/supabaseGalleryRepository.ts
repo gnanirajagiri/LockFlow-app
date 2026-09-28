@@ -168,6 +168,11 @@ export class SupabaseGalleryRepository implements GalleryRepository {
     if (patch.durationSeconds !== undefined) payload.duration_seconds = patch.durationSeconds;
     if (patch.width !== undefined) payload.width = patch.width;
     if (patch.height !== undefined) payload.height = patch.height;
+    if (patch.mediaStoragePath !== undefined) payload.media_storage_path = patch.mediaStoragePath;
+    if (patch.thumbnailStoragePath !== undefined) payload.thumbnail_storage_path = patch.thumbnailStoragePath;
+    if (patch.fileSizeBytes !== undefined) payload.file_size_bytes = patch.fileSizeBytes;
+    if (patch.mimeType !== undefined) payload.mime_type = patch.mimeType;
+    if (patch.generationProviderRunId !== undefined) payload.generation_provider_run_id = patch.generationProviderRunId;
     if (patch.metadata !== undefined) payload.metadata = patch.metadata;
     const { data, error } = await this.client
       .from('gallery_outputs')

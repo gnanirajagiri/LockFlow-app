@@ -24,6 +24,7 @@ import { getEnvironmentsRepository } from '../../data/environmentsFactory';
 import { SEED_CONTENT_WORKSPACE_ID } from '../../mock/contentSeed';
 import type { ContentJobPinRecord } from '../../domain/content';
 import { useContentProjectOutletContext } from './tabRoutes';
+import { GenerationPanel } from './GenerationPanel';
 
 export function JobTab() {
   const { toast } = useToast();
@@ -122,14 +123,12 @@ export function JobTab() {
                 <Badge tone="neutral">{job.requestedVariants} variant{job.requestedVariants === 1 ? '' : 's'}</Badge>
               </div>
               <p className="lf-tile__description">
-                Draft job request — no provider call, no queue submission, no outputs. When
-                generation is connected, submitted requests become immutable and outputs appear in
-                Gallery.
+                Draft job request with immutable version pins. Submission runs the eligibility,
+                quota and idempotency guards below — outputs land in Gallery as ready_for_review.
               </p>
               <p className="lf-library__note">
-                Outputs from this job will appear in Gallery once a provider is connected — never in
-                the Library. The exact pinned versions above are the provenance those outputs will
-                carry.
+                Generated outputs are private, workspace-scoped media in Gallery — never in the
+                Library. The exact pinned versions above are the provenance those outputs carry.
               </p>
             </>
           ) : (
@@ -156,6 +155,17 @@ export function JobTab() {
           </div>
         </CardBody>
       </Card>
+
+      <GenerationPanel
+        jobId={job?.id ?? null}
+        jobStatus={job?.status ?? 'draft'}
+        requestedVariants={job?.requestedVariants ?? project.requestedVariants}
+        pins={pins}
+        onSubmitted={() => {
+          void data.reload();
+          void loadPins();
+        }}
+      />
 
       <Card>
         <CardBody>

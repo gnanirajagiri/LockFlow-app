@@ -29,7 +29,11 @@ import {
   ContentReviewRoute,
   ContentStoryboardRoute,
 } from './features/content/tabRoutes';
-import { TemplatesPage } from './pages/TemplatesPage';
+import { TemplatesHomePage } from './features/templates/TemplatesHomePage';
+import { TemplateCreatePage } from './features/templates/TemplateCreatePage';
+import { TemplateEditPage } from './features/templates/TemplateEditPage';
+import { TemplateDetailPage } from './features/templates/TemplateDetailPage';
+import { TemplateApplyPage } from './features/templates/TemplateApplyPage';
 import { GalleryPage } from './pages/GalleryPage';
 import { GalleryOutputDetailPage } from './pages/GalleryOutputDetailPage';
 import { GalleryCollectionsPage } from './pages/GalleryCollectionsPage';
@@ -110,7 +114,11 @@ export default function App() {
                 <Route path="review" element={<ContentReviewRoute />} />
                 <Route path="job" element={<ContentJobRoute />} />
               </Route>
-              <Route path="templates" element={<TemplatesPage />} />
+              <Route path="templates" element={<TemplatesHomePage />} />
+              <Route path="templates/new" element={<TemplateCreatePage />} />
+              <Route path="templates/:templateId" element={<TemplateDetailPage />} />
+              <Route path="templates/:templateId/edit" element={<TemplateEditPage />} />
+              <Route path="templates/:templateId/apply" element={<TemplateApplyPage />} />
               <Route path="gallery" element={<GalleryPage />} />
               <Route path="gallery/collections" element={<GalleryCollectionsPage />} />
               <Route path="gallery/collections/:collectionId" element={<GalleryCollectionDetailPage />} />

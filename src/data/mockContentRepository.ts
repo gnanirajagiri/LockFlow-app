@@ -108,6 +108,8 @@ export class MockContentRepository implements ContentRepository {
       requestedVariants: input.requestedVariants ?? 1,
       creativeDirection: null,
       storyboardDirection: null,
+      sourceTemplateId: input.sourceTemplateId ?? null,
+      sourceTemplateName: input.sourceTemplateName ?? null,
       createdBy,
       createdAt: stamp,
       updatedAt: stamp,

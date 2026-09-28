@@ -46,6 +46,8 @@ function project(): ContentProjectRecord {
     creativeDirection:
       'Calm morning skincare routine, warm window light, confident and practical tone.',
     storyboardDirection: null,
+    sourceTemplateId: null,
+    sourceTemplateName: null,
     createdBy: 'demo-user',
     createdAt: '2026-09-27T10:00:00.000Z',
     updatedAt: '2026-09-27T10:00:00.000Z',

@@ -33,6 +33,7 @@ import type {
 import type { EnvironmentRecord, EnvironmentSpecRecord, EnvironmentVersionRecord } from '../../domain/environments';
 import type { LibraryAssetRecord, LibraryAssetVersionRecord, LookAssetItemRecord } from '../../domain/library';
 import { useContentProjectOutletContext } from './tabRoutes';
+import { TemplateSuggestionsPanel } from '../templates/TemplateSuggestionsPanel';
 
 const SHARED_ASSET_TYPES = new Set([
   'product', 'prop', 'wardrobe', 'accessory', 'personal_item', 'creator_tool', 'brand_asset', 'reference', 'scene',
@@ -270,6 +271,9 @@ export function InputsTab() {
   return (
     <div className="lf-envprofile__layout">
       <div className="lf-section" style={{ gap: 'var(--lf-space-4)' }}>
+        {/* Non-binding template hints (only when created from a template) */}
+        <TemplateSuggestionsPanel project={project} />
+
         {/* 1. Primary model ─────────────────────────────────────────────── */}
         <Card>
           <CardBody>

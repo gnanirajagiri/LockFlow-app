@@ -57,6 +57,13 @@ export interface ContentProjectRecord {
   creativeDirection: string | null;
   /** Natural-language storyboard direction captured via the intent bar. */
   storyboardDirection: string | null;
+  /**
+   * Historic provenance — set once at creation when the plan came from a
+   * Template. Informational only: applying never modifies the template and
+   * suggestions are never auto-converted into inputs or version pins.
+   */
+  sourceTemplateId: string | null;
+  sourceTemplateName: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -177,6 +184,9 @@ export interface CreateContentProjectInput {
   brandVoice?: string;
   plannedOutputType?: ContentOutputType;
   requestedVariants?: number;
+  /** Write-once provenance — set only by the Template application service. */
+  sourceTemplateId?: string;
+  sourceTemplateName?: string;
 }
 
 export interface UpdateContentProjectDraftInput {

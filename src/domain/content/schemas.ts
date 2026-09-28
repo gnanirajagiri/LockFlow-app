@@ -96,6 +96,8 @@ export function validateCreateContentProject(
   const name = str(raw.name).trim();
   const slug = str(raw.slug).trim() || slugify(name);
   const campaignBrief = raw.campaignBrief === undefined ? undefined : str(raw.campaignBrief).slice(0, 4000);
+  const sourceTemplateId = raw.sourceTemplateId === undefined ? undefined : str(raw.sourceTemplateId).trim();
+  const sourceTemplateName = raw.sourceTemplateName === undefined ? undefined : str(raw.sourceTemplateName).trim().slice(0, 80);
   const objective = raw.objective === undefined ? undefined : str(raw.objective).slice(0, 1000);
   const audience = raw.audience === undefined ? undefined : str(raw.audience).slice(0, 1000);
   const brandVoice = raw.brandVoice === undefined ? undefined : str(raw.brandVoice).slice(0, 1000);
@@ -129,6 +131,8 @@ export function validateCreateContentProject(
           ...(brandVoice !== undefined ? { brandVoice } : {}),
           ...(plannedOutputType !== undefined ? { plannedOutputType: plannedOutputType as ContentOutputType } : {}),
           ...(requestedVariants !== undefined ? { requestedVariants: requestedVariants as number } : {}),
+          ...(sourceTemplateId !== undefined && sourceTemplateId ? { sourceTemplateId } : {}),
+          ...(sourceTemplateName !== undefined && sourceTemplateName ? { sourceTemplateName } : {}),
         },
       };
 }

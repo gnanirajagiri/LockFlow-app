@@ -104,6 +104,11 @@ export function BriefTab() {
       <Card>
         <CardBody>
           <h3 className="lf-envpanel__heading">Brief</h3>
+          {project.sourceTemplateName ? (
+            <p className="lf-tile__description" role="note">
+              Created from template: <strong>{project.sourceTemplateName}</strong>
+            </p>
+          ) : null}
           <div className="lf-formstack">
             <Input
               label="Project name"

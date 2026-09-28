@@ -34,6 +34,8 @@ function mapProject(row: Record<string, unknown>): ContentProjectRecord {
     requestedVariants: (row.requested_variants as number | null) ?? 1,
     creativeDirection: (row.creative_direction as string | null) ?? null,
     storyboardDirection: (row.storyboard_direction as string | null) ?? null,
+    sourceTemplateId: (row.source_template_id as string | null) ?? null,
+    sourceTemplateName: (row.source_template_name as string | null) ?? null,
     createdBy: row.created_by as string,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
@@ -184,6 +186,8 @@ export class SupabaseContentRepository implements ContentRepository {
         ...(input.brandVoice !== undefined ? { brand_voice: input.brandVoice } : {}),
         ...(input.plannedOutputType !== undefined ? { planned_output_type: input.plannedOutputType } : {}),
         ...(input.requestedVariants !== undefined ? { requested_variants: input.requestedVariants } : {}),
+        ...(input.sourceTemplateId !== undefined ? { source_template_id: input.sourceTemplateId } : {}),
+        ...(input.sourceTemplateName !== undefined ? { source_template_name: input.sourceTemplateName } : {}),
         created_by: createdBy,
       })
       .select('*')

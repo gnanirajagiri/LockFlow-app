@@ -34,6 +34,10 @@ import { GalleryPage } from './pages/GalleryPage';
 import { GalleryOutputDetailPage } from './pages/GalleryOutputDetailPage';
 import { GalleryCollectionsPage } from './pages/GalleryCollectionsPage';
 import { GalleryCollectionDetailPage } from './pages/GalleryCollectionDetailPage';
+import { GalleryQualityReviewPage } from './features/quality/GalleryQualityReviewPage';
+import { CorrectionCreatePage } from './features/quality/CorrectionCreatePage';
+import { CorrectionsPage } from './features/quality/CorrectionsPage';
+import { CorrectionDetailPage } from './features/quality/CorrectionDetailPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { LibraryNewAssetPage } from './pages/LibraryNewAssetPage';
 import { LibraryLooksPage } from './pages/LibraryLooksPage';
@@ -111,6 +115,10 @@ export default function App() {
               <Route path="gallery/collections" element={<GalleryCollectionsPage />} />
               <Route path="gallery/collections/:collectionId" element={<GalleryCollectionDetailPage />} />
               <Route path="gallery/:outputId" element={<GalleryOutputDetailPage />} />
+              <Route path="gallery/:outputId/quality" element={<GalleryQualityReviewPage />} />
+              <Route path="gallery/:outputId/corrections" element={<CorrectionCreatePage />} />
+              <Route path="corrections" element={<CorrectionsPage />} />
+              <Route path="corrections/:correctionRequestId" element={<CorrectionDetailPage />} />
               <Route path="library" element={<LibraryPage />} />
               <Route path="library/new" element={<LibraryNewAssetPage />} />
               <Route path="library/looks" element={<LibraryLooksPage />} />

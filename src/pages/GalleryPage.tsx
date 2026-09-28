@@ -254,9 +254,14 @@ export function GalleryPage() {
         title="Gallery"
         description="Review, organise and export your generated work."
         actions={
-          <Link className="lf-btn lf-btn--primary" to="/content-studio">
-            Open Content Studio
-          </Link>
+          <div className="lf-envprofile__actions-row">
+            <Link className="lf-btn lf-btn--secondary" to="/corrections">
+              Correction requests
+            </Link>
+            <Link className="lf-btn lf-btn--primary" to="/content-studio">
+              Open Content Studio
+            </Link>
+          </div>
         }
       />
 

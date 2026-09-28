@@ -24,6 +24,9 @@ import { ContentStudioService } from '../services/contentService';
 import { LibraryService } from '../services/libraryService';
 import { ModelsService } from '../services/modelsService';
 import { EnvironmentsService } from '../services/environmentsService';
+import { getQualityServices } from '../quality/factory';
+import { qualitySummaryLabel } from '../features/quality/qualityUi';
+import type { QualityReviewRecord } from '../quality/types';
 import { getGalleryRepository } from '../data/galleryFactory';
 import { getContentRepository } from '../data/contentFactory';
 import { getLibraryRepository } from '../data/libraryFactory';
@@ -113,6 +116,9 @@ export function GalleryOutputDetailPage() {
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [qualityReviews, setQualityReviews] = useState<QualityReviewRecord[]>([]);
+
+  const qualityServices = useMemo(() => getQualityServices(), []);
 
   const load = useCallback(async () => {
     if (!outputId) return;
@@ -121,17 +127,21 @@ export function GalleryOutputDetailPage() {
     try {
       const workspaceId = SEED_GALLERY_WORKSPACE_ID;
       const record = await service.getOutput(outputId, workspaceId);
-      const [prov, reviewRows, eventRows, tagRows] = await Promise.all([
+      const [prov, reviewRows, eventRows, tagRows, qualityReviewRows] = await Promise.all([
         service.resolveProvenance(outputId, workspaceId).catch(() => null),
         service.listReviews(outputId, workspaceId).catch(() => []),
         service.listEvents(outputId, workspaceId).catch(() => []),
         service.listTagsForOutput(outputId, workspaceId).catch(() => []),
+        qualityServices.reviews
+          .listReviewsForOutput(outputId, workspaceId)
+          .catch(() => [] as QualityReviewRecord[]),
       ]);
       setOutput(record);
       setProvenance(prov);
       setReviews(reviewRows);
       setEvents(eventRows);
       setTags(tagRows);
+      setQualityReviews(qualityReviewRows);
       // Generated outputs: fetch a short-lived signed preview URL (never a
       // permanent public URL, never persisted). Placeholders keep their frame.
       const isGenerated = Boolean((record.metadata as { provider_generated?: boolean } | null)?.provider_generated)
@@ -155,7 +165,7 @@ export function GalleryOutputDetailPage() {
       setError(err instanceof Error ? err.message : 'Could not load this output.');
       setState('error');
     }
-  }, [outputId, service]);
+  }, [outputId, service, qualityServices]);
 
   useEffect(() => {
     void load();
@@ -194,6 +204,13 @@ export function GalleryOutputDetailPage() {
 
   const status = output.status;
   const canReview = status === 'ready_for_review';
+  // Quality actions: reviewable once the output exists with provenance;
+  // continuity review additionally makes sense for reviewable decisions.
+  const canReviewContinuity = ['ready_for_review', 'approved', 'rejected'].includes(status);
+  const hasProvenance = (provenance?.pins.length ?? 0) > 0;
+  const qualitySummary = qualitySummaryLabel(
+    qualityReviews.map((review) => ({ status: review.status, overallResult: review.overallResult })),
+  );
 
   async function run(action: () => Promise<unknown>, success: string) {
     setBusy(true);
@@ -284,6 +301,16 @@ export function GalleryOutputDetailPage() {
         description="Placeholder preview — provider generation and secure media storage are not connected yet."
         actions={
           <div className="lf-envprofile__actions-row">
+            {canReviewContinuity ? (
+              <Link className="lf-btn lf-btn--secondary" to={`/gallery/${output.id}/quality`}>
+                Review continuity
+              </Link>
+            ) : null}
+            {hasProvenance ? (
+              <Link className="lf-btn lf-btn--secondary" to={`/gallery/${output.id}/corrections`}>
+                Create correction
+              </Link>
+            ) : null}
             {canReview ? (
               <>
                 <Button variant="primary" onClick={() => setDialog('approve')}>
@@ -436,6 +463,49 @@ export function GalleryOutputDetailPage() {
                     Add tag
                   </Button>
                 </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          {/* Continuity quality summary — additive, never approval state ── */}
+          <Card>
+            <CardBody>
+              <div className="lf-envref__row" style={{ justifyContent: 'space-between' }}>
+                <h3 className="lf-envpanel__heading" style={{ margin: 0 }}>Continuity quality</h3>
+                <Badge
+                  tone={
+                    qualitySummary === 'Passed'
+                      ? 'success'
+                      : qualitySummary === 'Warnings'
+                        ? 'warning'
+                        : qualitySummary === 'Issues found'
+                          ? 'danger'
+                          : 'neutral'
+                  }
+                  dot
+                >
+                  {qualitySummary}
+                </Badge>
+              </div>
+              <p className="lf-tile__description" style={{ marginTop: 'var(--lf-space-2)' }}>
+                {qualityReviews.length === 0
+                  ? 'Not reviewed yet — a continuity review checks this output against the exact approved versions used to create it.'
+                  : `${qualityReviews.filter((review) => review.status === 'completed').length} completed review(s). Reviews never change this output's approval status.`}
+              </p>
+              <div className="lf-sheet__toolbar" style={{ marginTop: 'var(--lf-space-2)' }}>
+                {canReviewContinuity ? (
+                  <Link className="lf-btn lf-btn--secondary" to={`/gallery/${output.id}/quality`}>
+                    Review continuity
+                  </Link>
+                ) : null}
+                {hasProvenance ? (
+                  <Link className="lf-btn lf-btn--secondary" to={`/gallery/${output.id}/corrections`}>
+                    Create correction
+                  </Link>
+                ) : null}
+                <Link className="lf-btn lf-btn--secondary" to="/corrections">
+                  All corrections
+                </Link>
               </div>
             </CardBody>
           </Card>

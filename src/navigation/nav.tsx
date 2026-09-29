@@ -59,6 +59,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'Gallery', to: '/gallery', icon: <GalleryIcon /> },
       { label: 'Library', to: '/library', icon: <LibraryIcon /> },
       { label: 'Campaigns', to: '/campaigns', icon: <CampaignIcon /> },
+      { label: 'Publishing', to: '/publishing', icon: <GalleryIcon /> },
     ],
   },
   {

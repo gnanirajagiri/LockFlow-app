@@ -27,6 +27,7 @@ import { EnvironmentsService } from '../services/environmentsService';
 import { getQualityServices } from '../quality/factory';
 import { qualitySummaryLabel } from '../features/quality/qualityUi';
 import type { QualityReviewRecord } from '../quality/types';
+import type { SafePublishingDraftView } from '../domain/publishing';
 import { getGalleryRepository } from '../data/galleryFactory';
 import { getContentRepository } from '../data/contentFactory';
 import { getLibraryRepository } from '../data/libraryFactory';
@@ -123,6 +124,7 @@ export function GalleryOutputDetailPage() {
   const [campaignDialog, setCampaignDialog] = useState(false);
   const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; status: string }> | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState('');
+  const [publishingHistory, setPublishingHistory] = useState<SafePublishingDraftView[]>([]);
 
   const qualityServices = useMemo(() => getQualityServices(), []);
   const campaignsService = useMemo(
@@ -152,6 +154,32 @@ export function GalleryOutputDetailPage() {
       setEvents(eventRows);
       setTags(tagRows);
       setQualityReviews(qualityReviewRows);
+      // Read-only publishing history (safe view) for this output.
+      try {
+        const { PublishingDraftService } = await import('../services/publishingService');
+        const { createDefaultPublishingRegistry } = await import('../services/publishingProviders');
+        const { SocialConnectionsService } = await import('../services/socialConnectionsService');
+        const { SocialConnectionEncryptionService } = await import('../services/socialConnectionEncryption');
+        const { createDefaultProviderRegistry } = await import('../services/socialProviders');
+        const { getSocialConnectionsRepository } = await import('../data/socialConnectionsFactory');
+        const { getPublishingRepository } = await import('../data/publishingFactory');
+        const { getCampaignsRepository } = await import('../data/campaignsFactory');
+        const social = new SocialConnectionsService(
+          getSocialConnectionsRepository(),
+          createDefaultProviderRegistry(),
+          new SocialConnectionEncryptionService(),
+        );
+        const publishingService = new PublishingDraftService(
+          getPublishingRepository(),
+          createDefaultPublishingRegistry(),
+          social,
+          service,
+          new CampaignsService(getCampaignsRepository(), service),
+        );
+        setPublishingHistory(await publishingService.listDraftsForOutput(outputId, workspaceId));
+      } catch {
+        setPublishingHistory([]);
+      }
       // Generated outputs: fetch a short-lived signed preview URL (never a
       // permanent public URL, never persisted). Placeholders keep their frame.
       const isGenerated = Boolean((record.metadata as { provider_generated?: boolean } | null)?.provider_generated)
@@ -614,6 +642,37 @@ export function GalleryOutputDetailPage() {
               </p>
             </CardBody>
           </Card>
+
+          {/* Publishing history — read-only, safe fields only ──────────── */}
+          {publishingHistory.length > 0 ? (
+            <Card>
+              <CardBody>
+                <h3 className="lf-envpanel__heading">Publishing history</h3>
+                <p className="lf-tile__description">
+                  Publishing drafts referencing this output. Unpublished draft copy stays internal;
+                  published links appear only after provider confirmation.
+                </p>
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 'var(--lf-space-2)' }}>
+                  {publishingHistory.map((draft) => (
+                    <li key={draft.id} className="lf-envref__row">
+                      <span className="lf-refcard__type">{draft.placement.replace(/_/g, ' ')}</span>
+                      <span>
+                        <Link to={`/publishing/${draft.id}`}>{draft.externalAccount.accountLabel ?? draft.externalAccount.connectionLocalName}</Link>
+                        {' · '}
+                        {draft.status.replace(/_/g, ' ')}
+                        {draft.publishedUrl ? (
+                          <>
+                            {' · '}
+                            <a href={draft.publishedUrl} target="_blank" rel="noreferrer">view published post</a>
+                          </>
+                        ) : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            </Card>
+          ) : null}
 
           {/* Job timeline ──────────────────────────────────────────────── */}
           <Card>

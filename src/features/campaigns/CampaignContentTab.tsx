@@ -30,6 +30,10 @@ import { getModelsRepository } from '../../data';
 import { getEnvironmentsRepository } from '../../data/environmentsFactory';
 import { CAMPAIGN_CHANNEL_KEYS } from '../../domain/campaigns';
 import type { CampaignItemRecord, CampaignItemVariantRecord } from '../../domain/campaigns';
+import { SocialConnectionsService } from '../../services/socialConnectionsService';
+import { SocialConnectionEncryptionService } from '../../services/socialConnectionEncryption';
+import { createDefaultProviderRegistry } from '../../services/socialProviders';
+import { getSocialConnectionsRepository } from '../../data/socialConnectionsFactory';
 import {
   CAMPAIGN_CHANNEL_LABELS,
   CAMPAIGN_ITEM_FORMAT_LABELS,
@@ -88,6 +92,7 @@ export function CampaignContentTab() {
   const [variantLabel, setVariantLabel] = useState('');
   const [variantCaption, setVariantCaption] = useState('');
   const [variantCta, setVariantCta] = useState('');
+  const [hasVerifiedConnection, setHasVerifiedConnection] = useState(false);
 
   const channelKeys = useMemo(() => detail?.channels.map((ch) => ch.channel) ?? [], [detail]);
 
@@ -98,6 +103,18 @@ export function CampaignContentTab() {
       setDetail(d);
       setItems(d.items.filter((i) => i.status !== 'removed' && !i.removedAt));
       setVariants(d.variants);
+      // Verified-connection check gates the "Prepare post" action.
+      try {
+        const social = new SocialConnectionsService(
+          getSocialConnectionsRepository(),
+          createDefaultProviderRegistry(),
+          new SocialConnectionEncryptionService(),
+        );
+        const rows = await social.listConnections(SEED_GALLERY_WORKSPACE_ID);
+        setHasVerifiedConnection(rows.some((c) => c.status === 'connected'));
+      } catch {
+        setHasVerifiedConnection(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -339,6 +356,12 @@ export function CampaignContentTab() {
             const withOutput = detail?.itemsWithOutputs.find((w) => w.item.id === item.id);
             const effective = withOutput?.effectiveStatus ?? item.status;
             const outputTitle = withOutput?.output?.title ?? 'Gallery output';
+            // "Prepare post" shows only for active items whose source passes
+            // eligibility AND when a verified connection exists.
+            const itemRow = {
+              publishingEligible:
+                effective !== 'blocked' && effective !== 'removed' && hasVerifiedConnection,
+            };
             return (
               <Card key={item.id} role="listitem">
                 <CardBody>
@@ -404,6 +427,19 @@ export function CampaignContentTab() {
                       <Button size="sm" variant="ghost" disabled={readOnly} onClick={() => setRemoving(item)}>
                         Remove
                       </Button>
+                      {itemRow.publishingEligible ? (
+                        <Link
+                          className="lf-btn lf-btn--secondary lf-btn--sm"
+                          to={`/campaigns/${campaign.id}/publishing/new`}
+                          title="Prepare a publishing draft for this approved content"
+                        >
+                          Prepare post
+                        </Link>
+                      ) : (
+                        <span className="lf-tile__description" title="Connect a verified account to prepare publishing.">
+                          Connect a verified account to prepare publishing.
+                        </span>
+                      )}
                       <Link className="lf-btn lf-btn--ghost lf-btn--sm" to={`/gallery/${item.galleryOutputId}`}>
                         Open in Gallery
                       </Link>

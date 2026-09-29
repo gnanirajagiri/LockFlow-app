@@ -208,6 +208,9 @@
   font-weight: var(--lf-font-weight-semibold);
 }
 
+/* Publishing draft detail — stacked panels reuse lf-campaign-overview; the
+   step list on the create wizard uses the same stack. */
+
 /* ── Responsive: stack cards; calendar falls back to an agenda list ───── */
 @media (max-width: 720px) {
   .lf-connections-layout {

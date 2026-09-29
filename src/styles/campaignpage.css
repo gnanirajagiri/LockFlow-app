@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Campaigns — home summary, item cards, agenda rows, planning calendar
-   Token-only styles (lf-campaign-*). Reuses shared patterns
+   + Social Connections settings layout (lf-connections-*)
+   Token-only styles. Reuses shared patterns
    (lf-models-toolbar, lf-dialogactions, lf-tabs, lf-field) from pages.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -177,8 +178,42 @@
   box-shadow: var(--lf-focus-ring);
 }
 
+/* ── Social Connections settings (/settings/connections) ──────────────── */
+.lf-connections-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: var(--lf-space-4);
+  align-items: start;
+}
+
+.lf-connections-list {
+  display: grid;
+  gap: var(--lf-space-3);
+}
+
+.lf-connections-help {
+  display: grid;
+  gap: var(--lf-space-3);
+}
+
+.lf-connection-card__logo {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-color-navy-800);
+  color: var(--lf-color-navy-text);
+  font-weight: var(--lf-font-weight-semibold);
+}
+
 /* ── Responsive: stack cards; calendar falls back to an agenda list ───── */
 @media (max-width: 720px) {
+  .lf-connections-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .lf-campaign-item {
     flex-direction: column;
   }

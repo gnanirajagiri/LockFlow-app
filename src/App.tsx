@@ -38,6 +38,11 @@ import { GalleryPage } from './pages/GalleryPage';
 import { GalleryOutputDetailPage } from './pages/GalleryOutputDetailPage';
 import { GalleryCollectionsPage } from './pages/GalleryCollectionsPage';
 import { GalleryCollectionDetailPage } from './pages/GalleryCollectionDetailPage';
+import { ConnectionsPage } from './features/social/ConnectionsPage';
+import {
+  ConnectionCallbackPage,
+  ConnectionStartPage,
+} from './features/social/ConnectionCallbackPage';
 import { GalleryQualityReviewPage } from './features/quality/GalleryQualityReviewPage';
 import { CorrectionCreatePage } from './features/quality/CorrectionCreatePage';
 import { CorrectionsPage } from './features/quality/CorrectionsPage';
@@ -157,6 +162,15 @@ export default function App() {
               </Route>
               <Route path="workspace" element={<WorkspacePage />} />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="settings/connections" element={<ConnectionsPage />} />
+              <Route
+                path="settings/connections/:providerKey/connect"
+                element={<ConnectionStartPage />}
+              />
+              <Route
+                path="settings/connections/callback/:providerKey"
+                element={<ConnectionCallbackPage />}
+              />
               <Route path="help" element={<HelpPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>

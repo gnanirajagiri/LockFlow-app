@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -17,6 +18,24 @@ export function SettingsPage() {
         title="Settings"
         description="Account and workspace preferences. Settings become persistent once the database is connected."
       />
+      <Card style={{ marginBottom: 'var(--lf-space-4)' }}>
+        <CardBody>
+          <div className="lf-campaign-item">
+            <div className="lf-campaign-item__body">
+              <strong>Connections</strong>
+              <p className="lf-tile__description">
+                Connect workspace accounts (Meta, TikTok, YouTube, LinkedIn) for future campaign
+                publishing. Tokens stay on the server — publishing is not enabled yet.
+              </p>
+            </div>
+            <div className="lf-campaign-item__actions">
+              <Link className="lf-btn lf-btn--secondary" to="/settings/connections">
+                Manage connections
+              </Link>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
       <Card>
         <CardHeader
           title="General"

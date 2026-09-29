@@ -1,9 +1,10 @@
 /**
- * Campaign channels tab — planning targets only.
+ * Campaign channels tab — planning targets with honest connection status.
  *
- * Channels are internal planning records: NO social accounts, OAuth tokens
- * or connection state exist. Each channel shows "Not connected" with a
- * disabled "Connect account — coming soon" action.
+ * Channels are internal planning records (no account data is stored on them).
+ * The status line reflects real workspace social connections where they exist
+ * (Connected / Needs re-auth) and stays "Not connected" otherwise. No
+ * publishing, preference selection or account data happens here yet.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
@@ -19,6 +20,23 @@ import { SEED_GALLERY_WORKSPACE_ID } from '../../mock/gallerySeed';
 import { CAMPAIGN_CHANNEL_KEYS } from '../../domain/campaigns';
 import type { CampaignChannelRecord } from '../../domain/campaigns';
 import { CAMPAIGN_CHANNEL_LABELS, CAMPAIGN_INTENT_LABELS } from './campaignsUi';
+import { SocialConnectionsService } from '../../services/socialConnectionsService';
+import { SocialConnectionEncryptionService } from '../../services/socialConnectionEncryption';
+import { createDefaultProviderRegistry } from '../../services/socialProviders';
+import { getSocialConnectionsRepository } from '../../data/socialConnectionsFactory';
+import type { SocialConnectionRecord } from '../../domain/social';
+import { CONNECTION_STATUS_LABELS } from '../social/connectionsUi';
+
+/** Campaign channel → social provider key (planning-target mapping only). */
+const CHANNEL_PROVIDER_KEYS: Record<string, string> = {
+  instagram: 'meta',
+  tiktok: 'tiktok',
+  youtube: 'youtube',
+  facebook: 'meta',
+  linkedin: 'linkedin',
+  x: 'x',
+  pinterest: 'pinterest',
+};
 
 const INTENTS = ['organic', 'paid', 'both'] as const;
 
@@ -36,6 +54,7 @@ export function CampaignChannelsTab() {
   const [newNotes, setNewNotes] = useState('');
   const [removing, setRemoving] = useState<CampaignChannelRecord | null>(null);
   const [busy, setBusy] = useState(false);
+  const [connections, setConnections] = useState<SocialConnectionRecord[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,6 +87,17 @@ export function CampaignChannelsTab() {
         };
       }
       setChannelCounts(counts);
+      // Honest connection status from the workspace's social connections.
+      try {
+        const social = new SocialConnectionsService(
+          getSocialConnectionsRepository(),
+          createDefaultProviderRegistry(),
+          new SocialConnectionEncryptionService(),
+        );
+        setConnections(await social.listConnections(SEED_GALLERY_WORKSPACE_ID));
+      } catch {
+        setConnections([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -78,6 +108,22 @@ export function CampaignChannelsTab() {
   }, [load]);
 
   const taken = useMemo(() => new Set(channels.map((ch) => ch.channel)), [channels]);
+
+  /** Best active connection for a campaign channel's provider, if any. */
+  const connectionForChannel = useCallback(
+    (channelKey: string): SocialConnectionRecord | null => {
+      const providerKey = CHANNEL_PROVIDER_KEYS[channelKey];
+      if (!providerKey) return null;
+      return (
+        connections.find(
+          (c) =>
+            c.providerKey === providerKey &&
+            (c.status === 'connected' || c.status === 'needs_reauth' || c.status === 'pending'),
+        ) ?? null
+      );
+    },
+    [connections],
+  );
 
   async function handleAdd() {
     setBusy(true);
@@ -175,7 +221,29 @@ export function CampaignChannelsTab() {
                       </p>
                       {channel.notes ? <p className="lf-tile__description">{channel.notes}</p> : null}
                       <p className="lf-tile__description">
-                        Connection status: <strong>Not connected</strong> — publishing integrations are not part of LockFlow yet.
+                        {(() => {
+                          const connection = connectionForChannel(channel.channel);
+                          if (!connection) {
+                            return (
+                              <>
+                                Connection status: <strong>Not connected</strong> — publishing
+                                integrations are not part of LockFlow yet.
+                              </>
+                            );
+                          }
+                          return (
+                            <>
+                              Connection status:{' '}
+                              <strong>{CONNECTION_STATUS_LABELS[connection.status]}</strong>
+                              {' · '}
+                              {connection.localName}
+                              {connection.status === 'needs_reauth' &&
+                              connection.lastErrorMessageSafe
+                                ? ` — ${connection.lastErrorMessageSafe}`
+                                : ''}
+                            </>
+                          );
+                        })()}
                       </p>
                     </div>
                     <div className="lf-campaign-item__actions">
@@ -185,8 +253,10 @@ export function CampaignChannelsTab() {
                       <Button size="sm" variant="ghost" disabled={index === channels.length - 1 || readOnly} onClick={() => void move(channel, 1)}>
                         ↓ <span className="lf-visually-hidden">Move {channel.channel} down</span>
                       </Button>
-                      <Button size="sm" disabled title="Social account connections are not available yet">
-                        Connect account — coming soon
+                      <Button size="sm" disabled title="Publishing will be enabled after post/ad preparation is added.">
+                        {connectionForChannel(channel.channel)
+                          ? 'Publishing — coming next'
+                          : 'Connect account — coming soon'}
                       </Button>
                       <Button size="sm" variant="ghost" disabled={readOnly} onClick={() => setRemoving(channel)}>
                         Remove

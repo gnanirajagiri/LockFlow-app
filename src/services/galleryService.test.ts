@@ -124,13 +124,16 @@ describe('rule 4 — later source changes do not alter provenance', () => {
 
 describe('rule 5 — reviews append history and never mutate job pins', () => {
   it('records a rejection with feedback and leaves pins untouched', async () => {
+    // The vanity image ships approved; the story ships rejected — move it back
+    // into review so a fresh review can be appended on top of the seeded one.
+    await service.transitionOutput(GALLERY_OUTPUT_SEED_IDS.story, 'ready_for_review', workspaceId);
     const pinsBefore = JSON.stringify(
-      (await service.resolveProvenance(GALLERY_OUTPUT_SEED_IDS.vanity, workspaceId)).pins,
+      (await service.resolveProvenance(GALLERY_OUTPUT_SEED_IDS.story, workspaceId)).pins,
     );
 
     const { review } = await service.submitReview(
       {
-        galleryOutputId: GALLERY_OUTPUT_SEED_IDS.vanity,
+        galleryOutputId: GALLERY_OUTPUT_SEED_IDS.story,
         reviewerId: 'demo-user',
         decision: 'rejected',
         feedback: 'Composition drifts from the hero angle.',
@@ -140,10 +143,10 @@ describe('rule 5 — reviews append history and never mutate job pins', () => {
     expect(review.decision).toBe('rejected');
     expect(review.feedback).toContain('hero angle');
 
-    const history = await service.listReviews(GALLERY_OUTPUT_SEED_IDS.vanity, workspaceId);
-    expect(history.length).toBe(1); // appended, not overwritten
+    const history = await service.listReviews(GALLERY_OUTPUT_SEED_IDS.story, workspaceId);
+    expect(history.length).toBe(2); // seeded rejection + this one — appended, not overwritten
 
-    const provenance = await service.resolveProvenance(GALLERY_OUTPUT_SEED_IDS.vanity, workspaceId);
+    const provenance = await service.resolveProvenance(GALLERY_OUTPUT_SEED_IDS.story, workspaceId);
     expect(JSON.stringify(provenance.pins)).toBe(pinsBefore); // pins unchanged
   });
 
@@ -161,9 +164,10 @@ describe('rule 5 — reviews append history and never mutate job pins', () => {
   });
 
   it('requires feedback when rejecting or requesting changes', async () => {
+    await service.transitionOutput(GALLERY_OUTPUT_SEED_IDS.story, 'ready_for_review', workspaceId);
     await expect(
       service.submitReview(
-        { galleryOutputId: GALLERY_OUTPUT_SEED_IDS.vanity, reviewerId: 'demo-user', decision: 'rejected' },
+        { galleryOutputId: GALLERY_OUTPUT_SEED_IDS.story, reviewerId: 'demo-user', decision: 'rejected' },
         workspaceId,
       ),
     ).rejects.toThrow(/feedback is required/i);
@@ -174,7 +178,7 @@ describe('rule 6 — invalid status transitions are rejected', () => {
   it('refuses transitions outside the state machine', async () => {
     await expect(
       service.transitionOutput(GALLERY_OUTPUT_SEED_IDS.vanity, 'draft', workspaceId),
-    ).rejects.toThrow(/cannot move from ready_for_review to draft/);
+    ).rejects.toThrow(/cannot move from approved to draft/);
     await expect(
       service.transitionOutput(GALLERY_OUTPUT_SEED_IDS.variant, 'approved', workspaceId),
     ).rejects.toThrow(/cannot move from draft to approved/);
@@ -192,13 +196,17 @@ describe('rule 7 — archive and restore are soft-state changes', () => {
     const archived = await service.archiveOutput(GALLERY_OUTPUT_SEED_IDS.vanity, workspaceId);
     expect(archived.status).toBe('archived');
 
-    // Still readable with all data intact.
+    // Still readable with all data intact — including the seeded approval history.
     const stored = await service.getOutput(GALLERY_OUTPUT_SEED_IDS.vanity, workspaceId);
     expect(stored.title).toBe('Morning Vanity Setup');
-    expect(await service.listReviews(stored.id, workspaceId)).toEqual([]);
+    const seededHistory = await service.listReviews(stored.id, workspaceId);
+    expect(seededHistory).toHaveLength(1);
+    expect(seededHistory[0]?.decision).toBe('approved');
 
     const restored = await service.restoreOutput(GALLERY_OUTPUT_SEED_IDS.vanity, workspaceId);
-    expect(restored.status).toBe('ready_for_review'); // prior status restored
+    // Restore only re-enters reviewable statuses — a formerly approved output
+    // returns to review (its seeded approval history is preserved above).
+    expect(restored.status).toBe('ready_for_review');
 
     const events = await service.listEvents(GALLERY_OUTPUT_SEED_IDS.vanity, workspaceId);
     expect(events.map((event) => event.eventType)).toContain('restored');

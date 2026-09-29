@@ -57,7 +57,7 @@ function output(
 export const GALLERY_OUTPUTS: GalleryOutputRecord[] = [
   output(OUTPUT_IDS.vanity, 'Morning Vanity Setup', {
     outputType: 'image',
-    status: 'ready_for_review',
+    status: 'approved',
     outputIndex: 1,
     width: 1536,
     height: 1024,
@@ -91,6 +91,15 @@ export const GALLERY_OUTPUTS: GalleryOutputRecord[] = [
 ];
 
 export const GALLERY_REVIEWS: GalleryOutputReviewRecord[] = [
+  {
+    id: 'greview_vanity_approved',
+    galleryOutputId: OUTPUT_IDS.vanity,
+    reviewerId: 'demo-user',
+    decision: 'approved',
+    feedback: 'Continuity anchors hold — approved for campaign planning.',
+    createdAt: '2026-09-27T13:02:00.000Z',
+    updatedAt: '2026-09-27T13:02:00.000Z',
+  },
   {
     id: 'greview_serum_approved',
     galleryOutputId: OUTPUT_IDS.serum,
@@ -189,6 +198,14 @@ export const GALLERY_EVENTS: GalleryOutputEventRecord[] = [
     message: 'Status moved from draft to ready_for_review.',
     metadata: { from: 'draft', to: 'ready_for_review' },
     createdAt: '2026-09-27T12:30:00.000Z',
+  },
+  {
+    id: 'gevent_vanity_approved',
+    galleryOutputId: OUTPUT_IDS.vanity,
+    eventType: 'approved',
+    message: 'Output approved.',
+    metadata: { reviewerId: 'demo-user' },
+    createdAt: '2026-09-27T13:02:00.000Z',
   },
   {
     id: 'gevent_serum_created',

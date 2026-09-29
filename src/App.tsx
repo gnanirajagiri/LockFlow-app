@@ -54,7 +54,14 @@ import {
   LibraryReferencesRoute,
   LibraryVersionsRoute,
 } from './features/library/tabRoutes';
-import { CampaignsPage } from './pages/CampaignsPage';
+import { CampaignsHomePage } from './features/campaigns/CampaignsHomePage';
+import { CampaignCreatePage } from './features/campaigns/CampaignCreatePage';
+import { CampaignLayout } from './features/campaigns/CampaignLayout';
+import { CampaignOverviewTab } from './features/campaigns/CampaignOverviewTab';
+import { CampaignContentTab } from './features/campaigns/CampaignContentTab';
+import { CampaignCalendarTab } from './features/campaigns/CampaignCalendarTab';
+import { CampaignChannelsTab } from './features/campaigns/CampaignChannelsTab';
+import { CampaignActivityTab } from './features/campaigns/CampaignActivityTab';
 import { WorkspacePage } from './pages/WorkspacePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { HelpPage } from './pages/HelpPage';
@@ -138,7 +145,16 @@ export default function App() {
                 <Route path="references" element={<LibraryReferencesRoute />} />
                 <Route path="versions" element={<LibraryVersionsRoute />} />
               </Route>
-              <Route path="campaigns" element={<CampaignsPage />} />
+              <Route path="campaigns" element={<CampaignsHomePage />} />
+              <Route path="campaigns/new" element={<CampaignCreatePage />} />
+              <Route path="campaigns/:campaignId" element={<CampaignLayout />}>
+                <Route index element={<CampaignOverviewTab />} />
+                <Route path="overview" element={<CampaignOverviewTab />} />
+                <Route path="content" element={<CampaignContentTab />} />
+                <Route path="calendar" element={<CampaignCalendarTab />} />
+                <Route path="channels" element={<CampaignChannelsTab />} />
+                <Route path="activity" element={<CampaignActivityTab />} />
+              </Route>
               <Route path="workspace" element={<WorkspacePage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="help" element={<HelpPage />} />

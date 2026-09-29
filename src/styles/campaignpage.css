@@ -1,0 +1,205 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Campaigns — home summary, item cards, agenda rows, planning calendar
+   Token-only styles (lf-campaign-*). Reuses shared patterns
+   (lf-models-toolbar, lf-dialogactions, lf-tabs, lf-field) from pages.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Home: summary stat cards ─────────────────────────────────────────── */
+.lf-campaign-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--lf-space-3);
+}
+
+/* ── Overview tab: stacked panels ─────────────────────────────────────── */
+.lf-campaign-overview {
+  display: grid;
+  gap: var(--lf-space-4);
+}
+
+/* Home card: static action column instead of the library-style overlay
+   menu, so card actions never escape the card bounds. */
+.lf-campaign-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.lf-campaign-card .lf-library__rowmenu {
+  position: static;
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .lf-campaign-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .lf-campaign-card .lf-library__rowmenu {
+    justify-content: flex-start;
+  }
+}
+
+/* ── Item / channel row card (content, channels, variant lists) ──────── */
+.lf-campaign-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lf-space-3);
+  padding: var(--lf-space-3);
+  background: var(--lf-color-surface);
+  border: 1px solid var(--lf-color-border);
+  border-radius: var(--lf-radius-md);
+}
+
+.lf-campaign-item__preview {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  border-radius: var(--lf-radius-sm);
+  background: var(--lf-color-surface-muted);
+  border: 1px solid var(--lf-color-border);
+  color: var(--lf-color-ink-muted);
+}
+
+.lf-campaign-item__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: var(--lf-space-1);
+}
+
+.lf-campaign-item__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--lf-space-2);
+}
+
+/* ── Agenda rows (overview upcoming, activity timeline, agenda view) ──── */
+.lf-campaign-agendarow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--lf-space-3);
+  flex-wrap: wrap;
+  padding: var(--lf-space-2) 0;
+  border-bottom: 1px solid var(--lf-color-border);
+}
+
+.lf-campaign-agendarow:last-child {
+  border-bottom: none;
+}
+
+/* ── Planning calendar (month / week grids; agenda fallback on mobile) ── */
+.lf-campaign-calendar {
+  display: grid;
+  gap: 1px;
+  background: var(--lf-color-border);
+  border: 1px solid var(--lf-color-border);
+  border-radius: var(--lf-radius-md);
+  overflow: hidden;
+}
+
+.lf-campaign-calendar--month,
+.lf-campaign-calendar--week {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.lf-campaign-day {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--lf-space-1);
+  min-width: 0;
+  min-height: 92px;
+  padding: var(--lf-space-2);
+  background: var(--lf-color-surface);
+}
+
+.lf-campaign-calendar--week .lf-campaign-day {
+  min-height: 160px;
+}
+
+.lf-campaign-day--today {
+  background: var(--lf-color-primary-soft);
+  box-shadow: inset 0 0 0 2px var(--lf-color-primary-200);
+}
+
+.lf-campaign-day__num {
+  font-size: var(--lf-text-xs);
+  font-weight: var(--lf-font-weight-medium);
+  color: var(--lf-color-ink-muted);
+}
+
+.lf-campaign-day__entry {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lf-space-1);
+  width: 100%;
+  min-width: 0;
+  padding: 2px var(--lf-space-2);
+  text-align: left;
+  font-size: var(--lf-text-xs);
+  font-family: inherit;
+  color: var(--lf-color-ink);
+  background: var(--lf-color-primary-50);
+  border: 1px solid var(--lf-color-primary-200);
+  border-radius: var(--lf-radius-sm);
+  cursor: pointer;
+  transition: background var(--lf-duration-fast) var(--lf-ease-out);
+}
+
+.lf-campaign-day__entry > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lf-campaign-day__entry:hover:not(:disabled) {
+  background: var(--lf-color-primary-100);
+}
+
+.lf-campaign-day__entry:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.lf-campaign-day__entry:focus-visible {
+  outline: none;
+  box-shadow: var(--lf-focus-ring);
+}
+
+/* ── Responsive: stack cards; calendar falls back to an agenda list ───── */
+@media (max-width: 720px) {
+  .lf-campaign-item {
+    flex-direction: column;
+  }
+
+  .lf-campaign-item__actions {
+    justify-content: flex-start;
+  }
+
+  .lf-campaign-calendar--month,
+  .lf-campaign-calendar--week {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .lf-campaign-day {
+    min-height: 0;
+    padding: var(--lf-space-2) var(--lf-space-3);
+  }
+
+  .lf-campaign-day + .lf-campaign-day {
+    border-top: 1px solid var(--lf-color-border);
+  }
+}

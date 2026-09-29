@@ -8,6 +8,7 @@ import './styles/layout.css';
 import './styles/pages.css';
 import './styles/envpage.css';
 import './styles/librarypage.css';
+import './styles/campaignpage.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

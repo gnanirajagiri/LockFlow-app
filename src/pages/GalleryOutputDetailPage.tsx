@@ -33,6 +33,9 @@ import { getLibraryRepository } from '../data/libraryFactory';
 import { getModelsRepository } from '../data';
 import { getEnvironmentsRepository } from '../data/environmentsFactory';
 import { SEED_GALLERY_WORKSPACE_ID } from '../mock/gallerySeed';
+import { isGalleryOutputEligibleForCampaign } from '../domain/campaigns';
+import { CampaignsService } from '../services/campaignsService';
+import { getCampaignsRepository } from '../data/campaignsFactory';
 import type {
   GalleryOutputEventRecord,
   GalleryOutputRecord,
@@ -117,8 +120,15 @@ export function GalleryOutputDetailPage() {
   const [busy, setBusy] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [qualityReviews, setQualityReviews] = useState<QualityReviewRecord[]>([]);
+  const [campaignDialog, setCampaignDialog] = useState(false);
+  const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; status: string }> | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState('');
 
   const qualityServices = useMemo(() => getQualityServices(), []);
+  const campaignsService = useMemo(
+    () => new CampaignsService(getCampaignsRepository(), service),
+    [service],
+  );
 
   const load = useCallback(async () => {
     if (!outputId) return;
@@ -208,6 +218,20 @@ export function GalleryOutputDetailPage() {
   // continuity review additionally makes sense for reviewable decisions.
   const canReviewContinuity = ['ready_for_review', 'approved', 'rejected'].includes(status);
   const hasProvenance = (provenance?.pins.length ?? 0) > 0;
+  // Campaign attachment: only eligible APPROVED outputs offer the action.
+  // The verdict comes from the single domain rule — never re-implemented here.
+  const campaignEligible = isGalleryOutputEligibleForCampaign(
+    {
+      id: output.id,
+      workspaceId: output.workspaceId,
+      title: output.title,
+      outputType: output.outputType,
+      status: output.status,
+      contentJobRequestId: output.contentJobRequestId,
+      mediaAvailable: output.mediaStoragePath !== null || output.thumbnailStoragePath !== null,
+    },
+    SEED_GALLERY_WORKSPACE_ID,
+  );
   const qualitySummary = qualitySummaryLabel(
     qualityReviews.map((review) => ({ status: review.status, overallResult: review.overallResult })),
   );
@@ -350,6 +374,32 @@ export function GalleryOutputDetailPage() {
             {status === 'failed' ? (
               <Button variant="secondary" onClick={() => setDialog('archive')}>
                 Archive
+              </Button>
+            ) : null}
+            {campaignEligible ? (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setCampaignDialog(true);
+                  setCampaigns(null);
+                  setSelectedCampaign('');
+                  campaignsService
+                    .listCampaigns(SEED_GALLERY_WORKSPACE_ID)
+                    .then((rows) =>
+                      setCampaigns(
+                        rows
+                          .filter((row) => row.campaign.status !== 'archived')
+                          .map((row) => ({
+                            id: row.campaign.id,
+                            name: row.campaign.name,
+                            status: row.campaign.status,
+                          })),
+                      ),
+                    )
+                    .catch(() => setCampaigns([]));
+                }}
+              >
+                Add to campaign
               </Button>
             ) : null}
             {status === 'draft' || status === 'processing' ? (
@@ -678,6 +728,72 @@ export function GalleryOutputDetailPage() {
             ) : null}
           </div>
         ) : null}
+      </Modal>
+
+      {/* Add-to-campaign: only offered for eligible approved outputs. Creates
+          a campaign ITEM (reference) — never a media copy or Gallery change. */}
+      <Modal
+        open={campaignDialog}
+        onClose={() => setCampaignDialog(false)}
+        title="Add to campaign"
+        description="Adds this approved output to a campaign as planned content. The Gallery output itself is not changed."
+        size="sm"
+        footer={
+          <div className="lf-dialogactions">
+            <Button onClick={() => setCampaignDialog(false)}>Cancel</Button>
+            <Button
+              variant="primary"
+              disabled={!selectedCampaign || busy}
+              onClick={async () => {
+                if (!selectedCampaign || !output) return;
+                setBusy(true);
+                try {
+                  await campaignsService.addItem(
+                    { campaignId: selectedCampaign, galleryOutputId: output.id },
+                    'demo-user',
+                    SEED_GALLERY_WORKSPACE_ID,
+                  );
+                  toast({ title: 'Added to campaign as planned content.', tone: 'success' });
+                  setCampaignDialog(false);
+                } catch (err) {
+                  toast({
+                    title: err instanceof Error ? err.message : 'Could not add to the campaign.',
+                    tone: 'error',
+                  });
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Add to campaign
+            </Button>
+          </div>
+        }
+      >
+        {campaigns === null ? (
+          <p className="lf-tile__description">Loading campaigns…</p>
+        ) : campaigns.length === 0 ? (
+          <p className="lf-tile__description">
+            No active campaigns in this workspace yet. Create one under Campaigns first.
+          </p>
+        ) : (
+          <div className="lf-field">
+            <label className="lf-field__label" htmlFor="campaign-picker">Campaign</label>
+            <select
+              id="campaign-picker"
+              className="lf-input"
+              value={selectedCampaign}
+              onChange={(event) => setSelectedCampaign(event.target.value)}
+            >
+              <option value="">Choose a campaign…</option>
+              {campaigns.map((campaign) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.name} ({campaign.status})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </Modal>
     </div>
   );

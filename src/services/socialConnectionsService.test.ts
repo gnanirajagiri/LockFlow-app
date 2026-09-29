@@ -185,6 +185,35 @@ describe('cases 3–5 — OAuth state lifecycle', () => {
     expect(check.reason).toBe('expired');
   });
 
+  it('purges only strictly-expired states; consumed states stay until expiry', async () => {
+    await service.startConnection(
+      { providerKey: 'dev_fake', workspaceId: WS, userId: USER },
+      USER,
+    );
+    const soon = new Date(Date.now() + 60 * 1000).toISOString(); // not expired
+    await repo.createOauthState({
+      workspaceId: WS,
+      providerKey: 'dev_fake',
+      stateTokenHash: 'a'.repeat(64),
+      redirectUri: 'http://localhost:5173/settings/connections/callback/dev_fake',
+      expiresAt: soon,
+      createdBy: USER,
+    });
+    const past = new Date(Date.now() - 60 * 1000).toISOString(); // expired
+    await repo.createOauthState({
+      workspaceId: WS,
+      providerKey: 'dev_fake',
+      stateTokenHash: 'b'.repeat(64),
+      redirectUri: 'http://localhost:5173/settings/connections/callback/dev_fake',
+      expiresAt: past,
+      createdBy: USER,
+    });
+    const purged = await repo.purgeExpiredOauthStates(new Date().toISOString());
+    expect(purged).toBe(1);
+    expect(await repo.findOauthStateByHash('a'.repeat(64))).not.toBeNull();
+    expect(await repo.findOauthStateByHash('b'.repeat(64))).toBeNull();
+  });
+
   it('rejects mismatched provider or forged tokens', async () => {
     const started = await service.startConnection(
       { providerKey: 'dev_fake', workspaceId: WS, userId: USER },

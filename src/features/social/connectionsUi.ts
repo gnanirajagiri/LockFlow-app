@@ -31,21 +31,20 @@ export const CONNECTION_STATUS_TONES: Record<
 /** Honest chip for a provider card, combining registry + config state. */
 export function providerAvailability(
   provider: { status: string; configured: boolean },
-): { tone: 'neutral' | 'success' | 'warning'; label: string; connectDisabled: boolean } {
+): { tone: 'neutral' | 'success' | 'warning'; label: string; connectDisabled: boolean; unconfigured: boolean } {
   if (provider.status === 'dev_only') {
     return {
       tone: 'warning',
       label: 'Development only',
       connectDisabled: false,
+      unconfigured: false,
     };
   }
-  if (provider.status !== 'available' && !provider.configured) {
-    return { tone: 'neutral', label: 'Not configured', connectDisabled: true };
-  }
   if (!provider.configured) {
-    return { tone: 'neutral', label: 'Not configured', connectDisabled: true };
+    return { tone: 'neutral', label: 'Not configured', connectDisabled: true, unconfigured: true };
   }
-  return { tone: 'success', label: 'Available', connectDisabled: false };
+  // Available but not connected (spec state 1 chip wording).
+  return { tone: 'success', label: 'Not connected', connectDisabled: false, unconfigured: false };
 }
 
 export function formatVerifiedAt(iso: string | null): string {

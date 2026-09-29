@@ -214,14 +214,16 @@ export function ConnectionsPage() {
                               </p>
                             ) : null}
                           </>
+                        ) : availability.unconfigured ? (
+                          <p className="lf-tile__description">
+                            Provider credentials are not configured. Connection is unavailable
+                            until the workspace hosting environment provides them.
+                          </p>
                         ) : (
                           <p className="lf-tile__description">
                             {isDevOnly
                               ? 'Simulated provider for development and demos. Never presented as a production platform.'
-                              : 'No workspace account connected yet.'}
-                            {!availability.connectDisabled && !isDevOnly
-                              ? ' Publishing workflows arrive after connections are verified.'
-                              : ''}
+                              : 'No workspace account connected yet. Publishing workflows arrive after connections are verified.'}
                           </p>
                         )}
                       </div>
@@ -260,7 +262,7 @@ export function ConnectionsPage() {
                         )}
                       </div>
                     </div>
-                    {connected && availability.connectDisabled ? (
+                    {connected && availability.unconfigured ? (
                       <p className="lf-tile__description">
                         Provider credentials are not configured for new connections.
                       </p>

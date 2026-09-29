@@ -274,9 +274,11 @@ export class MockSocialConnectionsRepository implements SocialConnectionsReposit
   }
 
   async purgeExpiredOauthStates(nowIso: string): Promise<number> {
+    // Mirrors the SQL cleanup: remove only strictly-expired states. Consumed
+    // states are kept until expiry so replay attempts stay auditable.
     const before = this.oauthStates.length;
     this.oauthStates = this.oauthStates.filter(
-      (s) => new Date(s.expiresAt).getTime() > new Date(nowIso).getTime() || s.consumedAt === null === false,
+      (s) => new Date(s.expiresAt).getTime() > new Date(nowIso).getTime(),
     );
     return before - this.oauthStates.length;
   }

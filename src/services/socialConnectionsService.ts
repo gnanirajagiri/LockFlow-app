@@ -113,6 +113,10 @@ export class SocialConnectionsService {
       throw new Error('Redirect URI is not allowed for this provider.');
     }
 
+    // Opportunistic safe cleanup: expired states are purged on every new
+    // flow start (no background worker exists, and none may be added here).
+    await this.repo.purgeExpiredOauthStates(new Date().toISOString()).catch(() => undefined);
+
     const stateToken = this.encryption.newStateToken();
     const stateTokenHash = await sha256Hex(stateToken);
     // PKCE where the provider supports it: verifier encrypted at rest.

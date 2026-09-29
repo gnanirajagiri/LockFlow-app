@@ -20,6 +20,14 @@ import { useToast } from '../../components/ui/Toast';
 import { GalleryIcon, SearchIcon } from '../../components/icons';
 import type { CampaignContextValue } from './CampaignLayout';
 import { SEED_GALLERY_WORKSPACE_ID } from '../../mock/gallerySeed';
+import { ContentStudioService } from '../../services/contentService';
+import { LibraryService } from '../../services/libraryService';
+import { ModelsService } from '../../services/modelsService';
+import { EnvironmentsService } from '../../services/environmentsService';
+import { getContentRepository } from '../../data/contentFactory';
+import { getLibraryRepository } from '../../data/libraryFactory';
+import { getModelsRepository } from '../../data';
+import { getEnvironmentsRepository } from '../../data/environmentsFactory';
 import { CAMPAIGN_CHANNEL_KEYS } from '../../domain/campaigns';
 import type { CampaignItemRecord, CampaignItemVariantRecord } from '../../domain/campaigns';
 import {
@@ -57,6 +65,8 @@ export function CampaignContentTab() {
   const [eligible, setEligible] = useState<EligibleOutput[] | null>(null);
   const [eligibleSearch, setEligibleSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'image' | 'video' | 'story'>('all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([]);
   const [attaching, setAttaching] = useState<EligibleOutput | null>(null);
   const [attachChannel, setAttachChannel] = useState('');
   const [attachFormat, setAttachFormat] = useState('');
@@ -97,15 +107,47 @@ export function CampaignContentTab() {
     void load();
   }, [load]);
 
-  const openSelector = useCallback(async () => {
+  const contentService = useMemo(
+    () =>
+      new ContentStudioService(getContentRepository(), {
+        library: new LibraryService(getLibraryRepository()),
+        models: new ModelsService(getModelsRepository()),
+        environments: new EnvironmentsService(getEnvironmentsRepository()),
+      }),
+    [],
+  );
+
+  const openSelector = useCallback(() => {
     setSelectorOpen(true);
-    try {
-      setEligible(await service.listEligibleOutputs(SEED_GALLERY_WORKSPACE_ID));
-    } catch (err) {
-      toast({ title: err instanceof Error ? err.message : 'Could not load approved outputs.', tone: 'error' });
-      setEligible([]);
+    if (projects.length === 0) {
+      contentService
+        .listProjects(SEED_GALLERY_WORKSPACE_ID)
+        .then((rows) => setProjects(rows.map((p) => ({ id: p.id, name: p.name }))))
+        .catch(() => setProjects([]));
     }
-  }, [service, toast]);
+  }, [contentService, projects.length]);
+
+  // Eligible outputs refetch when the selector opens or the project filter
+  // changes — filtering happens through the service (job → project relation).
+  useEffect(() => {
+    if (!selectorOpen) return;
+    let active = true;
+    service
+      .listEligibleOutputs(
+        SEED_GALLERY_WORKSPACE_ID,
+        projectFilter === 'all' ? {} : { contentProjectId: projectFilter },
+      )
+      .then((rows) => {
+        if (active) setEligible(rows);
+      })
+      .catch((err) => {
+        toast({ title: err instanceof Error ? err.message : 'Could not load approved outputs.', tone: 'error' });
+        if (active) setEligible([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectorOpen, projectFilter, service, toast]);
 
   const filteredEligible = useMemo(() => {
     if (!eligible) return [];
@@ -411,6 +453,15 @@ export function CampaignContentTab() {
               <option value="image">Image</option>
               <option value="video">Video</option>
               <option value="story">Story</option>
+            </select>
+          </div>
+          <div className="lf-models-toolbar__filter">
+            <label className="lf-field__label" htmlFor="eligible-project">Content project</label>
+            <select id="eligible-project" className="lf-input" value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+              <option value="all">All projects</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
             </select>
           </div>
         </div>

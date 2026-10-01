@@ -66,6 +66,18 @@ function asset(
     createdBy: 'demo-user',
     createdAt: '2026-09-18T09:00:00.000Z',
     updatedAt,
+    // Prompt 21 unified-taxonomy defaults (null = legacy/unset rows stay legal).
+    usageScope: null,
+    sourceKind: 'manual',
+    linkedModelId: null,
+    linkedItemId: null,
+    linkedEnvironmentId: null,
+    linkedBrandId: null,
+    primaryFileId: null,
+    thumbnailFileId: null,
+    metadata: null,
+    archivedAt: null,
+    archivedBy: null,
   };
 }
 
@@ -168,6 +180,11 @@ export const LOOK_ASSET = asset(
   '2026-09-27T09:00:00.000Z',
   VERSION_IDS.lookV2,
 );
+
+export const LOOK_ASSET_SCOPED: LibraryAssetRecord = {
+  ...LOOK_ASSET,
+  usageScope: 'model' as const,
+};
 
 export const OTHER_WS_ASSET: LibraryAssetRecord = {
   ...SERUM_ASSET,

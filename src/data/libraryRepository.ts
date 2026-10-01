@@ -8,8 +8,12 @@ import type {
   AddAssetTagInput,
   CreateAssetVersionInput,
   CreateLibraryAssetInput,
+  CreateLibraryAssetExtendedInput,
+  LibraryAssetFilters,
   LibraryAssetRecord,
   LibraryAssetVersionRecord,
+  LibraryEventRecord,
+  LibraryEventType,
   LibraryReferenceRecord,
   LibraryTagRecord,
   LookAssetItemRecord,
@@ -18,6 +22,7 @@ import type {
   SetLookItemsInput,
   UpdateAssetVersionDraftInput,
   UpdateLibraryAssetDraftInput,
+  UpdateLibraryAssetExtendedInput,
 } from '../domain/library';
 
 export interface LibraryRepository {
@@ -61,4 +66,30 @@ export interface LibraryRepository {
   ensureLookDetails(versionId: string, modelId: string, presentationNotes?: string): Promise<LookDetailsRecord>;
   getLookItems(lookDetailsId: string): Promise<LookAssetItemRecord[]>;
   setLookItems(input: SetLookItemsInput): Promise<LookAssetItemRecord[]>;
+
+  // ── Prompt 21: unified-taxonomy operations ────────────────────────────
+  /** Filtered listing (search, type, status, scope, links, tags, dates). */
+  listAssetsFiltered(workspaceId: string, filters: LibraryAssetFilters): Promise<LibraryAssetRecord[]>;
+  /** Creates an asset with taxonomy fields + tags in one go. */
+  createAssetExtended(input: CreateLibraryAssetExtendedInput, createdBy: string): Promise<LibraryAssetRecord>;
+  /** Partial extended update (metadata, scope, links, files). */
+  updateAssetExtended(assetId: string, patch: UpdateLibraryAssetExtendedInput): Promise<LibraryAssetRecord>;
+  /** Soft-archive: stays inspectable, excluded from default pickers. */
+  archiveAsset(assetId: string, archivedBy: string): Promise<LibraryAssetRecord>;
+  /** Restore a soft-archived asset. */
+  restoreAsset(assetId: string): Promise<LibraryAssetRecord>;
+  // Audit trail (append-only)
+  appendLibraryEvent(input: {
+    workspaceId: string;
+    libraryAssetId: string | null;
+    actorId: string | null;
+    eventType: LibraryEventType;
+    message: string;
+    metadata?: Record<string, string | number | boolean> | null;
+  }): Promise<LibraryEventRecord>;
+  listLibraryEvents(workspaceId: string, filter?: {
+    libraryAssetId?: string;
+    eventType?: LibraryEventType;
+    limit?: number;
+  }): Promise<LibraryEventRecord[]>;
 }

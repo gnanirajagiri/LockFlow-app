@@ -11,7 +11,11 @@ import type {
   AddAssetTagInput,
   CreateAssetVersionInput,
   CreateLibraryAssetInput,
+  CreateLibraryAssetExtendedInput,
+  LibraryAssetFilters,
   LibraryAssetRecord,
+  LibraryEventRecord,
+  LibraryEventType,
   LibraryAssetVersionRecord,
   LibraryReferenceRecord,
   LibraryTagRecord,
@@ -21,7 +25,9 @@ import type {
   SetLookItemsInput,
   UpdateAssetVersionDraftInput,
   UpdateLibraryAssetDraftInput,
+  UpdateLibraryAssetExtendedInput,
 } from '../domain/library';
+import { normalizeTagName } from '../domain/library';
 import type { LibraryRepository } from './libraryRepository';
 
 function mapAsset(row: Record<string, unknown>): LibraryAssetRecord {
@@ -38,6 +44,18 @@ function mapAsset(row: Record<string, unknown>): LibraryAssetRecord {
     createdBy: row.created_by as string,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    // Prompt 21 unified-taxonomy columns (null-safe before migration runs).
+    usageScope: (row.usage_scope as LibraryAssetRecord['usageScope']) ?? null,
+    sourceKind: (row.source_kind as LibraryAssetRecord['sourceKind']) ?? null,
+    linkedModelId: (row.linked_model_id as string | null) ?? null,
+    linkedItemId: (row.linked_item_id as string | null) ?? null,
+    linkedEnvironmentId: (row.linked_environment_id as string | null) ?? null,
+    linkedBrandId: (row.linked_brand_id as string | null) ?? null,
+    primaryFileId: (row.primary_file_id as string | null) ?? null,
+    thumbnailFileId: (row.thumbnail_file_id as string | null) ?? null,
+    metadata: (row.metadata ?? null) as Record<string, unknown> | null,
+    archivedAt: (row.archived_at as string | null) ?? null,
+    archivedBy: (row.archived_by as string | null) ?? null,
   };
 }
 
@@ -455,5 +473,202 @@ export class SupabaseLibraryRepository implements LibraryRepository {
       .select('*');
     if (error) throw error;
     return (data ?? []).map(mapLookItem);
+  }
+
+  // ── Prompt 21: unified-taxonomy operations ────────────────────────────────
+
+  async listAssetsFiltered(
+    workspaceId: string,
+    filters: LibraryAssetFilters,
+  ): Promise<LibraryAssetRecord[]> {
+    let query = this.client
+      .from('library_assets')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (filters.archivedOnly) {
+      query = query.not('archived_at', 'is', null);
+    } else if (!filters.includeArchived) {
+      query = query.is('archived_at', null).neq('status', 'archived');
+    }
+    if (filters.search) query = query.ilike('name', `%${filters.search}%`);
+    if (filters.assetType) {
+      const types = Array.isArray(filters.assetType) ? filters.assetType : [filters.assetType];
+      query = query.in('asset_type', types);
+    }
+    if (filters.status) query = query.eq('status', filters.status);
+    if (filters.usageScope) query = query.eq('usage_scope', filters.usageScope);
+    if (filters.linkedModelId) query = query.eq('linked_model_id', filters.linkedModelId);
+    if (filters.linkedItemId) query = query.eq('linked_item_id', filters.linkedItemId);
+    if (filters.linkedEnvironmentId) query = query.eq('linked_environment_id', filters.linkedEnvironmentId);
+    if (filters.createdBy) query = query.eq('created_by', filters.createdBy);
+    if (filters.updatedFrom) query = query.gte('updated_at', filters.updatedFrom);
+    if (filters.updatedTo) query = query.lte('updated_at', filters.updatedTo);
+    // Tag filtering resolves through the normalized tag vocabulary.
+    if (filters.tag) {
+      const tagRes = await this.client
+        .from('library_asset_tags')
+        .select('id')
+        .eq('workspace_id', workspaceId)
+        .eq('normalized_name', normalizeTagName(filters.tag))
+        .maybeSingle();
+      if (tagRes.error) throw tagRes.error;
+      if (!tagRes.data) return [];
+      const linkRes = await this.client
+        .from('library_asset_tag_links')
+        .select('library_asset_id')
+        .eq('tag_id', (tagRes.data as { id: string }).id);
+      if (linkRes.error) throw linkRes.error;
+      const ids = (linkRes.data as Array<{ library_asset_id: string }>).map((r) => r.library_asset_id);
+      if (!ids.length) return [];
+      query = query.in('id', ids);
+    }
+    const res = await query.order('updated_at', { ascending: false });
+    if (res.error) throw res.error;
+    return (res.data as Array<Record<string, unknown>>).map(mapAsset);
+  }
+
+  async createAssetExtended(
+    input: CreateLibraryAssetExtendedInput,
+    createdBy: string,
+  ): Promise<LibraryAssetRecord> {
+    const created = await this.createAsset(
+      {
+        workspaceId: input.workspaceId,
+        name: input.name,
+        ...(input.slug ? { slug: input.slug } : {}),
+        assetType: input.assetType,
+        ...(input.description !== undefined ? { description: input.description } : {}),
+      },
+      createdBy,
+    );
+    const patch: UpdateLibraryAssetExtendedInput = {
+      usageScope: input.usageScope ?? null,
+      linkedModelId: input.linkedModelId ?? null,
+      linkedItemId: input.linkedItemId ?? null,
+      linkedEnvironmentId: input.linkedEnvironmentId ?? null,
+      linkedBrandId: input.linkedBrandId ?? null,
+      primaryFileId: input.primaryFileId ?? null,
+      thumbnailFileId: input.thumbnailFileId ?? null,
+      metadata: input.metadata ?? null,
+    };
+    const extended = await this.updateAssetExtended(created.id, patch);
+    for (const tagName of input.tags ?? []) {
+      await this.addTagToAsset(
+        { libraryAssetId: created.id, name: tagName, normalizedName: normalizeTagName(tagName) },
+        input.workspaceId,
+      );
+    }
+    return extended;
+  }
+
+  async updateAssetExtended(
+    assetId: string,
+    patch: UpdateLibraryAssetExtendedInput,
+  ): Promise<LibraryAssetRecord> {
+    const res = await this.client
+      .from('library_assets')
+      .update({
+        ...(patch.name !== undefined ? { name: patch.name } : {}),
+        ...(patch.description !== undefined ? { description: patch.description } : {}),
+        ...(patch.coverImagePath !== undefined ? { cover_image_path: patch.coverImagePath } : {}),
+        ...(patch.usageScope !== undefined ? { usage_scope: patch.usageScope } : {}),
+        ...(patch.linkedModelId !== undefined ? { linked_model_id: patch.linkedModelId } : {}),
+        ...(patch.linkedItemId !== undefined ? { linked_item_id: patch.linkedItemId } : {}),
+        ...(patch.linkedEnvironmentId !== undefined ? { linked_environment_id: patch.linkedEnvironmentId } : {}),
+        ...(patch.linkedBrandId !== undefined ? { linked_brand_id: patch.linkedBrandId } : {}),
+        ...(patch.primaryFileId !== undefined ? { primary_file_id: patch.primaryFileId } : {}),
+        ...(patch.thumbnailFileId !== undefined ? { thumbnail_file_id: patch.thumbnailFileId } : {}),
+        ...(patch.metadata !== undefined ? { metadata: patch.metadata ?? {} } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', assetId)
+      .select('*')
+      .single();
+    if (res.error) throw res.error;
+    return mapAsset(res.data as unknown as Record<string, unknown>);
+  }
+
+  async archiveAsset(assetId: string, archivedBy: string): Promise<LibraryAssetRecord> {
+    return (async () => {
+      const res = await this.client
+        .from('library_assets')
+        .update({ status: 'archived', archived_at: new Date().toISOString(), archived_by: archivedBy, updated_at: new Date().toISOString() })
+        .eq('id', assetId)
+        .select('*')
+        .single();
+      if (res.error) throw res.error;
+      return mapAsset(res.data as unknown as Record<string, unknown>);
+    })();
+  }
+
+  async restoreAsset(assetId: string): Promise<LibraryAssetRecord> {
+    const res = await this.client
+      .from('library_assets')
+      .update({ status: 'draft', archived_at: null, archived_by: null, updated_at: new Date().toISOString() })
+      .eq('id', assetId)
+      .select('*')
+      .single();
+    if (res.error) throw res.error;
+    return mapAsset(res.data as unknown as Record<string, unknown>);
+  }
+
+  async appendLibraryEvent(input: {
+    workspaceId: string;
+    libraryAssetId: string | null;
+    actorId: string | null;
+    eventType: LibraryEventType;
+    message: string;
+    metadata?: Record<string, string | number | boolean> | null;
+  }): Promise<LibraryEventRecord> {
+    const res = await this.client
+      .from('library_asset_events')
+      .insert({
+        workspace_id: input.workspaceId,
+        library_asset_id: input.libraryAssetId,
+        actor_id: input.actorId,
+        event_type: input.eventType,
+        message: input.message.slice(0, 400),
+        metadata: input.metadata ?? {},
+      })
+      .select('*')
+      .single();
+    if (res.error) throw res.error;
+    const row = res.data as Record<string, unknown>;
+    return {
+      id: row.id as string,
+      workspaceId: row.workspace_id as string,
+      libraryAssetId: (row.library_asset_id as string | null) ?? null,
+      actorId: (row.actor_id as string | null) ?? null,
+      eventType: row.event_type as LibraryEventType,
+      message: row.message as string,
+      metadata: (row.metadata ?? null) as Record<string, string | number | boolean> | null,
+      createdAt: row.created_at as string,
+    };
+  }
+
+  async listLibraryEvents(
+    workspaceId: string,
+    filter?: { libraryAssetId?: string; eventType?: LibraryEventType; limit?: number },
+  ): Promise<LibraryEventRecord[]> {
+    let query = this.client
+      .from('library_asset_events')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (filter?.libraryAssetId) query = query.eq('library_asset_id', filter.libraryAssetId);
+    if (filter?.eventType) query = query.eq('event_type', filter.eventType);
+    const res = await query
+      .order('created_at', { ascending: false })
+      .limit(filter?.limit ?? 50);
+    if (res.error) throw res.error;
+    return (res.data as Array<Record<string, unknown>>).map((row) => ({
+      id: row.id as string,
+      workspaceId: row.workspace_id as string,
+      libraryAssetId: (row.library_asset_id as string | null) ?? null,
+      actorId: (row.actor_id as string | null) ?? null,
+      eventType: row.event_type as LibraryEventType,
+      message: row.message as string,
+      metadata: (row.metadata ?? null) as Record<string, string | number | boolean> | null,
+      createdAt: row.created_at as string,
+    }));
   }
 }

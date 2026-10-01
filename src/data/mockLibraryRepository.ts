@@ -15,8 +15,12 @@ import type {
   AddAssetTagInput,
   CreateAssetVersionInput,
   CreateLibraryAssetInput,
+  CreateLibraryAssetExtendedInput,
+  LibraryAssetFilters,
   LibraryAssetRecord,
   LibraryAssetVersionRecord,
+  LibraryEventRecord,
+  LibraryEventType,
   LibraryReferenceRecord,
   LibraryTagRecord,
   LookAssetItemRecord,
@@ -25,7 +29,9 @@ import type {
   SetLookItemsInput,
   UpdateAssetVersionDraftInput,
   UpdateLibraryAssetDraftInput,
+  UpdateLibraryAssetExtendedInput,
 } from '../domain/library';
+import { normalizeTagName, sanitizeLibraryEventMetadata } from '../domain/library';
 import {
   LIBRARY_REFERENCES,
   LIBRARY_SEED,
@@ -48,6 +54,7 @@ export class MockLibraryRepository implements LibraryRepository {
   private tagLinks = new Set<string>(LIBRARY_TAG_LINKS.map((link) => `${link.libraryAssetId}:${link.tagId}`)); // `${assetId}:${tagId}`
   private lookDetails = new Map<string, LookDetailsRecord>(); // key: versionId
   private lookItems = new Map<string, LookAssetItemRecord[]>(); // key: lookDetailsId
+  private events: LibraryEventRecord[] = [];
 
   constructor() {
     for (const seed of LIBRARY_SEED) {
@@ -94,6 +101,18 @@ export class MockLibraryRepository implements LibraryRepository {
       createdBy,
       createdAt: stamp,
       updatedAt: stamp,
+      // Prompt 21 taxonomy defaults (extended create fills these itself).
+      usageScope: null,
+      sourceKind: 'manual',
+      linkedModelId: null,
+      linkedItemId: null,
+      linkedEnvironmentId: null,
+      linkedBrandId: null,
+      primaryFileId: null,
+      thumbnailFileId: null,
+      metadata: null,
+      archivedAt: null,
+      archivedBy: null,
     };
     this.assets.set(record.id, record);
     return structuredClone(record);
@@ -415,5 +434,168 @@ export class MockLibraryRepository implements LibraryRepository {
     }
     this.lookItems.set(input.lookDetailsId, items);
     return structuredClone(items);
+  }
+
+  // ── Prompt 21: unified-taxonomy operations ────────────────────────────────
+
+  async listAssetsFiltered(
+    workspaceId: string,
+    filters: LibraryAssetFilters,
+  ): Promise<LibraryAssetRecord[]> {
+    let rows = [...this.assets.values()].filter((a) => a.workspaceId === workspaceId);
+    if (filters.archivedOnly) {
+      rows = rows.filter((a) => a.archivedAt !== null || a.status === 'archived');
+    } else if (!filters.includeArchived) {
+      rows = rows.filter((a) => a.archivedAt === null && a.status !== 'archived');
+    }
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      rows = rows.filter((a) => a.name.toLowerCase().includes(q) || a.slug.includes(q));
+    }
+    if (filters.assetType) {
+      const types = Array.isArray(filters.assetType) ? filters.assetType : [filters.assetType];
+      rows = rows.filter((a) => types.includes(a.assetType));
+    }
+    if (filters.status) rows = rows.filter((a) => a.status === filters.status);
+    if (filters.usageScope) rows = rows.filter((a) => a.usageScope === filters.usageScope);
+    if (filters.linkedModelId) rows = rows.filter((a) => a.linkedModelId === filters.linkedModelId);
+    if (filters.linkedItemId) rows = rows.filter((a) => a.linkedItemId === filters.linkedItemId);
+    if (filters.linkedEnvironmentId) rows = rows.filter((a) => a.linkedEnvironmentId === filters.linkedEnvironmentId);
+    if (filters.createdBy) rows = rows.filter((a) => a.createdBy === filters.createdBy);
+    if (filters.updatedFrom) rows = rows.filter((a) => a.updatedAt >= filters.updatedFrom!);
+    if (filters.updatedTo) rows = rows.filter((a) => a.updatedAt <= filters.updatedTo!);
+    if (filters.tag) {
+      const tagName = normalizeTagName(filters.tag);
+      const tag = [...this.tags.values()].find(
+        (t) => t.workspaceId === workspaceId && t.normalizedName === tagName,
+      );
+      rows = tag ? rows.filter((a) => this.tagLinks.has(this.linkKey(a.id, tag.id))) : [];
+    }
+    return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((a) => structuredClone(a));
+  }
+
+  async createAssetExtended(
+    input: CreateLibraryAssetExtendedInput,
+    createdBy: string,
+  ): Promise<LibraryAssetRecord> {
+    const base = await this.createAsset(
+      {
+        workspaceId: input.workspaceId,
+        name: input.name,
+        ...(input.slug ? { slug: input.slug } : {}),
+        assetType: input.assetType,
+        ...(input.description !== undefined ? { description: input.description } : {}),
+      },
+      createdBy,
+    );
+    const extended: LibraryAssetRecord = {
+      ...base,
+      usageScope: input.usageScope ?? null,
+      sourceKind: input.sourceKind ?? 'manual',
+      linkedModelId: input.linkedModelId ?? null,
+      linkedItemId: input.linkedItemId ?? null,
+      linkedEnvironmentId: input.linkedEnvironmentId ?? null,
+      linkedBrandId: input.linkedBrandId ?? null,
+      primaryFileId: input.primaryFileId ?? null,
+      thumbnailFileId: input.thumbnailFileId ?? null,
+      metadata: input.metadata ? structuredClone(input.metadata) : null,
+      archivedAt: null,
+      archivedBy: null,
+    };
+    this.assets.set(base.id, extended);
+    for (const tagName of input.tags ?? []) {
+      await this.addTagToAsset(
+        { libraryAssetId: base.id, name: tagName, normalizedName: normalizeTagName(tagName) },
+        input.workspaceId,
+      );
+    }
+    return structuredClone(extended);
+  }
+
+  async updateAssetExtended(
+    assetId: string,
+    patch: UpdateLibraryAssetExtendedInput,
+  ): Promise<LibraryAssetRecord> {
+    const asset = await this.getAsset(assetId);
+    const next: LibraryAssetRecord = {
+      ...asset,
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.description !== undefined ? { description: patch.description } : {}),
+      ...(patch.coverImagePath !== undefined ? { coverImagePath: patch.coverImagePath } : {}),
+      ...(patch.usageScope !== undefined ? { usageScope: patch.usageScope } : {}),
+      ...(patch.linkedModelId !== undefined ? { linkedModelId: patch.linkedModelId } : {}),
+      ...(patch.linkedItemId !== undefined ? { linkedItemId: patch.linkedItemId } : {}),
+      ...(patch.linkedEnvironmentId !== undefined ? { linkedEnvironmentId: patch.linkedEnvironmentId } : {}),
+      ...(patch.linkedBrandId !== undefined ? { linkedBrandId: patch.linkedBrandId } : {}),
+      ...(patch.primaryFileId !== undefined ? { primaryFileId: patch.primaryFileId } : {}),
+      ...(patch.thumbnailFileId !== undefined ? { thumbnailFileId: patch.thumbnailFileId } : {}),
+      ...(patch.metadata !== undefined
+        ? { metadata: patch.metadata ? structuredClone(patch.metadata) : null }
+        : {}),
+      updatedAt: now(),
+    };
+    this.assets.set(assetId, next);
+    return structuredClone(next);
+  }
+
+  async archiveAsset(assetId: string, archivedBy: string): Promise<LibraryAssetRecord> {
+    const asset = await this.getAsset(assetId);
+    const next: LibraryAssetRecord = {
+      ...asset,
+      status: 'archived',
+      archivedAt: now(),
+      archivedBy,
+      updatedAt: now(),
+    };
+    this.assets.set(assetId, next);
+    return structuredClone(next);
+  }
+
+  async restoreAsset(assetId: string): Promise<LibraryAssetRecord> {
+    const asset = await this.getAsset(assetId);
+    const next: LibraryAssetRecord = {
+      ...asset,
+      status: 'draft',
+      archivedAt: null,
+      archivedBy: null,
+      updatedAt: now(),
+    };
+    this.assets.set(assetId, next);
+    return structuredClone(next);
+  }
+
+  async appendLibraryEvent(input: {
+    workspaceId: string;
+    libraryAssetId: string | null;
+    actorId: string | null;
+    eventType: LibraryEventType;
+    message: string;
+    metadata?: Record<string, string | number | boolean> | null;
+  }): Promise<LibraryEventRecord> {
+    const record: LibraryEventRecord = {
+      id: crypto.randomUUID(),
+      workspaceId: input.workspaceId,
+      libraryAssetId: input.libraryAssetId,
+      actorId: input.actorId,
+      eventType: input.eventType,
+      message: input.message.slice(0, 400),
+      metadata: sanitizeLibraryEventMetadata(input.metadata),
+      createdAt: now(),
+    };
+    this.events.push(record);
+    return structuredClone(record);
+  }
+
+  async listLibraryEvents(
+    workspaceId: string,
+    filter?: { libraryAssetId?: string; eventType?: LibraryEventType; limit?: number },
+  ): Promise<LibraryEventRecord[]> {
+    return this.events
+      .filter((e) => e.workspaceId === workspaceId)
+      .filter((e) => (filter?.libraryAssetId ? e.libraryAssetId === filter.libraryAssetId : true))
+      .filter((e) => (filter?.eventType ? e.eventType === filter.eventType : true))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, filter?.limit ?? 50)
+      .map((e) => ({ ...e, metadata: e.metadata ? { ...e.metadata } : null }));
   }
 }

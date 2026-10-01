@@ -57,12 +57,16 @@ import { GalleryQualityReviewPage } from './features/quality/GalleryQualityRevie
 import { CorrectionCreatePage } from './features/quality/CorrectionCreatePage';
 import { CorrectionsPage } from './features/quality/CorrectionsPage';
 import { CorrectionDetailPage } from './features/quality/CorrectionDetailPage';
-import { LibraryPage } from './pages/LibraryPage';
 import { LibraryNewAssetPage } from './pages/LibraryNewAssetPage';
 import { LibraryLooksPage } from './pages/LibraryLooksPage';
 import { LibraryNewLookPage } from './pages/LibraryNewLookPage';
 import { LibraryLookProfilePage } from './pages/LibraryLookProfilePage';
 import { LibraryAssetProfileLayout } from './features/library/LibraryAssetProfileLayout';
+import { LibraryOpsHomePage } from './features/library/LibraryOpsHomePage';
+import { LibraryAssetsPage } from './features/library/LibraryAssetsPage';
+import { LibraryAssetOpsDetailPage } from './features/library/LibraryAssetOpsDetailPage';
+import { LibraryPickerPage } from './features/library/LibraryPickerPage';
+import { LibraryArchivedPage } from './features/library/LibraryArchivedPage';
 import {
   LibraryDetailsRoute,
   LibraryOverviewRoute,
@@ -149,7 +153,11 @@ export default function App() {
               <Route path="gallery/:outputId/corrections" element={<CorrectionCreatePage />} />
               <Route path="corrections" element={<CorrectionsPage />} />
               <Route path="corrections/:correctionRequestId" element={<CorrectionDetailPage />} />
-              <Route path="library" element={<LibraryPage />} />
+              <Route path="library" element={<LibraryOpsHomePage />} />
+              <Route path="library/assets" element={<LibraryAssetsPage />} />
+              <Route path="library/assets/:assetId" element={<LibraryAssetOpsDetailPage />} />
+              <Route path="library/picker" element={<LibraryPickerPage />} />
+              <Route path="library/archived" element={<LibraryArchivedPage />} />
               <Route path="library/new" element={<LibraryNewAssetPage />} />
               <Route path="library/looks" element={<LibraryLooksPage />} />
               <Route path="library/looks/new" element={<LibraryNewLookPage />} />

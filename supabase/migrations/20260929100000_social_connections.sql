@@ -41,7 +41,7 @@ create type public.social_connection_event_type as enum (
 
 -- ── A. Provider registry (metadata only — never secrets) ────────────────────
 create table public.social_connection_providers (
-  id uuid primary key default gen_random_uuid(),
+  id uuid unique default gen_random_uuid(),
   key text primary key,
   display_name text not null check (char_length(display_name) between 1 and 60),
   status public.social_provider_status not null default 'disabled',

@@ -181,7 +181,7 @@ create index library_asset_tag_links_tag_idx on public.library_asset_tag_links (
 
 -- ── F. Look details (1:1 with versions of assets whose type is 'look') ──────
 create table public.look_details (
-  id uuid primary key default gen_random_uuid(),
+  id uuid unique default gen_random_uuid(),
   library_asset_version_id uuid primary key references public.library_asset_versions (id) on delete cascade,
   -- The ONE sanctioned model relationship in the Library: a Look belongs to a
   -- model's presentation, but never alters the model's Character Sheet.
@@ -214,7 +214,7 @@ begin
       raise exception 'look_details target version not found' using errcode = 'P0002';
     end if;
     if v_asset_type <> 'look' then
-      raise exception 'look_details is only valid for assets with asset_type = look (got %)'
+      raise exception 'look_details is only valid for assets with asset_type = look (got %)', v_asset_type
         using errcode = 'check_violation';
     end if;
   end if;

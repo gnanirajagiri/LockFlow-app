@@ -332,7 +332,7 @@ begin
   end if;
 
   if new.status in ('queued', 'processing', 'review') and new.provider_name is null then
-    raise exception 'job status % requires a provider integration (provider_name is null)'
+    raise exception 'job status % requires a provider integration (provider_name is null)', new.status
       using errcode = 'check_violation';
   end if;
 

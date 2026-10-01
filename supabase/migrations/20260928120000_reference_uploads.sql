@@ -76,20 +76,25 @@ alter table public.library_asset_references
   add column if not exists upload_status public.reference_upload_status not null default 'uploaded',
   add column if not exists deleted_at timestamptz;
 
--- Backfill workspace_id from each version chain.
+-- Backfill workspace_id from each version chain (versions carry no
+-- workspace_id; it lives on the asset parent: models / environments /
+-- library_assets).
 update public.model_references r
-set workspace_id = v.workspace_id
+set workspace_id = m.workspace_id
 from public.model_versions v
+join public.models m on m.id = v.model_id
 where r.model_version_id = v.id and r.workspace_id is null;
 
 update public.environment_references r
-set workspace_id = v.workspace_id
+set workspace_id = e.workspace_id
 from public.environment_versions v
+join public.environments e on e.id = v.environment_id
 where r.environment_version_id = v.id and r.workspace_id is null;
 
 update public.library_asset_references r
-set workspace_id = v.workspace_id
+set workspace_id = a.workspace_id
 from public.library_asset_versions v
+join public.library_assets a on a.id = v.library_asset_id
 where r.library_asset_version_id = v.id and r.workspace_id is null;
 
 -- From here on the column is required.
@@ -234,20 +239,24 @@ immutable
 as $$
   select case
     when raw is null then 'reference'
-    else coalesce(
-      nullif(regexp_replace(
-        regexp_replace(
-          lower(split_part(reverse(split_part(raw, '.')), '/', 1)),
-          '[^a-z0-9._-]', '', 'g'
-        ),
-        '^[._-]+|[._-]+$', ''
-      ), ''),
-      'reference'
-    end
-    || case
-      when raw like '%.%' and position('.' in raw) < length(raw) then '.' || lower(regexp_replace(split_part(raw, '.', -1), '[^a-z0-9]', '', 'g'))
-      else ''
-    end
+    else
+      coalesce(
+        nullif(regexp_replace(
+          regexp_replace(
+            lower(
+              -- basename: strip any leading path segments, then the extension
+              split_part(reverse(split_part(reverse(raw), '/', 1)), '.', 1)
+            ),
+            '[^a-z0-9._-]', '', 'g'
+          ),
+          '^[._-]+|[._-]+$', ''
+        ), ''),
+        'reference')
+      || case
+        when position('.' in raw) > 0 and position('.' in raw) < length(raw) then
+          '.' || lower(regexp_replace(split_part(raw, '.', -1), '[^a-z0-9]', '', 'g'))
+        else ''
+      end
   end;
 $$;
 

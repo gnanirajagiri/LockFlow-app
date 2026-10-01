@@ -38,7 +38,7 @@ fi
   -c "create schema if not exists supabase_migrations;" \
   -c "create table if not exists supabase_migrations.schema_migrations (
         version text primary key,
-        statements int,
+        statements int default 0,
         name text unique
       );"
 
@@ -59,7 +59,7 @@ for file in "$MIGRATIONS_DIR"/*.sql; do
   "${PSQL[@]}" \
     -c "begin;" \
     -f "$file" \
-    -c "insert into supabase_migrations.schema_migrations (version, statements, name) values ('$version', 0, '$name');" \
+    -c "insert into supabase_migrations.schema_migrations (version, name) values ('$version', '$name');" \
     -c "commit;" \
     >/dev/null
   echo "    ✓ $name"

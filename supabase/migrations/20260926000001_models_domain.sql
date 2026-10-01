@@ -98,7 +98,7 @@ create trigger trg_model_versions_updated_at
 
 -- ── Character sheets (1:1 with model_versions) ──────────────────────────────
 create table public.character_sheets (
-  id uuid primary key default gen_random_uuid(),
+  id uuid unique default gen_random_uuid(),
   model_version_id uuid primary key references public.model_versions (id) on delete cascade,
   identity_summary text not null default '',
   face_features jsonb not null default '{}'::jsonb,

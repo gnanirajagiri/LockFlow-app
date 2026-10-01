@@ -101,6 +101,21 @@ as $$
   );
 $$;
 
+-- Two-argument overload for explicit user checks (used by later domain
+-- migrations' RLS policies; same membership rule, no implicit auth.uid()).
+create or replace function public.is_workspace_member(ws_id uuid, user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.workspace_members m
+    where m.workspace_id = ws_id and m.user_id = is_workspace_member.user_id
+  );
+$$;
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Row-level security
 -- ═══════════════════════════════════════════════════════════════════════════

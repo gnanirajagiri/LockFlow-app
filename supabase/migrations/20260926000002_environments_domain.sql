@@ -114,7 +114,7 @@ create trigger trg_environment_versions_lock_guard
 -- signature props, palette/material direction, and the product zone where
 -- applicable.
 create table public.environment_specs (
-  id uuid primary key default gen_random_uuid(),
+  id uuid unique default gen_random_uuid(),
   environment_version_id uuid primary key references public.environment_versions (id) on delete cascade,
   room_type text not null default '',
   layout_feel text not null default '',

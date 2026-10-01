@@ -47,6 +47,8 @@ import { CampaignPublishingPage } from './features/publishing/PublishingHomePage
 import { PublishingCreatePage } from './features/publishing/PublishingCreatePage';
 import { PublishingDetailPage } from './features/publishing/PublishingDetailPage';
 import { PublishingGlobalListPage } from './features/publishing/PublishingGlobalListPage';
+import { PublishingReviewPage } from './features/publishing/PublishingReviewPage';
+import { PublishingRunDetailPage } from './features/publishing/PublishingRunDetailPage';
 import { GalleryQualityReviewPage } from './features/quality/GalleryQualityReviewPage';
 import { CorrectionCreatePage } from './features/quality/CorrectionCreatePage';
 import { CorrectionsPage } from './features/quality/CorrectionsPage';
@@ -165,6 +167,8 @@ export default function App() {
                 <Route path="activity" element={<CampaignActivityTab />} />
                 <Route path="publishing" element={<CampaignPublishingPage />} />
                 <Route path="publishing/new" element={<PublishingCreatePage />} />
+                <Route path="publishing-review" element={<PublishingReviewPage />} />
+                <Route path="publishing-review/:campaignItemId" element={<PublishingRunDetailPage />} />
               </Route>
               <Route path="publishing" element={<PublishingGlobalListPage />} />
               <Route path="publishing/:publishingDraftId" element={<PublishingDetailPage />} />

@@ -11,23 +11,28 @@ import type {
   AddAssetTagInput,
   CreateAssetVersionInput,
   CreateLibraryAssetInput,
+  CreateLibraryAssetAttachmentInput,
   CreateLibraryAssetExtendedInput,
+  LibraryAssetFileRecord,
   LibraryAssetFilters,
   LibraryAssetRecord,
+  LibraryAssetVersionRecord,
+  LibraryAttachmentFilters,
+  LibraryAttachmentRecord,
   LibraryEventRecord,
   LibraryEventType,
-  LibraryAssetVersionRecord,
   LibraryReferenceRecord,
   LibraryTagRecord,
   LookAssetItemRecord,
   LookDetailsRecord,
   LockAssetVersionInput,
+  RegisterLibraryAssetFileInput,
   SetLookItemsInput,
   UpdateAssetVersionDraftInput,
   UpdateLibraryAssetDraftInput,
   UpdateLibraryAssetExtendedInput,
 } from '../domain/library';
-import { normalizeTagName } from '../domain/library';
+import { normalizeTagName, normalizeRoleOrSlot } from '../domain/library';
 import type { LibraryRepository } from './libraryRepository';
 
 function mapAsset(row: Record<string, unknown>): LibraryAssetRecord {
@@ -54,6 +59,7 @@ function mapAsset(row: Record<string, unknown>): LibraryAssetRecord {
     primaryFileId: (row.primary_file_id as string | null) ?? null,
     thumbnailFileId: (row.thumbnail_file_id as string | null) ?? null,
     metadata: (row.metadata ?? null) as Record<string, unknown> | null,
+    rightsOrUsageNote: (row.rights_or_usage_note as string | null) ?? null,
     archivedAt: (row.archived_at as string | null) ?? null,
     archivedBy: (row.archived_by as string | null) ?? null,
   };
@@ -120,6 +126,38 @@ function mapLookItem(row: Record<string, unknown>): LookAssetItemRecord {
     sortOrder: row.sort_order as number,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+  };
+}
+
+function mapAttachment(row: Record<string, unknown>): LibraryAttachmentRecord {
+  return {
+    id: row.id as string,
+    workspaceId: row.workspace_id as string,
+    libraryAssetId: row.library_asset_id as string,
+    targetType: row.target_type as LibraryAttachmentRecord['targetType'],
+    targetId: row.target_id as string,
+    roleOrSlot: row.role_or_slot as string,
+    isPrimary: row.is_primary as boolean,
+    attachedBy: (row.attached_by as string | null) ?? null,
+    createdAt: row.created_at as string,
+  };
+}
+
+function mapAssetFile(row: Record<string, unknown>): LibraryAssetFileRecord {
+  return {
+    id: row.id as string,
+    workspaceId: row.workspace_id as string,
+    libraryAssetId: row.library_asset_id as string,
+    storageBucket: row.storage_bucket as string,
+    storagePath: row.storage_path as string,
+    fileName: row.file_name as string,
+    mimeType: row.mime_type as string,
+    fileSizeBytes: (row.file_size_bytes as number | null) ?? null,
+    sourceUrl: (row.source_url as string | null) ?? null,
+    fileKind: row.file_kind as LibraryAssetFileRecord['fileKind'],
+    uploadStatus: row.upload_status as LibraryAssetFileRecord['uploadStatus'],
+    uploadedBy: (row.uploaded_by as string | null) ?? null,
+    createdAt: row.created_at as string,
   };
 }
 
@@ -496,6 +534,7 @@ export class SupabaseLibraryRepository implements LibraryRepository {
       query = query.in('asset_type', types);
     }
     if (filters.status) query = query.eq('status', filters.status);
+    if (filters.statuses) query = query.in('status', filters.statuses);
     if (filters.usageScope) query = query.eq('usage_scope', filters.usageScope);
     if (filters.linkedModelId) query = query.eq('linked_model_id', filters.linkedModelId);
     if (filters.linkedItemId) query = query.eq('linked_item_id', filters.linkedItemId);
@@ -550,6 +589,7 @@ export class SupabaseLibraryRepository implements LibraryRepository {
       primaryFileId: input.primaryFileId ?? null,
       thumbnailFileId: input.thumbnailFileId ?? null,
       metadata: input.metadata ?? null,
+      ...(input.rightsOrUsageNote !== undefined ? { rightsOrUsageNote: input.rightsOrUsageNote } : {}),
     };
     const extended = await this.updateAssetExtended(created.id, patch);
     for (const tagName of input.tags ?? []) {
@@ -579,6 +619,7 @@ export class SupabaseLibraryRepository implements LibraryRepository {
         ...(patch.primaryFileId !== undefined ? { primary_file_id: patch.primaryFileId } : {}),
         ...(patch.thumbnailFileId !== undefined ? { thumbnail_file_id: patch.thumbnailFileId } : {}),
         ...(patch.metadata !== undefined ? { metadata: patch.metadata ?? {} } : {}),
+        ...(patch.rightsOrUsageNote !== undefined ? { rights_or_usage_note: patch.rightsOrUsageNote } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', assetId)
@@ -670,5 +711,136 @@ export class SupabaseLibraryRepository implements LibraryRepository {
       metadata: (row.metadata ?? null) as Record<string, string | number | boolean> | null,
       createdAt: row.created_at as string,
     }));
+  }
+
+  // ── Prompt 22: attachments ────────────────────────────────────────────────
+
+  async listAttachments(
+    workspaceId: string,
+    filter: LibraryAttachmentFilters = {},
+  ): Promise<LibraryAttachmentRecord[]> {
+    let query = this.client
+      .from('library_asset_attachments')
+      .select('*')
+      .eq('workspace_id', workspaceId);
+    if (filter.libraryAssetId) query = query.eq('library_asset_id', filter.libraryAssetId);
+    if (filter.targetType) query = query.eq('target_type', filter.targetType);
+    if (filter.targetId) query = query.eq('target_id', filter.targetId);
+    if (filter.roleOrSlot) query = query.eq('role_or_slot', filter.roleOrSlot);
+    if (filter.isPrimary !== undefined) query = query.eq('is_primary', filter.isPrimary);
+    const res = await query.order('created_at', { ascending: false });
+    if (res.error) throw res.error;
+    return (res.data as Array<Record<string, unknown>>).map(mapAttachment);
+  }
+
+  async getAttachment(workspaceId: string, attachmentId: string): Promise<LibraryAttachmentRecord> {
+    const res = await this.client
+      .from('library_asset_attachments')
+      .select('*')
+      .eq('id', attachmentId)
+      .eq('workspace_id', workspaceId)
+      .maybeSingle();
+    if (res.error) throw res.error;
+    if (!res.data) throw new Error(`Library attachment not found: ${attachmentId}`);
+    return mapAttachment(res.data as unknown as Record<string, unknown>);
+  }
+
+  async insertAttachment(
+    input: CreateLibraryAssetAttachmentInput & { workspaceId: string },
+    attachedBy: string | null,
+  ): Promise<LibraryAttachmentRecord> {
+    const res = await this.client
+      .from('library_asset_attachments')
+      .insert({
+        workspace_id: input.workspaceId,
+        library_asset_id: input.libraryAssetId,
+        target_type: input.targetType,
+        target_id: input.targetId,
+        role_or_slot: normalizeRoleOrSlot(input.roleOrSlot),
+        is_primary: input.isPrimary ?? false,
+        attached_by: attachedBy,
+      })
+      .select('*')
+      .single();
+    if (res.error) {
+      if (res.error.code === '23505') {
+        throw new Error(
+          'This asset is already attached to this slot, or the slot already has a primary asset.',
+        );
+      }
+      throw res.error;
+    }
+    return mapAttachment(res.data as unknown as Record<string, unknown>);
+  }
+
+  async deleteAttachment(workspaceId: string, attachmentId: string): Promise<void> {
+    const res = await this.client
+      .from('library_asset_attachments')
+      .delete()
+      .eq('id', attachmentId)
+      .eq('workspace_id', workspaceId)
+      .select('id');
+    if (res.error) throw res.error;
+    if (!res.data || res.data.length === 0) {
+      throw new Error(`Library attachment not found: ${attachmentId}`);
+    }
+  }
+
+  // ── Prompt 22: asset files (safe references) ─────────────────────────────
+
+  async listAssetFiles(assetId: string): Promise<LibraryAssetFileRecord[]> {
+    const res = await this.client
+      .from('library_asset_files')
+      .select('*')
+      .eq('library_asset_id', assetId)
+      .order('created_at', { ascending: false });
+    if (res.error) throw res.error;
+    return (res.data as Array<Record<string, unknown>>).map(mapAssetFile);
+  }
+
+  async insertAssetFile(
+    input: RegisterLibraryAssetFileInput & { workspaceId: string; libraryAssetId: string },
+    uploadedBy: string | null,
+  ): Promise<LibraryAssetFileRecord> {
+    const res = await this.client
+      .from('library_asset_files')
+      .insert({
+        workspace_id: input.workspaceId,
+        library_asset_id: input.libraryAssetId,
+        storage_bucket: input.storageBucket,
+        storage_path: input.storagePath,
+        file_name: input.fileName,
+        mime_type: input.mimeType,
+        ...(input.fileSizeBytes != null ? { file_size_bytes: input.fileSizeBytes } : {}),
+        ...(input.sourceUrl ? { source_url: input.sourceUrl } : {}),
+        ...(input.fileKind ? { file_kind: input.fileKind } : {}),
+        uploaded_by: uploadedBy,
+      })
+      .select('*')
+      .single();
+    if (res.error) {
+      if (res.error.code === '23505') {
+        throw new Error('This file reference is already registered for the workspace.');
+      }
+      throw res.error;
+    }
+    return mapAssetFile(res.data as unknown as Record<string, unknown>);
+  }
+
+  async updateAssetFileStatus(
+    workspaceId: string,
+    fileId: string,
+    status: LibraryAssetFileRecord['uploadStatus'],
+  ): Promise<void> {
+    const res = await this.client
+      .from('library_asset_files')
+      .update({ upload_status: status, updated_at: new Date().toISOString() })
+      .eq('id', fileId)
+      .eq('workspace_id', workspaceId)
+      .select('id');
+    if (res.error) throw res.error;
+    if (!res.data || res.data.length === 0) {
+      throw new Error(`Library asset file not found: ${fileId}`);
+    }
   }
 }

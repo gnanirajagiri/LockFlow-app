@@ -4,7 +4,7 @@
  * no AI transformation). Structural edits require a draft project.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody } from '../../components/ui/Card';
@@ -12,9 +12,13 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../components/ui/Toast';
 import { SEED_CONTENT_WORKSPACE_ID as SEED_WS } from '../../mock/contentSeed';
+import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { ContentIntentBar } from './ContentIntentBar';
 import { useContentProjectOutletContext } from './tabRoutes';
+import { LibraryAttachDrawer } from '../library/LibraryAttachDrawer';
+import { useLibraryOpsService } from '../library/useLibraryOpsService';
 import type { ContentBeatRecord, ContentSceneRecord } from '../../domain/content';
+import type { LibraryAttachmentRecord } from '../../domain/library';
 
 export function StoryboardTab() {
   const { toast } = useToast();
@@ -28,6 +32,11 @@ export function StoryboardTab() {
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ kind: 'scene' | 'beat'; id: string; title: string } | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  // Prompt 22: the unified Library attach drawer (references, never copies).
+  const [attachScene, setAttachScene] = useState<ContentSceneRecord | null>(null);
+  const [sceneAttachments, setSceneAttachments] = useState<Record<string, LibraryAttachmentRecord[]>>({});
+  const libraryOps = useLibraryOpsService();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (hydrated || scenes.length === 0) return;
@@ -269,6 +278,22 @@ export function StoryboardTab() {
                   <Button size="sm" variant="ghost" disabled={busy} onClick={() => void addBeat(scene.id)}>
                     Add beat
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={async () => {
+                      setAttachScene(scene);
+                      try {
+                        const records = await libraryOps.listAttachmentsForTarget(SEED_LIBRARY_WORKSPACE_ID, 'content_scene', scene.id);
+                        setSceneAttachments((current) => ({ ...current, [scene.id]: records }));
+                      } catch {
+                        setSceneAttachments((current) => ({ ...current, [scene.id]: [] }));
+                      }
+                    }}
+                  >
+                    Attach from Library{(sceneAttachments[scene.id]?.length ?? 0) > 0 ? ` (${sceneAttachments[scene.id].length})` : ''}
+                  </Button>
                   <Button size="sm" variant="ghost" disabled={busy || sceneIndex === 0} onClick={() => void reorderScenes(sceneIndex, -1)}>
                     Move up
                   </Button>
@@ -390,6 +415,31 @@ export function StoryboardTab() {
             : 'The beat will be removed and the remaining beats keep a contiguous order.'}
         </p>
       </Modal>
+
+      {attachScene && (
+        <LibraryAttachDrawer
+          open
+          onClose={() => setAttachScene(null)}
+          service={libraryOps}
+          workspaceId={SEED_LIBRARY_WORKSPACE_ID}
+          targetType="content_scene"
+          targetId={attachScene.id}
+          targetLabel={`scene “${attachScene.title}”`}
+          roleOrSlot="prop"
+          multiSelect
+          onAttached={async (records) => {
+            setSceneAttachments((current) => ({
+              ...current,
+              [attachScene.id]: [...(current[attachScene.id] ?? []), ...records],
+            }));
+            toast({ title: 'Attached from the Library', tone: 'success' });
+          }}
+          onInlineAdd={() => {
+            setAttachScene(null);
+            navigate(`/library/add?context=picker&return=${encodeURIComponent(`${basePath}/storyboard`)}`);
+          }}
+        />
+      )}
 
     </div>
   );

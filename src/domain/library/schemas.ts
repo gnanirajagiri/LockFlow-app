@@ -12,10 +12,14 @@ import type {
   AssetVersionStatus,
   CreateAssetVersionInput,
   CreateLibraryAssetInput,
+  CreateLibraryAssetAttachmentInput,
   LibraryAssetStatus,
   LibraryAssetType,
+  LibraryAttachmentTargetType,
   LibraryReferenceType,
   LookItemRole,
+  ParseLibraryAssetDescriptionInput,
+  RegisterLibraryAssetFileInput,
   SetLookItemsInput,
   UpdateAssetVersionDraftInput,
   UpdateLibraryAssetDraftInput,
@@ -64,6 +68,140 @@ const LOOK_ROLES: LookItemRole[] = [
 
 export function isLibraryAssetType(value: unknown): value is LibraryAssetType {
   return LIBRARY_ASSET_TYPES.includes(value as LibraryAssetType);
+}
+
+// ═══ Prompt 22: ingestion, attachment & file validators ═════════════════════
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_RE.test(value);
+}
+
+export const LIBRARY_ATTACHMENT_TARGET_TYPES: LibraryAttachmentTargetType[] = [
+  'content_scene',
+  'content_job',
+  'campaign',
+  'model',
+  'environment',
+];
+
+export function isLibraryAttachmentTargetType(value: unknown): value is LibraryAttachmentTargetType {
+  return LIBRARY_ATTACHMENT_TARGET_TYPES.includes(value as LibraryAttachmentTargetType);
+}
+
+/** Allow-listed PRIVATE buckets (same pair the reference-upload flow uses). */
+export const LIBRARY_STORAGE_BUCKETS = ['lockflow-references', 'lockflow-previews'] as const;
+
+export const LIBRARY_FILE_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/avif',
+  'image/gif',
+  'application/pdf',
+] as const;
+
+/** 25 MiB — matches the DB CHECK on library_asset_files. */
+export const MAX_LIBRARY_FILE_BYTES = 26214400;
+
+export function validateParseLibraryAssetDescription(
+  input: unknown,
+): ValidationResult<ParseLibraryAssetDescriptionInput> {
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const description = typeof raw.description === 'string' ? raw.description.trim() : '';
+  if (description.length < 10) {
+    return { ok: false, errors: ['Describe the asset in at least 10 characters.'] };
+  }
+  if (description.length > 2000) {
+    return { ok: false, errors: ['Keep the description under 2000 characters.'] };
+  }
+  return { ok: true, value: { description } };
+}
+
+export function validateCreateLibraryAssetAttachment(
+  input: unknown,
+): ValidationResult<CreateLibraryAssetAttachmentInput> {
+  const errors: string[] = [];
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const libraryAssetId = str(raw.libraryAssetId);
+  const targetId = str(raw.targetId);
+  const targetType = raw.targetType;
+  const roleRaw = raw.roleOrSlot;
+
+  if (!isUuid(libraryAssetId)) errors.push('libraryAssetId must be a valid id');
+  if (!isUuid(targetId)) errors.push('targetId must be a valid id');
+  if (!isLibraryAttachmentTargetType(targetType)) {
+    errors.push('targetType must be content_scene, content_job, campaign, model or environment');
+  }
+  if (roleRaw !== undefined && typeof roleRaw !== 'string') {
+    errors.push('roleOrSlot must be a string');
+  }
+
+  return errors.length
+    ? { ok: false, errors }
+    : {
+        ok: true,
+        value: {
+          libraryAssetId,
+          targetId,
+          targetType: targetType as LibraryAttachmentTargetType,
+          ...(typeof roleRaw === 'string' ? { roleOrSlot: roleRaw } : {}),
+        },
+      };
+}
+
+export function validateRegisterLibraryAssetFile(
+  input: unknown,
+): ValidationResult<RegisterLibraryAssetFileInput> {
+  const errors: string[] = [];
+  const raw = (input ?? {}) as Record<string, unknown>;
+  const storageBucket = str(raw.storageBucket);
+  const storagePath = str(raw.storagePath);
+  const fileName = str(raw.fileName);
+  const mimeType = str(raw.mimeType);
+  const sizeRaw = raw.fileSizeBytes;
+  const sourceUrl = raw.sourceUrl;
+  const fileKind = raw.fileKind;
+
+  if (!(LIBRARY_STORAGE_BUCKETS as readonly string[]).includes(storageBucket)) {
+    errors.push('storage_bucket must be one of the allow-listed private buckets');
+  }
+  if (storagePath.length < 1 || storagePath.length > 512) {
+    errors.push('storage_path must be 1–512 characters');
+  }
+  if (fileName.length < 1 || fileName.length > 200) {
+    errors.push('file name must be 1–200 characters');
+  }
+  if (!(LIBRARY_FILE_MIME_TYPES as readonly string[]).includes(mimeType)) {
+    errors.push('That file type is not supported yet — use JPEG, PNG, WebP, AVIF, GIF or PDF.');
+  }
+  if (sizeRaw !== undefined && sizeRaw !== null) {
+    if (typeof sizeRaw !== 'number' || !Number.isFinite(sizeRaw) || sizeRaw <= 0 || sizeRaw > MAX_LIBRARY_FILE_BYTES) {
+      errors.push('file size must be between 1 byte and 25 MiB');
+    }
+  }
+  if (sourceUrl !== undefined && sourceUrl !== null && typeof sourceUrl !== 'string') {
+    errors.push('sourceUrl must be a string or null');
+  }
+  if (fileKind !== undefined && !['image', 'document', 'other'].includes(fileKind as string)) {
+    errors.push('fileKind must be image, document or other');
+  }
+
+  return errors.length
+    ? { ok: false, errors }
+    : {
+        ok: true,
+        value: {
+          storageBucket,
+          storagePath,
+          fileName,
+          mimeType,
+          ...(typeof sizeRaw === 'number' ? { fileSizeBytes: sizeRaw } : {}),
+          ...(typeof sourceUrl === 'string' ? { sourceUrl } : {}),
+          ...(typeof fileKind === 'string' ? { fileKind: fileKind as 'image' | 'document' | 'other' } : {}),
+        },
+      };
 }
 
 export function isLibraryReferenceType(value: unknown): value is LibraryReferenceType {

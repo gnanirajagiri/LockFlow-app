@@ -88,8 +88,8 @@ export function LibraryOpsHomePage() {
         title="Library"
         description="One Library of reusable assets — organized by where they are used: on a model, on an item, in an environment, or shared. Generated outputs live in Gallery."
         actions={
-          <Button variant="primary" onClick={() => navigate('/library/assets?create=1')}>
-            New asset
+          <Button variant="primary" onClick={() => navigate('/library/add')}>
+            Add asset
           </Button>
         }
       />

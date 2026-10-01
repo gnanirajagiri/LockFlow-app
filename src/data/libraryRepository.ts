@@ -8,10 +8,14 @@ import type {
   AddAssetTagInput,
   CreateAssetVersionInput,
   CreateLibraryAssetInput,
+  CreateLibraryAssetAttachmentInput,
   CreateLibraryAssetExtendedInput,
+  LibraryAssetFileRecord,
   LibraryAssetFilters,
   LibraryAssetRecord,
   LibraryAssetVersionRecord,
+  LibraryAttachmentFilters,
+  LibraryAttachmentRecord,
   LibraryEventRecord,
   LibraryEventType,
   LibraryReferenceRecord,
@@ -19,6 +23,7 @@ import type {
   LookAssetItemRecord,
   LookDetailsRecord,
   LockAssetVersionInput,
+  RegisterLibraryAssetFileInput,
   SetLookItemsInput,
   UpdateAssetVersionDraftInput,
   UpdateLibraryAssetDraftInput,
@@ -92,4 +97,25 @@ export interface LibraryRepository {
     eventType?: LibraryEventType;
     limit?: number;
   }): Promise<LibraryEventRecord[]>;
+
+  // ── Prompt 22: attachments (canonical references into other workflows) ──
+  listAttachments(workspaceId: string, filter?: LibraryAttachmentFilters): Promise<LibraryAttachmentRecord[]>;
+  getAttachment(workspaceId: string, attachmentId: string): Promise<LibraryAttachmentRecord>;
+  insertAttachment(
+    input: CreateLibraryAssetAttachmentInput & { workspaceId: string },
+    attachedBy: string | null,
+  ): Promise<LibraryAttachmentRecord>;
+  deleteAttachment(workspaceId: string, attachmentId: string): Promise<void>;
+
+  // ── Prompt 22: asset files (SAFE references only — never signed URLs) ───
+  listAssetFiles(assetId: string): Promise<LibraryAssetFileRecord[]>;
+  insertAssetFile(
+    input: RegisterLibraryAssetFileInput & { workspaceId: string; libraryAssetId: string },
+    uploadedBy: string | null,
+  ): Promise<LibraryAssetFileRecord>;
+  updateAssetFileStatus(
+    workspaceId: string,
+    fileId: string,
+    status: LibraryAssetFileRecord['uploadStatus'],
+  ): Promise<void>;
 }

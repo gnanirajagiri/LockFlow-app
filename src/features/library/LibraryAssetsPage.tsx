@@ -118,8 +118,8 @@ export function LibraryAssetsPage() {
         title="Library assets"
         description="Reusable assets only — organized by where they are used. Generated outputs belong to Gallery."
         actions={
-          <Button variant="primary" onClick={() => setCreating(true)}>
-            New asset
+          <Button variant="primary" onClick={() => navigate('/library/add')}>
+            Add asset
           </Button>
         }
       />

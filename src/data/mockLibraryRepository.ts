@@ -15,10 +15,14 @@ import type {
   AddAssetTagInput,
   CreateAssetVersionInput,
   CreateLibraryAssetInput,
+  CreateLibraryAssetAttachmentInput,
   CreateLibraryAssetExtendedInput,
+  LibraryAssetFileRecord,
   LibraryAssetFilters,
   LibraryAssetRecord,
   LibraryAssetVersionRecord,
+  LibraryAttachmentFilters,
+  LibraryAttachmentRecord,
   LibraryEventRecord,
   LibraryEventType,
   LibraryReferenceRecord,
@@ -26,12 +30,13 @@ import type {
   LookAssetItemRecord,
   LookDetailsRecord,
   LockAssetVersionInput,
+  RegisterLibraryAssetFileInput,
   SetLookItemsInput,
   UpdateAssetVersionDraftInput,
   UpdateLibraryAssetDraftInput,
   UpdateLibraryAssetExtendedInput,
 } from '../domain/library';
-import { normalizeTagName, sanitizeLibraryEventMetadata } from '../domain/library';
+import { normalizeTagName, normalizeRoleOrSlot, sanitizeLibraryEventMetadata } from '../domain/library';
 import {
   LIBRARY_REFERENCES,
   LIBRARY_SEED,
@@ -457,6 +462,7 @@ export class MockLibraryRepository implements LibraryRepository {
       rows = rows.filter((a) => types.includes(a.assetType));
     }
     if (filters.status) rows = rows.filter((a) => a.status === filters.status);
+    if (filters.statuses) rows = rows.filter((a) => filters.statuses!.includes(a.status));
     if (filters.usageScope) rows = rows.filter((a) => a.usageScope === filters.usageScope);
     if (filters.linkedModelId) rows = rows.filter((a) => a.linkedModelId === filters.linkedModelId);
     if (filters.linkedItemId) rows = rows.filter((a) => a.linkedItemId === filters.linkedItemId);
@@ -499,6 +505,7 @@ export class MockLibraryRepository implements LibraryRepository {
       primaryFileId: input.primaryFileId ?? null,
       thumbnailFileId: input.thumbnailFileId ?? null,
       metadata: input.metadata ? structuredClone(input.metadata) : null,
+      ...(input.rightsOrUsageNote !== undefined ? { rightsOrUsageNote: input.rightsOrUsageNote } : {}),
       archivedAt: null,
       archivedBy: null,
     };
@@ -532,6 +539,7 @@ export class MockLibraryRepository implements LibraryRepository {
       ...(patch.metadata !== undefined
         ? { metadata: patch.metadata ? structuredClone(patch.metadata) : null }
         : {}),
+      ...(patch.rightsOrUsageNote !== undefined ? { rightsOrUsageNote: patch.rightsOrUsageNote } : {}),
       updatedAt: now(),
     };
     this.assets.set(assetId, next);
@@ -597,5 +605,142 @@ export class MockLibraryRepository implements LibraryRepository {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, filter?.limit ?? 50)
       .map((e) => ({ ...e, metadata: e.metadata ? { ...e.metadata } : null }));
+  }
+
+  // ── Prompt 22: attachments ────────────────────────────────────────────────
+
+  private attachments = new Map<string, LibraryAttachmentRecord>();
+  private assetFiles = new Map<string, LibraryAssetFileRecord>();
+
+  async listAttachments(
+    workspaceId: string,
+    filter: LibraryAttachmentFilters = {},
+  ): Promise<LibraryAttachmentRecord[]> {
+    return [...this.attachments.values()]
+      .filter((a) => a.workspaceId === workspaceId)
+      .filter((a) => (filter.libraryAssetId ? a.libraryAssetId === filter.libraryAssetId : true))
+      .filter((a) => (filter.targetType ? a.targetType === filter.targetType : true))
+      .filter((a) => (filter.targetId ? a.targetId === filter.targetId : true))
+      .filter((a) => (filter.roleOrSlot ? a.roleOrSlot === filter.roleOrSlot : true))
+      .filter((a) => (filter.isPrimary !== undefined ? a.isPrimary === filter.isPrimary : true))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((a) => structuredClone(a));
+  }
+
+  async getAttachment(workspaceId: string, attachmentId: string): Promise<LibraryAttachmentRecord> {
+    const record = this.attachments.get(attachmentId);
+    if (!record || record.workspaceId !== workspaceId) notFound('Library attachment', attachmentId);
+    return structuredClone(record);
+  }
+
+  async insertAttachment(
+    input: CreateLibraryAssetAttachmentInput & { workspaceId: string },
+    attachedBy: string | null,
+  ): Promise<LibraryAttachmentRecord> {
+    const asset = await this.getAsset(input.libraryAssetId); // existence check
+    if (asset.workspaceId !== input.workspaceId) {
+      throw new Error('Attachments must stay inside the asset\u2019s workspace.');
+    }
+    const roleOrSlot = normalizeRoleOrSlot(input.roleOrSlot);
+
+    // DB parity: no duplicate (asset, target, slot) attach…
+    const duplicate = [...this.attachments.values()].find(
+      (a) =>
+        a.workspaceId === input.workspaceId &&
+        a.targetType === input.targetType &&
+        a.targetId === input.targetId &&
+        a.libraryAssetId === input.libraryAssetId &&
+        a.roleOrSlot === roleOrSlot,
+    );
+    if (duplicate) {
+      throw new Error('This asset is already attached to this slot on the target.');
+    }
+    // …and ONE primary per slot.
+    if (input.isPrimary) {
+      const primary = [...this.attachments.values()].find(
+        (a) =>
+          a.workspaceId === input.workspaceId &&
+          a.targetType === input.targetType &&
+          a.targetId === input.targetId &&
+          a.roleOrSlot === roleOrSlot &&
+          a.isPrimary,
+      );
+      if (primary) {
+        throw new Error('A primary attachment already exists for this slot.');
+      }
+    }
+
+    const stamp = now();
+    const record: LibraryAttachmentRecord = {
+      id: crypto.randomUUID(),
+      workspaceId: input.workspaceId,
+      libraryAssetId: asset.id,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      roleOrSlot,
+      isPrimary: input.isPrimary ?? false,
+      attachedBy,
+      createdAt: stamp,
+    };
+    this.attachments.set(record.id, record);
+    return structuredClone(record);
+  }
+
+  async deleteAttachment(workspaceId: string, attachmentId: string): Promise<void> {
+    const record = await this.getAttachment(workspaceId, attachmentId); // workspace-scoped
+    this.attachments.delete(record.id);
+  }
+
+  // ── Prompt 22: asset files (safe references) ─────────────────────────────
+
+  async listAssetFiles(assetId: string): Promise<LibraryAssetFileRecord[]> {
+    return [...this.assetFiles.values()]
+      .filter((f) => f.libraryAssetId === assetId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((f) => structuredClone(f));
+  }
+
+  async insertAssetFile(
+    input: RegisterLibraryAssetFileInput & { workspaceId: string; libraryAssetId: string },
+    uploadedBy: string | null,
+  ): Promise<LibraryAssetFileRecord> {
+    await this.getAsset(input.libraryAssetId); // existence check
+    const duplicate = [...this.assetFiles.values()].find(
+      (f) =>
+        f.workspaceId === input.workspaceId &&
+        f.storageBucket === input.storageBucket &&
+        f.storagePath === input.storagePath,
+    );
+    if (duplicate) {
+      throw new Error('This file reference is already registered for the workspace.');
+    }
+    const stamp = now();
+    const record: LibraryAssetFileRecord = {
+      id: crypto.randomUUID(),
+      workspaceId: input.workspaceId,
+      libraryAssetId: input.libraryAssetId,
+      storageBucket: input.storageBucket,
+      storagePath: input.storagePath,
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      fileSizeBytes: input.fileSizeBytes ?? null,
+      sourceUrl: input.sourceUrl ?? null,
+      fileKind: input.fileKind ?? 'image',
+      uploadStatus: 'pending',
+      uploadedBy,
+      createdAt: stamp,
+    };
+    this.assetFiles.set(record.id, record);
+    return structuredClone(record);
+  }
+
+  async updateAssetFileStatus(
+    workspaceId: string,
+    fileId: string,
+    status: LibraryAssetFileRecord['uploadStatus'],
+  ): Promise<void> {
+    const file = this.assetFiles.get(fileId);
+    if (!file || file.workspaceId !== workspaceId) notFound('Library asset file', fileId);
+    this.assetFiles.set(fileId, { ...file, uploadStatus: status });
   }
 }

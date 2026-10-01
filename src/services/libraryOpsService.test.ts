@@ -254,6 +254,7 @@ describe('7. sensitive storage data is never exposed', () => {
   });
 
   it('the audit event catalogue matches the spec', () => {
+    // Prompt 22 extended the catalogue additively (ingestion + attach events).
     expect(LIBRARY_EVENT_TYPES).toEqual([
       'library_asset_created',
       'library_asset_updated',
@@ -262,6 +263,10 @@ describe('7. sensitive storage data is never exposed', () => {
       'library_asset_viewed',
       'library_picker_opened',
       'library_asset_attached',
+      'library_asset_add_started',
+      'library_asset_parse_suggested',
+      'library_asset_detached',
+      'library_inline_add_started',
     ]);
   });
 });

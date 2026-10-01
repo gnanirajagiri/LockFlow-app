@@ -67,6 +67,8 @@ import { LibraryAssetsPage } from './features/library/LibraryAssetsPage';
 import { LibraryAssetOpsDetailPage } from './features/library/LibraryAssetOpsDetailPage';
 import { LibraryPickerPage } from './features/library/LibraryPickerPage';
 import { LibraryArchivedPage } from './features/library/LibraryArchivedPage';
+import { LibraryAddAssetPage } from './features/library/LibraryAddAssetPage';
+import { LibraryAssetEditPage } from './features/library/LibraryAssetEditPage';
 import {
   LibraryDetailsRoute,
   LibraryOverviewRoute,
@@ -156,6 +158,8 @@ export default function App() {
               <Route path="library" element={<LibraryOpsHomePage />} />
               <Route path="library/assets" element={<LibraryAssetsPage />} />
               <Route path="library/assets/:assetId" element={<LibraryAssetOpsDetailPage />} />
+              <Route path="library/assets/:assetId/edit" element={<LibraryAssetEditPage />} />
+              <Route path="library/add" element={<LibraryAddAssetPage />} />
               <Route path="library/picker" element={<LibraryPickerPage />} />
               <Route path="library/archived" element={<LibraryArchivedPage />} />
               <Route path="library/new" element={<LibraryNewAssetPage />} />

@@ -224,9 +224,16 @@ export class MockCampaignsRepository implements CampaignsRepository {
       createdAt: now(),
       updatedAt: now(),
       removedAt: null,
+      plannedTimezone: input.plannedTimezone ?? null,
+      planningStatus: input.planningStatus ?? null,
     };
     this.items.push(record);
     return { ...record };
+  }
+
+  async getItem(itemId: string): Promise<CampaignItemRecord | null> {
+    const found = this.items.find((i) => i.id === itemId);
+    return found ? { ...found } : null;
   }
 
   async updateItem(itemId: string, patch: UpdateCampaignItemInput): Promise<CampaignItemRecord> {
@@ -241,6 +248,8 @@ export class MockCampaignsRepository implements CampaignsRepository {
       ...(patch.captionDraft !== undefined ? { captionDraft: patch.captionDraft } : {}),
       ...(patch.callToAction !== undefined ? { callToAction: patch.callToAction } : {}),
       ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
+      ...(patch.plannedTimezone !== undefined ? { plannedTimezone: patch.plannedTimezone } : {}),
+      ...(patch.planningStatus !== undefined ? { planningStatus: patch.planningStatus } : {}),
       updatedAt: now(),
     };
     this.items = this.items.map((i) => (i.id === itemId ? next : i));

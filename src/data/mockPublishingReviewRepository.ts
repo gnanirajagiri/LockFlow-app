@@ -102,6 +102,13 @@ export class MockPublishingReviewRepository implements PublishingReviewRepositor
       completedAt: null,
       createdAt: ts,
       updatedAt: ts,
+      // Prompt 20 operational fields:
+      lastStatusCheckedAt: null,
+      nextStatusCheckAt: null,
+      providerPublishedAt: null,
+      providerPermalink: null,
+      failureCategory: null,
+      isRetryable: false,
     };
     this.runs.push(record);
     return structuredClone(record);

@@ -95,6 +95,8 @@ export const CAMPAIGN_ITEMS_SEED: CampaignItemRecord[] = [
     createdAt: '2026-09-28T09:10:00.000Z',
     updatedAt: '2026-09-28T09:10:00.000Z',
     removedAt: null,
+    plannedTimezone: null,
+    planningStatus: null,
   },
   {
     id: 'citem_vanity_image',
@@ -113,6 +115,8 @@ export const CAMPAIGN_ITEMS_SEED: CampaignItemRecord[] = [
     createdAt: '2026-09-28T09:12:00.000Z',
     updatedAt: '2026-09-28T09:12:00.000Z',
     removedAt: null,
+    plannedTimezone: null,
+    planningStatus: null,
   },
 ];
 

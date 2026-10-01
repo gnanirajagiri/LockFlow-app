@@ -138,6 +138,19 @@ export interface PublishRunRecord {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // ── Prompt 20 operational fields (all optional/bookkeeping) ──────────
+  /** Last time the provider was asked for status (null = never). */
+  lastStatusCheckedAt: string | null;
+  /** Scheduled next status check (planning hint only — no auto-worker). */
+  nextStatusCheckAt: string | null;
+  /** Provider-confirmed publish timestamp (safe metadata only). */
+  providerPublishedAt: string | null;
+  /** Safe public permalink once confirmed — never a signed/private URL. */
+  providerPermalink: string | null;
+  /** Safe failure taxonomy code (see publishingOps failure model). */
+  failureCategory: string | null;
+  /** Whether this failed run may be retried as a NEW run. */
+  isRetryable: boolean;
 }
 
 export type PublishingReviewAuditEventType =
@@ -150,7 +163,18 @@ export type PublishingReviewAuditEventType =
   | 'run_published'
   | 'run_failed'
   | 'retry_requested'
-  | 'run_cancelled';
+  | 'run_cancelled'
+  // Prompt 20 operational events:
+  | 'campaign_item_planned'
+  | 'campaign_item_rescheduled'
+  | 'publish_status_refresh_requested'
+  | 'publish_status_refreshed'
+  | 'publish_status_refresh_failed'
+  | 'publish_run_marked_published'
+  | 'publish_run_marked_failed'
+  | 'publish_run_retryable'
+  | 'publish_retry_started'
+  | 'connection_reauth_required';
 
 export interface PublishingReviewAuditEventRecord {
   id: string;

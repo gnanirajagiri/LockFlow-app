@@ -109,6 +109,11 @@ export interface CampaignItemRecord {
   createdAt: string;
   updatedAt: string;
   removedAt: string | null;
+  // ── Prompt 20 planning fields (all nullable) ─────────────────────────
+  /** IANA timezone for the planned date (planning metadata only). */
+  plannedTimezone: string | null;
+  /** Explicit planning status (e.g. 'on_track'); null = default. */
+  planningStatus: string | null;
 }
 
 export interface CampaignItemVariantRecord {
@@ -178,6 +183,9 @@ export interface CreateCampaignItemInput {
   captionDraft?: string;
   callToAction?: string;
   notes?: string;
+  // Prompt 20 planning fields:
+  plannedTimezone?: string | null;
+  planningStatus?: string | null;
 }
 
 export interface UpdateCampaignItemInput {
@@ -188,6 +196,9 @@ export interface UpdateCampaignItemInput {
   captionDraft?: string | null;
   callToAction?: string | null;
   notes?: string | null;
+  // Prompt 20 planning fields:
+  plannedTimezone?: string | null;
+  planningStatus?: string | null;
 }
 
 export interface CreateCampaignItemVariantInput {

@@ -58,6 +58,8 @@ export interface CampaignsRepository {
 
   // Items (references to approved Gallery outputs)
   listItems(campaignId: string): Promise<CampaignItemRecord[]>;
+  /** Single-item lookup (workspace scoping enforced by the service). */
+  getItem(itemId: string): Promise<CampaignItemRecord | null>;
   createItem(input: CreateCampaignItemInput, sortOrder: number, createdBy: string): Promise<CampaignItemRecord>;
   updateItem(itemId: string, patch: UpdateCampaignItemInput): Promise<CampaignItemRecord>;
   /** Explicit replacement of the attached output — never automatic. */

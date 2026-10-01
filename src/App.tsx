@@ -49,6 +49,10 @@ import { PublishingDetailPage } from './features/publishing/PublishingDetailPage
 import { PublishingGlobalListPage } from './features/publishing/PublishingGlobalListPage';
 import { PublishingReviewPage } from './features/publishing/PublishingReviewPage';
 import { PublishingRunDetailPage } from './features/publishing/PublishingRunDetailPage';
+import { CampaignPublishingCalendarPage } from './features/publishing/CampaignPublishingCalendarPage';
+import { PublishingHistoryPage } from './features/publishing/PublishingHistoryPage';
+import { PublishRunDetailOpsPage } from './features/publishing/PublishRunDetailOpsPage';
+import { CampaignStatusOverviewPage } from './features/publishing/CampaignStatusOverviewPage';
 import { GalleryQualityReviewPage } from './features/quality/GalleryQualityReviewPage';
 import { CorrectionCreatePage } from './features/quality/CorrectionCreatePage';
 import { CorrectionsPage } from './features/quality/CorrectionsPage';
@@ -169,6 +173,10 @@ export default function App() {
                 <Route path="publishing/new" element={<PublishingCreatePage />} />
                 <Route path="publishing-review" element={<PublishingReviewPage />} />
                 <Route path="publishing-review/:campaignItemId" element={<PublishingRunDetailPage />} />
+                <Route path="calendar" element={<CampaignPublishingCalendarPage />} />
+                <Route path="publishing-history" element={<PublishingHistoryPage />} />
+                <Route path="publish-runs/:publishRunId" element={<PublishRunDetailOpsPage />} />
+                <Route path="status" element={<CampaignStatusOverviewPage />} />
               </Route>
               <Route path="publishing" element={<PublishingGlobalListPage />} />
               <Route path="publishing/:publishingDraftId" element={<PublishingDetailPage />} />

@@ -79,6 +79,10 @@ function mapItem(row: Row): CampaignItemRecord {
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
     removedAt: (row.removed_at as string | null) ?? null,
+    // Prompt 20 planning fields (nullable, safe defaults until the column
+    // migration is applied to the hosted project).
+    plannedTimezone: ((row as Record<string, unknown>).planned_timezone as string | null) ?? null,
+    planningStatus: ((row as Record<string, unknown>).planning_status as string | null) ?? null,
   };
 }
 
@@ -269,6 +273,16 @@ export class SupabaseCampaignsRepository implements CampaignsRepository {
   }
 
   // ── Items ──────────────────────────────────────────────────────────────────
+
+  async getItem(itemId: string): Promise<CampaignItemRecord | null> {
+    const res = await this.client
+      .from('campaign_items')
+      .select('*')
+      .eq('id', itemId)
+      .maybeSingle();
+    if (res.error) throw res.error;
+    return res.data ? mapItem(res.data as Row) : null;
+  }
 
   async listItems(campaignId: string): Promise<CampaignItemRecord[]> {
     const res = await this.client

@@ -28,6 +28,14 @@ export interface UpdatePublishRunInput {
   errorMessageSafe?: string | null;
   startedAt?: string | null;
   completedAt?: string | null;
+  // ── Prompt 20 operational bookkeeping (snapshots stay immutable) ─────
+  lastStatusCheckedAt?: string | null;
+  nextStatusCheckAt?: string | null;
+  providerPublishedAt?: string | null;
+  /** Safe public permalink only — never signed/private URLs. */
+  providerPermalink?: string | null;
+  failureCategory?: string | null;
+  isRetryable?: boolean;
 }
 
 export interface ListPublishRunsFilter {

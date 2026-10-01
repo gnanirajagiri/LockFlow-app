@@ -387,11 +387,12 @@ export class LibraryOpsService {
     isInWorkspaceStrict(asset.workspaceId, workspaceId);
     const validated = validateRegisterLibraryAssetFile(input);
     if (!validated.ok) invalid(validated.errors.join(' '));
-    // Server-side ownership: the reference must live under THIS workspace's
-    // path prefix — a client cannot point a file at another workspace.
-    const prefix = `${workspaceId}/`;
-    if (!validated.value.storagePath.startsWith(prefix)) {
-      invalid('File references must live inside this workspace\u2019s path prefix.');
+    // Server-side ownership: the canonical object path's segment 2 must be
+    // THIS workspace id — the same parsing the storage RLS performs, so a
+    // client cannot point a file reference at another workspace.
+    const segments = validated.value.storagePath.split('/');
+    if (segments[0] !== 'workspaces' || segments[1] !== workspaceId) {
+      invalid('File references must live under this workspace\u2019s storage prefix.');
     }
     if (validated.value.sourceUrl) {
       const safeUrl = sanitizeExternalImageUrl(validated.value.sourceUrl);

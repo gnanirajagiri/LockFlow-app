@@ -134,14 +134,14 @@ describe('1. Asset ingestion creates workspace-scoped reusable assets', () => {
     expect(mine.some((a) => a.name === 'Only in demo workspace')).toBe(true);
   });
 
-  it('registers SAFE file references scoped to the workspace path prefix', async () => {
+  it('registers SAFE file references scoped to the workspace path segment', async () => {
     const asset = await makeAsset();
     const file = await ops.registerLibraryAssetFile(
       WS,
       asset.id,
       {
         storageBucket: 'lockflow-references',
-        storagePath: `${WS}/library-assets/${asset.id}/ref.png`,
+        storagePath: `workspaces/${WS}/library-assets/${asset.id}/00000000-0000-0000-0000-00000000000a/ref.png`,
         fileName: 'ref.png',
         mimeType: 'image/png',
         fileSizeBytes: 1024,
@@ -151,10 +151,10 @@ describe('1. Asset ingestion creates workspace-scoped reusable assets', () => {
     expect(file.uploadStatus).toBe('pending');
     const rows = await ops.listAssetFiles(WS, asset.id);
     expect(rows).toHaveLength(1);
-    expect(rows[0].storagePath.startsWith(`${WS}/`)).toBe(true);
+    expect(rows[0].storagePath.startsWith('workspaces/')).toBe(true);
   });
 
-  it('refuses file references outside the workspace path prefix', async () => {
+  it('refuses file references outside the workspace path segment', async () => {
     const asset = await makeAsset();
     await expect(
       ops.registerLibraryAssetFile(
@@ -162,13 +162,26 @@ describe('1. Asset ingestion creates workspace-scoped reusable assets', () => {
         asset.id,
         {
           storageBucket: 'lockflow-references',
-          storagePath: `${OTHER_WS}/escape.png`,
+          storagePath: `workspaces/${OTHER_WS}/escape.png`,
           fileName: 'escape.png',
           mimeType: 'image/png',
         },
         USER,
       ),
-    ).rejects.toThrow(/path prefix/);
+    ).rejects.toThrow(/storage prefix/);
+    await expect(
+      ops.registerLibraryAssetFile(
+        WS,
+        asset.id,
+        {
+          storageBucket: 'lockflow-references',
+          storagePath: 'not-canonical/escape.png',
+          fileName: 'escape.png',
+          mimeType: 'image/png',
+        },
+        USER,
+      ),
+    ).rejects.toThrow(/storage prefix/);
   });
 });
 
@@ -470,7 +483,7 @@ describe('9. Sensitive storage data is not leaked to the browser', () => {
       asset.id,
       {
         storageBucket: 'lockflow-references',
-        storagePath: `${WS}/library-assets/${asset.id}/secret-free.png`,
+        storagePath: `workspaces/${WS}/library-assets/${asset.id}/00000000-0000-0000-0000-00000000000b/secret-free.png`,
         fileName: 'secret-free.png',
         mimeType: 'image/png',
       },

@@ -9,6 +9,10 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { LibraryAttachDrawer } from '../features/library/LibraryAttachDrawer';
+import { useLibraryOpsService } from '../features/library/useLibraryOpsService';
+import { SEED_LIBRARY_WORKSPACE_ID } from '../mock/librarySeed';
+import type { LibraryAttachmentRecord } from '../domain/library';
 import {
   ArchiveIcon,
   EnvironmentIcon,
@@ -65,6 +69,10 @@ export function EnvironmentsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  // Prompt 22: the unified Library attach drawer (references, never copies).
+  const [attachEnv, setAttachEnv] = useState<EnvironmentWithVersion | null>(null);
+  const [envAttachmentCount, setEnvAttachmentCount] = useState<Record<string, number>>({});
+  const libraryOps = useLibraryOpsService();
 
   const [state, setState] = useState<LoadState>('loading');
   const [environments, setEnvironments] = useState<EnvironmentWithVersion[]>([]);
@@ -333,6 +341,13 @@ export function EnvironmentsPage() {
                             <Button
                               size="sm"
                               variant="ghost"
+                              onClick={() => setAttachEnv(environment)}
+                            >
+                              Attach{(envAttachmentCount[environment.id] ?? 0) > 0 ? ` (${envAttachmentCount[environment.id]})` : ''}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
                               leftIcon={<ArchiveIcon size={14} />}
                               onClick={() => setArchiving(environment)}
                             >
@@ -358,6 +373,13 @@ export function EnvironmentsPage() {
                           <Link className="lf-btn lf-btn--secondary lf-btn--sm" to={`/environments/${environment.id}`}>
                             Open
                           </Link>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAttachEnv(environment)}
+                          >
+                            Attach{(envAttachmentCount[environment.id] ?? 0) > 0 ? ` (${envAttachmentCount[environment.id]})` : ''}
+                          </Button>
                           <Button
                             size="sm"
                             variant="ghost"
@@ -408,6 +430,28 @@ export function EnvironmentsPage() {
           locking happen next — no generation or image analysis happens here.
         </p>
       </Modal>
+
+      {attachEnv && (
+        <LibraryAttachDrawer
+          open
+          onClose={() => setAttachEnv(null)}
+          service={libraryOps}
+          workspaceId={SEED_LIBRARY_WORKSPACE_ID}
+          targetType="environment"
+          targetId={attachEnv.id}
+          targetLabel={`environment “${attachEnv.name}”`}
+          roleOrSlot="set"
+          multiSelect
+          onAttached={async (records: LibraryAttachmentRecord[]) => {
+            setEnvAttachmentCount((current) => ({
+              ...current,
+              [attachEnv.id]: (current[attachEnv.id] ?? 0) + records.length,
+            }));
+            toast({ title: 'Attached from the Library', tone: 'success' });
+          }}
+          onInlineAdd={() => navigate('/library/add?context=picker&return=%2Fenvironments')}
+        />
+      )}
 
       <Modal
         open={archiving !== null}

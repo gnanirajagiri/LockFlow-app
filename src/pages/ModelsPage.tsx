@@ -9,6 +9,10 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
+import { LibraryAttachDrawer } from '../features/library/LibraryAttachDrawer';
+import { useLibraryOpsService } from '../features/library/useLibraryOpsService';
+import { SEED_LIBRARY_WORKSPACE_ID } from '../mock/librarySeed';
+import type { LibraryAttachmentRecord } from '../domain/library';
 import {
   ArchiveIcon,
   GridViewIcon,
@@ -65,6 +69,10 @@ export function ModelsPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [archiving, setArchiving] = useState<ModelWithVersion | null>(null);
+  // Prompt 22: the unified Library attach drawer (references, never copies).
+  const [attachModel, setAttachModel] = useState<ModelWithVersion | null>(null);
+  const [modelAttachmentCount, setModelAttachmentCount] = useState<Record<string, number>>({});
+  const libraryOps = useLibraryOpsService();
 
   const load = useCallback(async () => {
     setState('loading');
@@ -268,6 +276,8 @@ export function ModelsPage() {
                   key={model.id}
                   model={model}
                   onArchive={() => setArchiving(model)}
+                  onAttachLibrary={() => setAttachModel(model)}
+                  attachmentCount={modelAttachmentCount[model.id] ?? 0}
                 />
               ))}
             </div>
@@ -296,6 +306,13 @@ export function ModelsPage() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      onClick={() => setAttachModel(model)}
+                    >
+                      Attach from Library{(modelAttachmentCount[model.id] ?? 0) > 0 ? ` (${modelAttachmentCount[model.id]})` : ''}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       leftIcon={<ArchiveIcon size={14} />}
                       onClick={() => setArchiving(model)}
                     >
@@ -308,6 +325,28 @@ export function ModelsPage() {
           ) : null}
         </>
       ) : null}
+
+      {attachModel && (
+        <LibraryAttachDrawer
+          open
+          onClose={() => setAttachModel(null)}
+          service={libraryOps}
+          workspaceId={SEED_LIBRARY_WORKSPACE_ID}
+          targetType="model"
+          targetId={attachModel.id}
+          targetLabel={`model “${attachModel.name}”`}
+          roleOrSlot="wardrobe"
+          multiSelect
+          onAttached={async (records: LibraryAttachmentRecord[]) => {
+            setModelAttachmentCount((current) => ({
+              ...current,
+              [attachModel.id]: (current[attachModel.id] ?? 0) + records.length,
+            }));
+            toast({ title: 'Attached from the Library', tone: 'success' });
+          }}
+          onInlineAdd={() => navigate('/library/add?context=picker&return=%2Fmodels')}
+        />
+      )}
 
       <CreateModelModal
         open={createOpen}
@@ -357,7 +396,17 @@ function VersionBadge({ model }: { model: ModelWithVersion }) {
   );
 }
 
-function ModelCard({ model, onArchive }: { model: ModelWithVersion; onArchive: () => void }) {
+function ModelCard({
+  model,
+  onArchive,
+  onAttachLibrary,
+  attachmentCount,
+}: {
+  model: ModelWithVersion;
+  onArchive: () => void;
+  onAttachLibrary: () => void;
+  attachmentCount: number;
+}) {
   return (
     <Card>
       <CardBody>
@@ -395,6 +444,13 @@ function ModelCard({ model, onArchive }: { model: ModelWithVersion; onArchive: (
             <Link className="lf-btn lf-btn--sm lf-btn--secondary" to={`/models/${model.id}`}>
               Open
             </Link>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onAttachLibrary}
+            >
+              Attach{(attachmentCount > 0) ? ` (${attachmentCount})` : ''}
+            </Button>
             <Button
               size="sm"
               variant="ghost"

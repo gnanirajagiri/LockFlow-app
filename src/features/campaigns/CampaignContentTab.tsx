@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardBody } from '../../components/ui/Card';
@@ -20,6 +20,10 @@ import { useToast } from '../../components/ui/Toast';
 import { GalleryIcon, SearchIcon } from '../../components/icons';
 import type { CampaignContextValue } from './CampaignLayout';
 import { SEED_GALLERY_WORKSPACE_ID } from '../../mock/gallerySeed';
+import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
+import { LibraryAttachDrawer } from '../library/LibraryAttachDrawer';
+import { useLibraryOpsService } from '../library/useLibraryOpsService';
+import type { LibraryAttachmentRecord } from '../../domain/library';
 import { ContentStudioService } from '../../services/contentService';
 import { LibraryService } from '../../services/libraryService';
 import { ModelsService } from '../../services/modelsService';
@@ -95,6 +99,11 @@ export function CampaignContentTab() {
   const [hasVerifiedConnection, setHasVerifiedConnection] = useState(false);
 
   const channelKeys = useMemo(() => detail?.channels.map((ch) => ch.channel) ?? [], [detail]);
+
+  // Prompt 22: the unified Library attach drawer (references, never copies).
+  const libraryOps = useLibraryOpsService();
+  const navigate = useNavigate();
+  const [libraryDrawerOpen, setLibraryDrawerOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -335,7 +344,28 @@ export function CampaignContentTab() {
         <Button variant="primary" disabled={readOnly} onClick={() => void openSelector()}>
           Add approved content
         </Button>
+        <Button disabled={readOnly} onClick={() => setLibraryDrawerOpen(true)}>
+          Attach from Library
+        </Button>
       </div>
+
+      {libraryDrawerOpen && (
+        <LibraryAttachDrawer
+          open
+          onClose={() => setLibraryDrawerOpen(false)}
+          service={libraryOps}
+          workspaceId={SEED_LIBRARY_WORKSPACE_ID}
+          targetType="campaign"
+          targetId={campaign.id}
+          targetLabel={`campaign “${campaign.name}”`}
+          roleOrSlot="reference"
+          multiSelect
+          onAttached={async (records: LibraryAttachmentRecord[]) => {
+            toast({ title: `${records.length} Library asset${records.length === 1 ? '' : 's'} attached to the campaign.`, tone: 'success' });
+          }}
+          onInlineAdd={() => navigate(`/library/add?context=picker&return=${encodeURIComponent(`/campaigns/${campaign.id}/content`)}`)}
+        />
+      )}
 
       {loading ? (
         <Skeleton height={120} />

@@ -4,8 +4,8 @@
  * audit-safe history summary. Everything is workspace-scoped via the ops
  * service; archived assets stay fully inspectable here.
  */
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -26,6 +26,7 @@ import {
   USAGE_SCOPES,
 } from '../../domain/library';
 import { useLibraryOpsService } from './useLibraryOpsService';
+import { LibraryAssetStorageService, DemoModeError } from '../../services/libraryAssetStorage';
 import { ModelsService } from '../../services/modelsService';
 import { EnvironmentsService } from '../../services/environmentsService';
 import { getModelsRepository } from '../../data';
@@ -59,6 +60,12 @@ export function LibraryAssetEditPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Signed-URL upload pipeline (real Supabase) with per-row retry.
+  const storage = useMemo(() => new LibraryAssetStorageService(), []);
+  const retryFileIdRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingFileId, setUploadingFileId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,6 +99,44 @@ export function LibraryAssetEditPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Honest demo-mode notice surfaced by the Add flow after a metadata-only save.
+  useEffect(() => {
+    if (searchParams.get('upload') === 'demo-mode') {
+      setNotice('Saved without the file — uploads need a configured Supabase project. Use “Upload file” on the pending reference to finish it.');
+    }
+  }, [searchParams]);
+
+  function startUpload(fileId: string | null) {
+    retryFileIdRef.current = fileId;
+    fileInputRef.current?.click();
+  }
+
+  async function onUploadFileChosen(picked: File | null) {
+    if (!picked || !asset) return;
+    setUploadingFileId(retryFileIdRef.current ?? 'new');
+    setError(null);
+    try {
+      await storage.uploadAssetFile({
+        workspaceId: WS,
+        assetId: asset.id,
+        file: picked,
+        ...(retryFileIdRef.current ? { retryFileId: retryFileIdRef.current } : {}),
+      });
+      setFiles(await ops.listAssetFiles(WS, asset.id));
+      setEvents(await ops.getAssetEvents(WS, asset.id, 12));
+      setNotice('File uploaded.');
+    } catch (err) {
+      setError(err instanceof DemoModeError ? err.message : err instanceof Error ? err.message : 'Upload failed.');
+      if (asset && retryFileIdRef.current) {
+        setFiles(await ops.listAssetFiles(WS, asset.id));
+      }
+    } finally {
+      setUploadingFileId(null);
+      retryFileIdRef.current = null;
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -316,19 +361,39 @@ export function LibraryAssetEditPage() {
         <Card>
           <CardBody>
             <h2 style={{ margin: '0 0 8px', fontSize: 16 }}>File references ({files.length})</h2>
-            {files.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>No file references yet.</p>
-            ) : (
-              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 6, fontSize: 13 }}>
-                {files.map((f) => (
-                  <li key={f.id} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
+            <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>
+              Uploads transfer directly to private storage through a short-lived signed URL — no credentials in the browser.
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: 'none' }}
+              onChange={(e) => void onUploadFileChosen(e.target.files?.[0] ?? null)}
+            />
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: 6, fontSize: 13 }}>
+              {files.map((f) => (
+                <li key={f.id} style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px', display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                  <span>
                     <strong>{f.fileName}</strong>
-                    <span style={{ color: '#64748b' }}> · {f.mimeType} · {f.fileSizeBytes ? `${Math.max(1, Math.round(f.fileSizeBytes / 1024))} KB` : 'size unknown'} · {f.uploadStatus}</span>
+                    <span style={{ color: '#64748b' }}> · {f.mimeType} · {f.fileSizeBytes ? `${Math.max(1, Math.round(f.fileSizeBytes / 1024))} KB` : 'size unknown'}</span>
+                    <Badge tone={f.uploadStatus === 'uploaded' ? 'success' : f.uploadStatus === 'failed' ? 'warning' : 'neutral'}> {f.uploadStatus}</Badge>
                     {f.sourceUrl && <div style={{ color: '#64748b', wordBreak: 'break-all' }}>{f.sourceUrl}</div>}
-                  </li>
-                ))}
-              </ul>
-            )}
+                  </span>
+                  {f.uploadStatus !== 'uploaded' && f.mimeType !== 'application/pdf' && (
+                    <Button variant="ghost" disabled={uploadingFileId !== null} onClick={() => startUpload(f.uploadStatus === 'pending' || f.uploadStatus === 'failed' ? f.id : null)}>
+                      {uploadingFileId === f.id ? 'Uploading…' : f.uploadStatus === 'failed' ? 'Retry upload' : 'Upload file'}
+                    </Button>
+                  )}
+                </li>
+              ))}
+              {files.length === 0 && <li style={{ color: '#64748b' }}>No file references yet — add one by uploading.</li>}
+            </ul>
+            <div className="lf-dialogactions" style={{ justifyContent: 'flex-start', marginTop: 8 }}>
+              <Button variant="secondary" disabled={uploadingFileId !== null} onClick={() => startUpload(null)}>
+                {uploadingFileId === 'new' ? 'Uploading…' : 'Upload file to this asset'}
+              </Button>
+            </div>
           </CardBody>
         </Card>
 

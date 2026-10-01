@@ -10,7 +10,7 @@
  * uploads register a SAFE file reference (bucket + workspace-scoped path)
  * with upload_status 'pending' — no fake local storage behavior.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Card, CardBody } from '../../components/ui/Card';
@@ -34,6 +34,7 @@ import {
   sanitizeExternalImageUrl,
 } from '../../domain/library';
 import { useLibraryOpsService } from './useLibraryOpsService';
+import { LibraryAssetStorageService, DemoModeError } from '../../services/libraryAssetStorage';
 import { ModelsService } from '../../services/modelsService';
 import { EnvironmentsService } from '../../services/environmentsService';
 import { getModelsRepository } from '../../data';
@@ -85,6 +86,10 @@ export function LibraryAddAssetPage() {
   const [environments, setEnvironments] = useState<Array<{ id: string; name: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // The raw File is kept OUT of React state concerns above — one ref slot is
+  // all the upload pipeline needs (the preview uses its own object URL).
+  const pickedFileRef = useRef<File | null>(null);
+  const storage = useMemo(() => new LibraryAssetStorageService(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +148,7 @@ export function LibraryAddAssetPage() {
       fileMimeType: picked.type,
       previewUrl: picked.type.startsWith('image/') ? URL.createObjectURL(picked) : null,
     });
+    pickedFileRef.current = picked;
   }
 
   async function runParse() {
@@ -170,6 +176,8 @@ export function LibraryAddAssetPage() {
     if (!method) return;
     setError(null);
     setSaving(true);
+    let demoUploadNotice: string | null = null;
+    const pickedFile = pickedFileRef.current;
     try {
       await ops.startLibraryAssetAdd(WS, method, USER_ID, file?.fileName ?? (imageUrl || undefined));
 
@@ -209,21 +217,19 @@ export function LibraryAddAssetPage() {
         USER_ID,
       );
 
-      // Register the safe file reference (no bytes move — upload pipeline pending).
-      if (file) {
-        await ops.registerLibraryAssetFile(
-          WS,
-          asset.id,
-          {
-            storageBucket: 'lockflow-references',
-            storagePath: `${WS}/library-assets/${asset.id}/${Date.now()}-${safeFileName(file.fileName)}`,
-            fileName: file.fileName,
-            mimeType: file.fileMimeType,
-            fileSizeBytes: file.fileSizeBytes,
-            fileKind: file.fileMimeType === 'application/pdf' ? 'document' : 'image',
-          },
-          USER_ID,
-        );
+      // Upload the actual bytes through the signed-URL pipeline (real
+      // Supabase configured). In demo mode this throws DemoModeError: the
+      // asset is still created with its metadata — the user is told the
+      // upload needs a configured project, and the file stays 'pending'.
+      if (file && pickedFile) {
+        try {
+          await storage.uploadAssetFile({ workspaceId: WS, assetId: asset.id, file: pickedFile });
+        } catch (uploadErr) {
+          if (!(uploadErr instanceof DemoModeError)) {
+            throw uploadErr;
+          }
+          demoUploadNotice = uploadErr.message;
+        }
       }
       if (method === 'image_url') {
         await ops.registerLibraryAssetFile(
@@ -231,7 +237,7 @@ export function LibraryAddAssetPage() {
           asset.id,
           {
             storageBucket: 'lockflow-references',
-            storagePath: `${WS}/library-assets/${asset.id}/url-import-${Date.now()}`,
+            storagePath: `workspaces/${WS}/library-assets/${asset.id}/url-import-${crypto.randomUUID()}/image`,
             fileName: safeFileName(name || 'url-import'),
             mimeType: 'image/png',
             sourceUrl: sanitizeExternalImageUrl(imageUrl) ?? undefined,
@@ -241,7 +247,11 @@ export function LibraryAddAssetPage() {
         );
       }
 
-      navigate(returnTo ?? `/library/assets/${asset.id}`);
+      if (demoUploadNotice) {
+        navigate(`${returnTo ?? `/library/assets/${asset.id}`}?upload=demo-mode`);
+      } else {
+        navigate(returnTo ?? `/library/assets/${asset.id}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the asset.');
     } finally {

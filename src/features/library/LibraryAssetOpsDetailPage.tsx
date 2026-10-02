@@ -178,6 +178,9 @@ export function LibraryAssetOpsDetailPage() {
                 </dl>
                 <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                   <Button disabled={busy || archived} onClick={() => setEditing(true)}>Edit metadata</Button>
+                  <Button variant="secondary" onClick={() => navigate(`/library/assets/${asset.id}/edit`)}>
+                    Open full editor
+                  </Button>
                   {!archived ? (
                     <Button disabled={busy} onClick={() => void run(() => ops.archiveLibraryAsset(SEED_LIBRARY_WORKSPACE_ID, asset.id, USER_ID).then(() => undefined), 'Asset archived.')}>
                       Archive

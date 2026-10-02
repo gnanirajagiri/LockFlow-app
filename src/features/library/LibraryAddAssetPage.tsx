@@ -158,9 +158,11 @@ export function LibraryAddAssetPage() {
       const parsed = await ops.parseLibraryAssetDescription(WS, { description: describeText }, USER_ID);
       setSuggestion(parsed);
       // Pre-fill the confirmation form — the user reviews and edits EVERYTHING.
+      // 'item' scope requires a linked scene (created in the scene workflow),
+      // so the suggestion lands as 'shared' here with a visible note.
       setName(parsed.name);
       setAssetType(parsed.assetType);
-      setUsageScope(parsed.usageScope);
+      setUsageScope(parsed.usageScope === 'item' ? 'shared' : parsed.usageScope);
       setDescription(parsed.description);
       setTagsInput(parsed.tags.join(', '));
       setRightsNote(parsed.rightsOrUsageNote ?? '');
@@ -431,7 +433,11 @@ export function LibraryAddAssetPage() {
                 <label style={{ fontSize: 13, display: 'block' }}>
                   <span style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Used on / in</span>
                   <select className="lf-input" value={usageScope} onChange={(e) => setUsageScope(e.target.value as LibraryUsageScope)} style={{ width: '100%' }}>
-                    {USAGE_SCOPES.map((s) => <option key={s} value={s}>{USAGE_SCOPE_LABELS[s]}</option>)}
+                    {/* 'item' scope needs a linked scene, which is created in
+                        the scene workflow — so it is not offered here. */}
+                    {USAGE_SCOPES.filter((s) => s !== 'item').map((s) => (
+                      <option key={s} value={s}>{USAGE_SCOPE_LABELS[s]}</option>
+                    ))}
                   </select>
                 </label>
               </div>
@@ -451,9 +457,9 @@ export function LibraryAddAssetPage() {
                   </select>
                 </label>
               </div>
-              {needsItemHint && (
+              {(needsItemHint || suggestion?.usageScope === 'item') && (
                 <p style={{ margin: 0, fontSize: 12, color: '#92400e' }}>
-                  Item links are made from the scene workflow — save this asset, then attach it from Content Studio.
+                  Item-scoped assets are linked from the scene workflow — this asset is saved as shared; attach it to a scene from Content Studio.
                 </p>
               )}
               <label style={{ fontSize: 13, display: 'block' }}>

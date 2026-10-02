@@ -8,7 +8,7 @@
  * toggle and always carry a visible warning. Emits selected asset records —
  * consumers wire their own links; nothing is duplicated into the target.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -54,6 +54,12 @@ export function LibraryAssetPicker(props: LibraryAssetPickerProps) {
   const [includeArchived, setIncludeArchived] = useState(context.includeArchived ?? false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // The context object is host-supplied and often an inline literal; reading
+  // it through a ref keeps `load` (and therefore the effect) stable instead
+  // of refetching — and never settling — on every render.
+  const contextRef = useRef(context);
+  contextRef.current = context;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -61,7 +67,7 @@ export function LibraryAssetPicker(props: LibraryAssetPickerProps) {
       const results = await service.listLibraryPickerAssets(
         workspaceId,
         {
-          ...context,
+          ...contextRef.current,
           ...(search ? { search } : {}),
           ...(scope ? { usageScope: scope as LibraryUsageScope } : {}),
           ...(assetType ? { assetTypes: [assetType as LibraryAssetRecord['assetType']] } : {}),
@@ -76,7 +82,7 @@ export function LibraryAssetPicker(props: LibraryAssetPickerProps) {
     } finally {
       setLoading(false);
     }
-  }, [service, workspaceId, context, search, scope, assetType, includeDrafts, includeArchived]);
+  }, [service, workspaceId, search, scope, assetType, includeDrafts, includeArchived]);
 
   useEffect(() => {
     void load();

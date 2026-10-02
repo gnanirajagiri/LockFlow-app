@@ -16,9 +16,15 @@ import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { ContentIntentBar } from './ContentIntentBar';
 import { useContentProjectOutletContext } from './tabRoutes';
 import { LibraryAttachDrawer } from '../library/LibraryAttachDrawer';
+import { LibraryAttachedAssetsPanel } from '../library/LibraryAttachedAssetsPanel';
 import { useLibraryOpsService } from '../library/useLibraryOpsService';
 import type { ContentBeatRecord, ContentSceneRecord } from '../../domain/content';
-import type { LibraryAttachmentRecord } from '../../domain/library';
+import type { LibraryAttachmentRecord, LibraryAttachmentRoleName } from '../../domain/library';
+
+/** Prompt 23 — roles offered when attaching to a content scene. */
+const SCENE_ATTACH_ROLES: LibraryAttachmentRoleName[] = [
+  'props', 'primary-product', 'reference', 'look-reference', 'supporting',
+];
 
 export function StoryboardTab() {
   const { toast } = useToast();
@@ -35,6 +41,8 @@ export function StoryboardTab() {
   // Prompt 22: the unified Library attach drawer (references, never copies).
   const [attachScene, setAttachScene] = useState<ContentSceneRecord | null>(null);
   const [sceneAttachments, setSceneAttachments] = useState<Record<string, LibraryAttachmentRecord[]>>({});
+  // Bumped after any attach so the summary panels reload their details.
+  const [attachmentEpoch, setAttachmentEpoch] = useState(0);
   const libraryOps = useLibraryOpsService();
   const navigate = useNavigate();
 
@@ -71,6 +79,16 @@ export function StoryboardTab() {
       });
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Reloads one scene's attachment list (button count + panel refresh). */
+  async function refreshSceneAttachments(sceneId: string) {
+    try {
+      const details = await libraryOps.listTargetAttachmentDetails(SEED_LIBRARY_WORKSPACE_ID, 'content_scene', sceneId);
+      setSceneAttachments((current) => ({ ...current, [sceneId]: details.map((d) => d.attachment) }));
+    } catch {
+      setSceneAttachments((current) => ({ ...current, [sceneId]: [] }));
     }
   }
 
@@ -282,14 +300,9 @@ export function StoryboardTab() {
                     size="sm"
                     variant="ghost"
                     disabled={busy}
-                    onClick={async () => {
+                    onClick={() => {
                       setAttachScene(scene);
-                      try {
-                        const records = await libraryOps.listAttachmentsForTarget(SEED_LIBRARY_WORKSPACE_ID, 'content_scene', scene.id);
-                        setSceneAttachments((current) => ({ ...current, [scene.id]: records }));
-                      } catch {
-                        setSceneAttachments((current) => ({ ...current, [scene.id]: [] }));
-                      }
+                      void refreshSceneAttachments(scene.id);
                     }}
                   >
                     Attach from Library{(sceneAttachments[scene.id]?.length ?? 0) > 0 ? ` (${sceneAttachments[scene.id].length})` : ''}
@@ -382,6 +395,19 @@ export function StoryboardTab() {
                   </Button>
                 </div>
               ) : null}
+
+              <LibraryAttachedAssetsPanel
+                service={libraryOps}
+                workspaceId={SEED_LIBRARY_WORKSPACE_ID}
+                targetType="content_scene"
+                targetId={scene.id}
+                targetLabel={`scene “${scene.title}”`}
+                canEdit={isDraft && !busy}
+                roleOptions={SCENE_ATTACH_ROLES}
+                onAttach={() => setAttachScene(scene)}
+                onChanged={() => void refreshSceneAttachments(scene.id)}
+                refreshKey={attachmentEpoch}
+              />
             </CardBody>
           </Card>
         );
@@ -425,13 +451,15 @@ export function StoryboardTab() {
           targetType="content_scene"
           targetId={attachScene.id}
           targetLabel={`scene “${attachScene.title}”`}
-          roleOrSlot="prop"
+          roleOrSlot="props"
+          roleOptions={SCENE_ATTACH_ROLES}
           multiSelect
           onAttached={async (records) => {
             setSceneAttachments((current) => ({
               ...current,
               [attachScene.id]: [...(current[attachScene.id] ?? []), ...records],
             }));
+            setAttachmentEpoch((n) => n + 1);
             toast({ title: 'Attached from the Library', tone: 'success' });
           }}
           onInlineAdd={() => {

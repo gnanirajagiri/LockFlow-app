@@ -6,8 +6,16 @@
  * target-validated, audited). Attachments reference canonical Library
  * assets — nothing is duplicated into the target domain.
  *
- * Used from Content Studio scenes, and embeddable from Models,
- * Environments, Campaigns and standalone flows.
+ * Prompt 23 additions:
+ *   * Role/slot presets — hosts pass `roleOptions` (registry roles with
+ *     cardinality + asset-type fit); the drawer adapts the picker (suggested
+ *     types first, single-select for single-cardinality roles) and marks
+ *     single-slot attachments as primary so the DB index backs the rule.
+ *   * Replace mode — pass `replaceAttachment` to swap one attachment safely
+ *     (same validation, both sides audited; Library assets untouched).
+ *
+ * Used from Content Studio scenes, Campaign items, and embeddable from
+ * Models, Environments and standalone flows.
  */
 import { useState } from 'react';
 import { Drawer } from '../../components/ui/Drawer';
@@ -15,12 +23,16 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import type {
   LibraryAttachmentRecord,
+  LibraryAttachmentRoleName,
   LibraryAttachmentTargetType,
   LibraryAssetRecord,
+  LibraryPickerContext,
 } from '../../domain/library';
 import {
   ATTACHMENT_TARGET_LABELS,
   libraryAttachmentWarnings,
+  libraryRoleDefinition,
+  libraryRoleOptions,
   normalizeRoleOrSlot,
 } from '../../domain/library';
 import type { LibraryOpsService } from '../../services/libraryOpsService';
@@ -38,6 +50,16 @@ export interface LibraryAttachDrawerProps {
   multiSelect?: boolean;
   actorId?: string;
   onAttached?: (records: LibraryAttachmentRecord[]) => void;
+  /**
+   * Prompt 23 — replace mode: when set, the drawer swaps THIS attachment
+   * instead of creating new ones (single-select, same validation, audited).
+   */
+  replaceAttachment?: LibraryAttachmentRecord | null;
+  onReplaced?: (record: LibraryAttachmentRecord) => void;
+  /** Registry roles offered in the role select (free text stays available). */
+  roleOptions?: LibraryAttachmentRoleName[];
+  /** Extra picker context (merged with the role preset's type suggestions). */
+  context?: LibraryPickerContext;
   /** Host-provided inline Add-Asset entry (audited + navigates). */
   onInlineAdd?: () => void;
 }
@@ -45,14 +67,22 @@ export interface LibraryAttachDrawerProps {
 export function LibraryAttachDrawer(props: LibraryAttachDrawerProps) {
   const {
     open, onClose, service, workspaceId, targetType, targetId, targetLabel,
-    roleOrSlot: initialRole = 'reference', multiSelect = true,
-    actorId = 'demo-user', onAttached, onInlineAdd,
+    roleOrSlot, multiSelect = true, actorId = 'demo-user',
+    onAttached, onReplaced, replaceAttachment = null, roleOptions, context: hostContext,
+    onInlineAdd,
   } = props;
+  const initialRole = replaceAttachment?.roleOrSlot ?? roleOrSlot ?? roleOptions?.[0] ?? 'reference';
+  // Free-text roles (e.g. 'wardrobe' from Models) render as an input; only
+  // registry roles render as the preset select.
   const [role, setRole] = useState(initialRole);
+  const [customRole, setCustomRole] = useState(!libraryRoleDefinition(initialRole));
   const [selected, setSelected] = useState<LibraryAssetRecord[]>([]);
   const [attaching, setAttaching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attached, setAttached] = useState<LibraryAttachmentRecord[]>([]);
+
+  const roleDef = libraryRoleDefinition(role);
+  const effectiveMulti = multiSelect && roleDef?.cardinality !== 'single' && !replaceAttachment;
 
   async function confirmAttach() {
     if (selected.length === 0) return;
@@ -62,17 +92,40 @@ export function LibraryAttachDrawer(props: LibraryAttachDrawerProps) {
       // Archived assets may only be here because the user explicitly opted
       // in — pass allowArchived so the service can attach WITH a warning.
       const anyArchived = selected.some((a) => a.archivedAt !== null || a.status === 'archived');
-      const records = await service.attachLibraryAssets(
-        workspaceId,
-        targetType,
-        targetId,
-        selected.map((asset) => ({ assetId: asset.id, roleOrSlot: normalizeRoleOrSlot(role) })),
-        actorId,
-        { allowArchived: anyArchived },
-      );
-      setAttached((prev) => [...records, ...prev]);
-      setSelected([]);
-      onAttached?.(records);
+      if (replaceAttachment) {
+        const record = await service.replaceLibraryAttachment(
+          workspaceId,
+          replaceAttachment.id,
+          {
+            assetId: selected[0].id,
+            roleOrSlot: normalizeRoleOrSlot(role),
+            // Single-cardinality roles always carry the primary flag — the
+            // DB partial unique index backs the one-per-slot rule.
+            ...(roleDef?.cardinality === 'single' ? { isPrimary: true } : {}),
+          },
+          actorId,
+          { allowArchived: anyArchived },
+        );
+        setAttached([record]);
+        setSelected([]);
+        onReplaced?.(record);
+      } else {
+        const records = await service.attachLibraryAssets(
+          workspaceId,
+          targetType,
+          targetId,
+          selected.map((asset) => ({
+            assetId: asset.id,
+            roleOrSlot: normalizeRoleOrSlot(role),
+            ...(roleDef?.cardinality === 'single' ? { isPrimary: true } : {}),
+          })),
+          actorId,
+          { allowArchived: anyArchived },
+        );
+        setAttached((prev) => [...records, ...prev]);
+        setSelected([]);
+        onAttached?.(records);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not attach the selected assets.');
     } finally {
@@ -81,49 +134,96 @@ export function LibraryAttachDrawer(props: LibraryAttachDrawerProps) {
   }
 
   const warnings = selected.flatMap((asset) => libraryAttachmentWarnings(asset, { archivedSelectedExplicitly: true }));
+  const pickerContext: LibraryPickerContext = {
+    ...hostContext,
+    ...(roleDef?.allowedAssetTypes && !hostContext?.assetTypes
+      ? { assetTypes: roleDef.allowedAssetTypes }
+      : {}),
+  };
+  const options = libraryRoleOptions().filter((o) => !roleOptions || roleOptions.includes(o.name));
 
   return (
     <Drawer
       open={open}
       onClose={onClose}
       side="right"
-      title="Attach from the Library"
+      title={replaceAttachment ? 'Replace Library attachment' : 'Attach from the Library'}
       footer={
         <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <span style={{ fontSize: 12, color: '#64748b' }}>
-            {selected.length} selected · references, never copies
+            {replaceAttachment
+              ? `Replacing “${replaceAttachment.roleOrSlot}” · references, never copies`
+              : `${selected.length} selected · references, never copies`}
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <Button onClick={onClose}>Close</Button>
             <Button variant="primary" disabled={selected.length === 0 || attaching} onClick={() => void confirmAttach()}>
-              {attaching ? 'Attaching…' : 'Attach'}
+              {attaching ? 'Saving…' : replaceAttachment ? 'Replace' : 'Attach'}
             </Button>
           </div>
         </div>
       }
     >
       <p style={{ margin: '0 0 10px', fontSize: 13, color: '#334155' }}>
-        Attach reusable assets to <strong>{targetLabel ?? ATTACHMENT_TARGET_LABELS[targetType]}</strong>.
-        Existing attachments stay inspectable if an asset is archived later.
+        {replaceAttachment ? (
+          <>Choose the Library asset that should replace <strong>{replaceAttachment.roleOrSlot}</strong> on{' '}
+            <strong>{targetLabel ?? ATTACHMENT_TARGET_LABELS[targetType]}</strong>. The old reference is detached;
+            both sides are audited.</>
+        ) : (
+          <>Attach reusable assets to <strong>{targetLabel ?? ATTACHMENT_TARGET_LABELS[targetType]}</strong>.
+            Existing attachments stay inspectable if an asset is archived later.</>
+        )}
       </p>
 
-      <label style={{ display: 'block', fontSize: 13, marginBottom: 10 }}>
-        <span style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Role / slot</span>
-        <input
-          className="lf-input"
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          placeholder="e.g. hero, prop, reference"
-          aria-label="Role or slot for the attachment"
-          style={{ maxWidth: 240 }}
-        />
-      </label>
+      {options.length > 0 && !customRole ? (
+        <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
+          <span style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Role / slot</span>
+          <select
+            className="lf-input"
+            value={role}
+            onChange={(e) => {
+              if (e.target.value === '__custom') {
+                setCustomRole(true);
+                setRole('');
+              } else {
+                setRole(e.target.value);
+              }
+            }}
+            aria-label="Role or slot for the attachment"
+            style={{ maxWidth: 240 }}
+          >
+            {options.map((o) => (
+              <option key={o.name} value={o.name}>{o.label}</option>
+            ))}
+            <option value="__custom">Custom role…</option>
+          </select>
+        </label>
+      ) : (
+        <label style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
+          <span style={{ display: 'block', marginBottom: 4, fontWeight: 600 }}>Role / slot</span>
+          <input
+            className="lf-input"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            placeholder="e.g. hero, prop, reference"
+            aria-label="Role or slot for the attachment"
+            style={{ maxWidth: 240 }}
+          />
+        </label>
+      )}
+      {roleDef && (
+        <p style={{ margin: '0 0 10px', fontSize: 12, color: '#64748b' }}>
+          {roleDef.description}
+          {roleDef.cardinality === 'single' ? ' Only one per target.' : ''}
+        </p>
+      )}
 
       <LibraryAssetPicker
         service={service}
         workspaceId={workspaceId}
-        multiSelect={multiSelect}
-        confirmLabel="Attach"
+        context={pickerContext}
+        multiSelect={effectiveMulti}
+        confirmLabel={replaceAttachment ? 'Replace' : 'Attach'}
         onConfirm={(assets) => setSelected(assets)}
         onInlineAdd={onInlineAdd}
       />
@@ -142,7 +242,9 @@ export function LibraryAttachDrawer(props: LibraryAttachDrawerProps) {
 
       {attached.length > 0 && (
         <div style={{ marginTop: 14, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
-          <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>Attached just now</h3>
+          <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>
+            {replaceAttachment ? 'Replaced just now' : 'Attached just now'}
+          </h3>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {attached.map((record) => (
               <Badge key={record.id} tone="success">

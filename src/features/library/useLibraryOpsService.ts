@@ -38,7 +38,10 @@ export function useLibraryOpsService(): LibraryOpsService {
         getJobRequest: (id, ws) => content.getJobRequest(id, ws),
       },
       environments: { getEnvironment: (id, ws) => environments.getEnvironment(id, ws) },
-      campaigns: { getCampaign: (id, ws) => campaigns.getCampaign(id, ws) },
+      campaigns: {
+        getCampaign: (id, ws) => campaigns.getCampaign(id, ws),
+        getCampaignItem: (id, ws) => campaigns.getCampaignItem(id, ws),
+      },
     });
   }, []);
 }

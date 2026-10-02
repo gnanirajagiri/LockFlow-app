@@ -90,6 +90,19 @@ export function LibraryAssetPicker(props: LibraryAssetPickerProps) {
 
   const selected = useMemo(() => rows.filter((r) => selectedIds.has(r.id)), [rows, selectedIds]);
 
+  // Prompt 23 — context-aware prioritization: when the caller suggests asset
+  // types (role preset, e.g. product-like assets for "primary product"),
+  // matching assets come first while everything else stays reachable.
+  const suggestedTypes = contextRef.current.assetTypes ?? null;
+  const orderedRows = useMemo(() => {
+    if (!suggestedTypes || suggestedTypes.length === 0) return rows;
+    return [...rows].sort((a, b) => {
+      const aMatch = suggestedTypes.includes(a.assetType) ? 0 : 1;
+      const bMatch = suggestedTypes.includes(b.assetType) ? 0 : 1;
+      return aMatch - bMatch;
+    });
+  }, [rows, suggestedTypes]);
+
   function toggle(id: string) {
     setSelectedIds((prev) => togglePickerSelection(prev, id, multiSelect));
   }
@@ -146,7 +159,7 @@ export function LibraryAssetPicker(props: LibraryAssetPickerProps) {
         />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10, maxHeight: 340, overflowY: 'auto' }}>
-          {rows.map((asset) => {
+          {orderedRows.map((asset) => {
             const isSelected = selectedIds.has(asset.id);
             const archived = asset.archivedAt !== null || asset.status === 'archived';
             const warnings = includeArchived ? libraryAttachmentWarnings(asset, { archivedSelectedExplicitly: true }) : [];

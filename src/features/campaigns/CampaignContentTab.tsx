@@ -22,8 +22,19 @@ import type { CampaignContextValue } from './CampaignLayout';
 import { SEED_GALLERY_WORKSPACE_ID } from '../../mock/gallerySeed';
 import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { LibraryAttachDrawer } from '../library/LibraryAttachDrawer';
+import { LibraryAttachedAssetsPanel } from '../library/LibraryAttachedAssetsPanel';
 import { useLibraryOpsService } from '../library/useLibraryOpsService';
-import type { LibraryAttachmentRecord } from '../../domain/library';
+import type { LibraryAttachmentRecord, LibraryAttachmentRoleName } from '../../domain/library';
+
+/** Prompt 23 — roles offered when attaching Library assets to a campaign item. */
+const ITEM_ATTACH_ROLES: LibraryAttachmentRoleName[] = [
+  'primary-product', 'props', 'brand-asset', 'reference', 'supporting',
+];
+
+/** Prompt 23 — roles offered for campaign-level reference attachments. */
+const CAMPAIGN_ATTACH_ROLES: LibraryAttachmentRoleName[] = [
+  'reference', 'brand-asset', 'supporting',
+];
 import { ContentStudioService } from '../../services/contentService';
 import { LibraryService } from '../../services/libraryService';
 import { ModelsService } from '../../services/modelsService';
@@ -100,10 +111,33 @@ export function CampaignContentTab() {
 
   const channelKeys = useMemo(() => detail?.channels.map((ch) => ch.channel) ?? [], [detail]);
 
-  // Prompt 22: the unified Library attach drawer (references, never copies).
+  // Prompt 22/23: the unified Library attach drawer (references, never
+  // copies) — campaign-level references plus per-item planning attachments.
   const libraryOps = useLibraryOpsService();
   const navigate = useNavigate();
   const [libraryDrawerOpen, setLibraryDrawerOpen] = useState(false);
+  const [itemAttach, setItemAttach] = useState<CampaignItemRecord | null>(null);
+  const [itemAttachments, setItemAttachments] = useState<Record<string, number>>({});
+  const [itemAttachmentEpoch, setItemAttachmentEpoch] = useState(0);
+
+  /** Reloads one item's attachment count for its attach button. */
+  async function refreshItemAttachments(itemId: string) {
+    try {
+      const details = await libraryOps.listTargetAttachmentDetails(SEED_LIBRARY_WORKSPACE_ID, 'campaign_item', itemId);
+      setItemAttachments((current) => ({ ...current, [itemId]: details.length }));
+    } catch {
+      setItemAttachments((current) => ({ ...current, [itemId]: 0 }));
+    }
+  }
+
+  // Hydrate attachment counts once the item list is loaded.
+  useEffect(() => {
+    if (loading) return;
+    for (const item of items) {
+      void refreshItemAttachments(item.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, items.map((i) => i.id).join(',')]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -359,9 +393,33 @@ export function CampaignContentTab() {
           targetId={campaign.id}
           targetLabel={`campaign “${campaign.name}”`}
           roleOrSlot="reference"
+          roleOptions={CAMPAIGN_ATTACH_ROLES}
           multiSelect
           onAttached={async (records: LibraryAttachmentRecord[]) => {
             toast({ title: `${records.length} Library asset${records.length === 1 ? '' : 's'} attached to the campaign.`, tone: 'success' });
+          }}
+          onInlineAdd={() => navigate(`/library/add?context=picker&return=${encodeURIComponent(`/campaigns/${campaign.id}/content`)}`)}
+        />
+      )}
+
+      {itemAttach && (
+        <LibraryAttachDrawer
+          open
+          onClose={() => setItemAttach(null)}
+          service={libraryOps}
+          workspaceId={SEED_LIBRARY_WORKSPACE_ID}
+          targetType="campaign_item"
+          targetId={itemAttach.id}
+          targetLabel={`campaign item “${itemAttach.plannedChannel ? (CAMPAIGN_CHANNEL_LABELS[itemAttach.plannedChannel] ?? itemAttach.plannedChannel) : 'planned item'}”`}
+          roleOptions={ITEM_ATTACH_ROLES}
+          multiSelect
+          onAttached={async (records: LibraryAttachmentRecord[]) => {
+            setItemAttachments((current) => ({
+              ...current,
+              [itemAttach.id]: (current[itemAttach.id] ?? 0) + records.length,
+            }));
+            setItemAttachmentEpoch((n) => n + 1);
+            toast({ title: `${records.length} Library asset${records.length === 1 ? '' : 's'} attached to the campaign item.`, tone: 'success' });
           }}
           onInlineAdd={() => navigate(`/library/add?context=picker&return=${encodeURIComponent(`/campaigns/${campaign.id}/content`)}`)}
         />
@@ -439,6 +497,18 @@ export function CampaignContentTab() {
                           ))}
                         </ul>
                       ) : null}
+                      <LibraryAttachedAssetsPanel
+                        service={libraryOps}
+                        workspaceId={SEED_LIBRARY_WORKSPACE_ID}
+                        targetType="campaign_item"
+                        targetId={item.id}
+                        targetLabel="this campaign item"
+                        canEdit={!readOnly}
+                        roleOptions={ITEM_ATTACH_ROLES}
+                        onAttach={() => setItemAttach(item)}
+                        onChanged={() => void refreshItemAttachments(item.id)}
+                        refreshKey={itemAttachmentEpoch}
+                      />
                     </div>
                     <div className="lf-campaign-item__actions">
                       <Button size="sm" variant="ghost" disabled={index === 0 || readOnly} onClick={() => void move(item, -1)}>
@@ -448,6 +518,18 @@ export function CampaignContentTab() {
                         ↓ <span className="lf-visually-hidden">Move {outputTitle} down</span>
                       </Button>
                       <Button size="sm" disabled={readOnly} onClick={() => openEdit(item)}>Edit plan</Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={readOnly}
+                        onClick={() => {
+                          setItemAttach(item);
+                          void refreshItemAttachments(item.id);
+                        }}
+                        title="Attach reusable Library assets (products, props, references) to this item"
+                      >
+                        Attach from Library{(itemAttachments[item.id] ?? 0) > 0 ? ` (${itemAttachments[item.id]})` : ''}
+                      </Button>
                       <Button size="sm" variant="ghost" disabled={readOnly} onClick={() => setVariantItem(item)}>
                         Add copy variant
                       </Button>

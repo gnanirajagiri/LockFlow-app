@@ -389,6 +389,18 @@ export class CampaignsService {
     return replaced;
   }
 
+  /**
+   * Single campaign item with workspace scoping via the parent campaign —
+   * the bridge the Library attachment validator uses for campaign-item
+   * attachment targets.
+   */
+  async getCampaignItem(itemId: string, activeWorkspaceId: string): Promise<CampaignItemRecord> {
+    const item = await this.repo.getItem(itemId);
+    if (!item) throw new Error('Campaign item not found.');
+    await this.getCampaign(item.campaignId, activeWorkspaceId);
+    return item;
+  }
+
   async removeItem(itemId: string, campaignId: string, activeWorkspaceId: string): Promise<CampaignItemRecord> {
     await this.getCampaign(campaignId, activeWorkspaceId);
     assertCampaignEditable(await this.getCampaign(campaignId, activeWorkspaceId));

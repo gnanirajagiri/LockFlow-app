@@ -14,6 +14,8 @@ import type {
   LibraryAssetStatus,
   LibraryEventType,
   LibraryIntakeMethod,
+  LibraryAttachmentRoleDefinition,
+  LibraryAttachmentRoleName,
   LibraryAttachmentTargetType,
   LibraryPickerContext,
   LibraryUsageScope,
@@ -176,9 +178,73 @@ export const ATTACHMENT_TARGET_LABELS: Record<LibraryAttachmentTargetType, strin
   content_scene: 'content scene',
   content_job: 'content studio job',
   campaign: 'campaign',
+  campaign_item: 'campaign item',
   model: 'model',
   environment: 'environment',
 };
+
+// ── Prompt 23: attachment role/slot registry ──────────────────────────────────
+
+/**
+ * The named roles the attach UI can offer. Free-text roles remain allowed
+ * everywhere; this registry only adds structure when a caller opts in:
+ *   * 'single' cardinality — one attachment with the role per target;
+ *   * allowedAssetTypes — an asset of another type cannot fill the role.
+ * Validation is context-aware and server-checked (service layer); the DB's
+ * single-primary partial unique index backs the primary flag.
+ */
+export const LIBRARY_ATTACHMENT_ROLES: Record<LibraryAttachmentRoleName, LibraryAttachmentRoleDefinition> = {
+  'primary-product': {
+    label: 'Primary product',
+    cardinality: 'single',
+    allowedAssetTypes: ['product', 'brand_asset'],
+    description: 'The hero product of the composition — one product-like asset.',
+  },
+  props: {
+    label: 'Props',
+    cardinality: 'multi',
+    allowedAssetTypes: ['prop', 'accessory', 'personal_item', 'product', 'creator_tool', 'other'],
+    description: 'Supporting objects in the shot — several allowed.',
+  },
+  reference: {
+    label: 'Reference',
+    cardinality: 'multi',
+    allowedAssetTypes: null,
+    description: 'General visual reference — several allowed.',
+  },
+  'look-reference': {
+    label: 'Look reference',
+    cardinality: 'single',
+    allowedAssetTypes: ['look'],
+    description: 'The styling/look this composition follows — one look.',
+  },
+  'brand-asset': {
+    label: 'Brand asset',
+    cardinality: 'multi',
+    allowedAssetTypes: ['brand_asset'],
+    description: 'Logos, packshots and other approved brand material.',
+  },
+  supporting: {
+    label: 'Supporting asset',
+    cardinality: 'multi',
+    allowedAssetTypes: null,
+    description: 'Anything else that supports the composition.',
+  },
+};
+
+/** Resolves a stored/typed role to its registry definition (free text → null). */
+export function libraryRoleDefinition(roleOrSlot: string | null | undefined): LibraryAttachmentRoleDefinition | null {
+  const normalized = normalizeRoleOrSlot(roleOrSlot);
+  return (LIBRARY_ATTACHMENT_ROLES as Record<string, LibraryAttachmentRoleDefinition>)[normalized] ?? null;
+}
+
+/** Ordered (label, name) pairs for role selects in attach UIs. */
+export function libraryRoleOptions(): Array<{ name: LibraryAttachmentRoleName; label: string }> {
+  return (Object.keys(LIBRARY_ATTACHMENT_ROLES) as LibraryAttachmentRoleName[]).map((name) => ({
+    name,
+    label: LIBRARY_ATTACHMENT_ROLES[name].label,
+  }));
+}
 
 /**
  * Role/slot normalization: lowercase kebab, ≤ 60 chars, default 'reference'.
@@ -205,6 +271,23 @@ export function attachmentRoleProblems(roleOrSlot: string | null | undefined): s
     problems.push('Role/slot must be 60 characters or fewer.');
   }
   return problems;
+}
+
+/**
+ * Context-aware role fit: does this asset's TYPE satisfy the role's allowed
+ * asset types? Registry roles only — free-text roles fit anything.
+ */
+export function libraryRoleCompatibilityProblems(
+  roleOrSlot: string | null | undefined,
+  assetType: LibraryAssetType,
+): string[] {
+  const def = libraryRoleDefinition(roleOrSlot);
+  if (!def || !def.allowedAssetTypes) return [];
+  if (def.allowedAssetTypes.includes(assetType)) return [];
+  return [
+    `Asset type "${assetType.replaceAll('_', ' ')}" cannot fill the “${def.label}” role` +
+      ` (allowed: ${def.allowedAssetTypes.map((t) => t.replaceAll('_', ' ')).join(', ')}).`,
+  ];
 }
 
 /**

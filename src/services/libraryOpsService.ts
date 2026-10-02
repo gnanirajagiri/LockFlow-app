@@ -21,6 +21,8 @@ import {
   attachmentRoleProblems,
   isInWorkspaceStrict,
   libraryAttachmentWarnings,
+  libraryRoleCompatibilityProblems,
+  libraryRoleDefinition,
   normalizeRoleOrSlot,
   normalizeTagName,
   parseLibraryAssetDescription,
@@ -67,7 +69,10 @@ export interface LibraryOpsBridges {
     getJobRequest?(jobRequestId: string, workspaceId: string): Promise<unknown>;
   };
   environments?: { getEnvironment(environmentId: string, workspaceId: string): Promise<unknown> };
-  campaigns?: { getCampaign(campaignId: string, workspaceId: string): Promise<unknown> };
+  campaigns?: {
+    getCampaign(campaignId: string, workspaceId: string): Promise<unknown>;
+    getCampaignItem?(itemId: string, workspaceId: string): Promise<unknown>;
+  };
 }
 
 export class LibraryOpsService {
@@ -428,7 +433,7 @@ export class LibraryOpsService {
     targetType: LibraryAttachmentTargetType,
     targetId: string,
     roleOrSlot: string | undefined,
-    opts: { allowArchived?: boolean; isPrimary?: boolean } = {},
+    opts: { allowArchived?: boolean; isPrimary?: boolean; excludeAttachmentId?: string } = {},
   ): Promise<{ ok: boolean; problems: string[]; warnings: string[] }> {
     assertWorkspace(workspaceId);
     const problems: string[] = [];
@@ -468,14 +473,30 @@ export class LibraryOpsService {
         const primaries = await this.repo.listAttachments(workspaceId, {
           targetType, targetId, roleOrSlot: slot, isPrimary: true,
         });
-        if (primaries.some((p) => p.libraryAssetId !== assetId)) {
+        if (primaries.some((p) => p.libraryAssetId !== assetId && p.id !== opts.excludeAttachmentId)) {
           problems.push('A primary attachment already exists for this slot.');
+        }
+      }
+      // Prompt 23: context-aware role semantics. Registry roles with 'single'
+      // cardinality allow ONE attachment per target regardless of the
+      // primary flag; allowedAssetTypes constrain which asset types fit.
+      const roleDef = libraryRoleDefinition(roleOrSlot);
+      if (roleDef) {
+        problems.push(...libraryRoleCompatibilityProblems(roleOrSlot, asset.assetType));
+        if (roleDef.cardinality === 'single') {
+          const slot = normalizeRoleOrSlot(roleOrSlot);
+          const existing = await this.repo.listAttachments(workspaceId, {
+            targetType, targetId, roleOrSlot: slot,
+          });
+          if (existing.some((r) => r.libraryAssetId !== assetId && r.id !== opts.excludeAttachmentId)) {
+            problems.push(`Only one “${roleDef.label}” attachment is allowed per ${ATTACHMENT_TARGET_LABELS[targetType]}.`);
+          }
         }
       }
       const duplicates = await this.repo.listAttachments(workspaceId, {
         libraryAssetId: assetId, targetType, targetId, roleOrSlot: normalizeRoleOrSlot(roleOrSlot),
       });
-      if (duplicates.length > 0) {
+      if (duplicates.some((d) => d.id !== opts.excludeAttachmentId)) {
         problems.push('This asset is already attached to this slot on the target.');
       }
     }
@@ -544,6 +565,83 @@ export class LibraryOpsService {
     await this.audit(workspaceId, record.libraryAssetId, actorId, 'library_asset_detached',
       `Asset “${asset?.name ?? record.libraryAssetId}” detached from a ${ATTACHMENT_TARGET_LABELS[record.targetType]}.`,
       { targetType: record.targetType, targetId: record.targetId, roleOrSlot: record.roleOrSlot });
+  }
+
+  /**
+   * Prompt 23 — safe replace: swaps ONE attachment's asset (and optionally
+   * its role) without ever touching the Library assets themselves. The old
+   * attachment is validated out of the uniqueness checks, the replacement
+   * goes through the same context-aware validation, and BOTH sides of the
+   * swap are audited. If the replacement fails validation nothing changes.
+   */
+  async replaceLibraryAttachment(
+    workspaceId: string,
+    attachmentId: string,
+    replacement: { assetId: string; roleOrSlot?: string; isPrimary?: boolean },
+    actorId: string,
+    opts: { allowArchived?: boolean } = {},
+  ): Promise<LibraryAttachmentRecord> {
+    assertWorkspace(workspaceId);
+    if (!replacement?.assetId) invalid('A replacement asset is required.');
+    const old = await this.repo.getAttachment(workspaceId, attachmentId);
+    const oldAsset = await this.repo.getAsset(old.libraryAssetId).catch(() => null);
+
+    // Validate the replacement with the outgoing attachment excluded from
+    // duplicate/cardinality checks so replacing in place is allowed.
+    const validation = await this.validateAssetAttachment(
+      workspaceId,
+      replacement.assetId,
+      old.targetType,
+      old.targetId,
+      replacement.roleOrSlot ?? old.roleOrSlot,
+      {
+        ...opts,
+        isPrimary: replacement.isPrimary ?? old.isPrimary,
+        excludeAttachmentId: old.id,
+      },
+    );
+    if (!validation.ok) invalid(validation.problems.join(' '));
+
+    await this.repo.deleteAttachment(workspaceId, old.id);
+    const created = await this.repo.insertAttachment(
+      {
+        workspaceId,
+        libraryAssetId: replacement.assetId,
+        targetType: old.targetType,
+        targetId: old.targetId,
+        roleOrSlot: replacement.roleOrSlot ?? old.roleOrSlot,
+        isPrimary: replacement.isPrimary ?? old.isPrimary,
+      },
+      actorId,
+    );
+
+    const newAsset = await this.repo.getAsset(created.libraryAssetId);
+    await this.audit(workspaceId, old.libraryAssetId, actorId, 'library_asset_detached',
+      `Asset “${oldAsset?.name ?? old.libraryAssetId}” replaced by “${newAsset.name}” on a ${ATTACHMENT_TARGET_LABELS[old.targetType]} (${created.roleOrSlot}).`,
+      { targetType: old.targetType, targetId: old.targetId, roleOrSlot: created.roleOrSlot, replacedBy: created.libraryAssetId });
+    await this.audit(workspaceId, created.libraryAssetId, actorId, 'library_asset_attached',
+      `Asset “${newAsset.name}” attached to a ${ATTACHMENT_TARGET_LABELS[old.targetType]}, replacing “${oldAsset?.name ?? old.libraryAssetId}”.`,
+      { targetType: old.targetType, targetId: old.targetId, roleOrSlot: created.roleOrSlot, isPrimary: created.isPrimary, replacedAttachmentId: old.id });
+    return created;
+  }
+
+  /**
+   * Prompt 23 — attached-asset summary: every attachment on a target with
+   * its hydrated Library asset record (name/type/status for the panel UI).
+   */
+  async listTargetAttachmentDetails(
+    workspaceId: string,
+    targetType: LibraryAttachmentTargetType,
+    targetId: string,
+  ): Promise<Array<{ attachment: LibraryAttachmentRecord; asset: LibraryAssetRecord }>> {
+    assertWorkspace(workspaceId);
+    const records = await this.repo.listAttachments(workspaceId, { targetType, targetId });
+    const details: Array<{ attachment: LibraryAttachmentRecord; asset: LibraryAssetRecord }> = [];
+    for (const record of records) {
+      const asset = await this.repo.getAsset(record.libraryAssetId).catch(() => null);
+      if (asset) details.push({ attachment: record, asset });
+    }
+    return details;
   }
 
   /** Attachment records for an asset (“where is this used?”). */
@@ -633,6 +731,9 @@ export class LibraryOpsService {
     } else if (targetType === 'campaign') {
       if (!this.bridges.campaigns) invalid('Campaign validation is unavailable.');
       await this.bridges.campaigns.getCampaign(targetId, workspaceId).catch(() => refusal());
+    } else if (targetType === 'campaign_item') {
+      if (!this.bridges.campaigns?.getCampaignItem) invalid('Campaign item validation is unavailable.');
+      await this.bridges.campaigns.getCampaignItem(targetId, workspaceId).catch(() => refusal());
     } else if (targetType === 'model') {
       if (!this.bridges.models) invalid('Model validation is unavailable.');
       await this.bridges.models.getModel(targetId, workspaceId).catch(() => refusal());

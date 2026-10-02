@@ -334,13 +334,15 @@ export type LibraryIntakeMethod =
 
 /**
  * Where an attachment points. Polymorphic on purpose — content scenes,
- * studio jobs, campaigns, models and environments each keep owning their
- * own wiring; the Library records the canonical reusable reference.
+ * studio jobs, campaigns, campaign items, models and environments each keep
+ * owning their own wiring; the Library records the canonical reusable
+ * reference.
  */
 export type LibraryAttachmentTargetType =
   | 'content_scene'
   | 'content_job'
   | 'campaign'
+  | 'campaign_item'
   | 'model'
   | 'environment';
 
@@ -370,6 +372,30 @@ export interface LibraryAttachmentFilters {
   targetId?: string;
   roleOrSlot?: string;
   isPrimary?: boolean;
+}
+
+// ── Prompt 23: role/slot semantics for product integrations ─────────────────
+
+/**
+ * Named attachment roles a caller can offer in the attach UI. Free-text
+ * roles stay allowed — the registry only adds structure where callers opt
+ * in, and validation is context-aware (cardinality + asset-type fit).
+ */
+export type LibraryAttachmentRoleName =
+  | 'primary-product'
+  | 'props'
+  | 'reference'
+  | 'look-reference'
+  | 'brand-asset'
+  | 'supporting';
+
+export interface LibraryAttachmentRoleDefinition {
+  label: string;
+  /** 'single' — at most ONE attachment with this role per target. */
+  cardinality: 'single' | 'multi';
+  /** When set, only these asset types may fill the role. */
+  allowedAssetTypes: LibraryAssetType[] | null;
+  description: string;
 }
 
 /** Safe file reference — private-bucket path pair, never a signed URL. */

@@ -82,6 +82,7 @@ export const LIBRARY_ATTACHMENT_TARGET_TYPES: LibraryAttachmentTargetType[] = [
   'content_scene',
   'content_job',
   'campaign',
+  'campaign_item',
   'model',
   'environment',
 ];

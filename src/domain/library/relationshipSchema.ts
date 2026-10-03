@@ -7,15 +7,11 @@
  */
 import {
   RELATIONSHIP_TYPE_ORDER,
-  RELATIONSHIP_VARIANT_LABELS,
-  relationshipContextRelevance,
   type RelationshipContext,
   type RelationshipType,
 } from './relationshipTypes';
 import type {
   LibraryAssetRecord,
-  LibraryAssetType,
-  LibraryUsageScope,
 } from './types';
 
 export interface DefaultRelationshipRecord {
@@ -195,6 +191,31 @@ export interface LibraryDefaultRelationshipInput {
   updatedAt: string;
 }
 
+/** UI-safe bundle member row. The owned asset record is trimmed (privacy). */
+export interface LibraryAssetBundleMemberView {
+  id: string;
+  bundleId: string;
+  libraryAssetId: string;
+  roleOrSlot: string | null;
+  position: number | null;
+}
+
+/** One draft attachment created by applying a default or a bundle (version-
+ *  safety enforcement lives in the engine; the client returns the records the
+ *  host uses to notify the user).
+ */
+export interface LibraryAttachmentRecordView {
+  id: string;
+  workspaceId: string;
+  libraryAssetId: string;
+  targetType: string;
+  targetId: string;
+  roleOrSlot: string;
+  isPrimary: boolean;
+  attachedBy: string | null;
+  createdAt: string;
+}
+
 /**
  * Stability priority for sorting. Lower = appears first in the default
  * roster for a slot. The engine never re-priorities; the UI uses this for
@@ -271,7 +292,7 @@ export function validateCreateDefaultRelationship(
           versionSafety: versionSafety as string,
           conditionsJson: raw.conditionsJson ?? null,
           reason: raw.reason ?? null,
-        },
+        } as CreateDefaultRelationshipInput,
       };
 }
 

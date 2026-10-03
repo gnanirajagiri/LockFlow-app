@@ -36,6 +36,12 @@ import type { LibraryAssetRecord } from '../domain/library';
 export class RelationshipEngine {
   /** id -> default/recommended relationship row. */
   private defaults = new Map<string, DefaultRelationshipRecord>();
+  /** The workspace id this engine instance is scoped to. */
+  private readonly workspaceId: string;
+
+  constructor(workspaceId: string = '') {
+    this.workspaceId = workspaceId;
+  }
 
   /** bundle id -> bundle row. */
   private bundles = new Map<string, LibraryAssetBundleRecord>();
@@ -72,7 +78,7 @@ export class RelationshipEngine {
   static getEngine(workspaceId: string): RelationshipEngine {
     let engine = RelationshipEngine.byWorkspace.get(workspaceId);
     if (!engine) {
-      engine = new RelationshipEngine();
+      engine = new RelationshipEngine(workspaceId);
       RelationshipEngine.byWorkspace.set(workspaceId, engine);
     }
     return engine;
@@ -84,6 +90,7 @@ export class RelationshipEngine {
     this.bundles.clear();
     this.bundleMembers.clear();
     this.suggestions.clear();
+    this.nextId = 1;
     RelationshipEngine.byWorkspace.set(workspaceId, this);
   }
 
@@ -438,12 +445,26 @@ export class RelationshipEngine {
 
   /** ////////////////// HELPERS ///////////////////////////////////////// */
 
-  private ensureWorkspace(_workspaceId: string): void {
-    // Engine is per-workspace; if a different workspace id is used, throw
-    // to guard cross-workspace reads.
-    // Deliberately permissive here: the engine is a pure store; the client
-    // enforces workspace identity. This guard is informational and is
-    // superseded by the client's workspace checks.
+  /** Enforce that a caller only touches its own workspace (RLS-equivalent).
+   *  The engine is a per-workspace singleton: `getEngine(workspaceId)` returns
+   *  the engine instance owned by that workspace, so the owner is determined
+   *  at instance construction and stored implicitly. Cross-workspace reads or
+   *  writes are refused here so that relationship rows cannot leak between
+   *  workspaces at the store level (the client additionally enforces the same
+   *  rule at the UI boundary).
+   */
+  private ensureWorkspace(workspaceId: string): void {
+    // Enforce that a caller only touches its own workspace (RLS-equivalent).
+    // The engine is a per-workspace singleton; each instance is scoped to a
+    // workspaceId at construction time. Cross-workspace reads/writes are
+    // refused here so that relationship rows cannot leak between workspaces
+    // at the store level (the client additionally enforces the rule at the
+    // UI boundary).
+    if (this.workspaceId && this.workspaceId !== workspaceId) {
+      throw new Error(
+        `Cross-workspace access denied (session scoped to ${this.workspaceId}, requested ${workspaceId}).`,
+      );
+    }
   }
 
   private validateInput(input: CreateDefaultRelationshipInput): void {

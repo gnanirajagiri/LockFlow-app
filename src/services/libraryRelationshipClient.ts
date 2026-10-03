@@ -14,6 +14,8 @@ import type {
   LibraryAssetBundleMemberRecord,
   LibraryAssetBundleRecord,
   LibrarySuggestedAssetView,
+  LibraryAssetBundleMemberView,
+  LibraryAttachmentRecordView,
   CreateDefaultRelationshipInput,
   CreateLibraryAssetBundleInput,
   AddBundleMemberInput,
@@ -161,10 +163,7 @@ export class RelationshipClient {
   ): Promise<LibraryAssetBundleMemberView[]> {
     this.enforceWorkspace(workspaceId);
     const members = this.engine.listLibraryAssetBundleMembers(workspaceId, bundleId);
-    return members.map((m) => ({
-      ...m,
-      libraryAsset: undefined,
-    }));
+    return members.map((m) => this.mapBundleMember(m));
   }
 
   async addBundleMember(
@@ -173,7 +172,7 @@ export class RelationshipClient {
     input: AddBundleMemberInput,
   ): Promise<LibraryAssetBundleMemberView> {
     this.enforceWorkspace(workspaceId);
-    return this.engine.addBundleMember(workspaceId, bundleId, input);
+    return this.mapBundleMember(this.engine.addBundleMember(workspaceId, bundleId, input));
   }
 
   async removeBundleMember(
@@ -192,7 +191,7 @@ export class RelationshipClient {
     bundleId: string,
     targetType: string,
     targetId: string,
-  ): Promise<LibraryAttachmentRecord[]> {
+  ): Promise<LibraryAttachmentRecordView[]> {
     this.enforceWorkspace(workspaceId);
     const result = this.engine.applyLibraryAssetBundleToDraftTarget(
       workspaceId,
@@ -258,6 +257,16 @@ export class RelationshipClient {
   }
 
   /** ── Helpers (internal) ─────────────────────────────────────────────── */
+
+  private mapBundleMember(member: LibraryAssetBundleMemberRecord): LibraryAssetBundleMemberView {
+    return {
+      id: member.id,
+      bundleId: member.bundleId,
+      libraryAssetId: member.libraryAssetId,
+      roleOrSlot: member.roleOrSlot ?? null,
+      position: member.position,
+    };
+  }
 
   /** Build UI-safe view rows from engine records (storage-data privacy:
    *  the returned view carries only scalars and ids, never asset objects).

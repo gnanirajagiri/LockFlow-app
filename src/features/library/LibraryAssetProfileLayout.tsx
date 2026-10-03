@@ -18,22 +18,35 @@ import { LibraryService } from '../../services/libraryService';
 import { getLibraryRepository } from '../../data/libraryFactory';
 import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { RIGHTS_LABELS } from './libraryUi';
+import { LibraryDataProvider } from './useLibraryData';
+import { RelationshipEngine } from '../../services/libraryRelationshipEngine';
 import { useLibraryAssetData, type LibraryAssetState } from './useLibraryData';
 import type { LibraryAssetRecord, LibraryAssetVersionRecord } from '../../domain/library';
 
-type TabKey = 'overview' | 'details' | 'references' | 'versions';
+/** Per-workspace deterministic engine instance the relationship feature owns.
+ *  The layout constructs it once; the relationship service reuses it.
+ */
+const relationshipEngine = new RelationshipEngine();
+
+type TabKey = 'overview' | 'details' | 'references' | 'versions' | 'relationships';
 
 const TABS: Array<{ key: TabKey; label: string; to: string }> = [
   { key: 'overview', label: 'Overview', to: '' },
   { key: 'details', label: 'Details', to: 'details' },
   { key: 'references', label: 'References', to: 'references' },
   { key: 'versions', label: 'Versions', to: 'versions' },
+  { key: 'relationships', label: 'Relationships', to: 'relationships' },
 ];
+
+import { DefaultRelationshipsPanel } from './DefaultRelationshipsPanel';
 
 export interface LibraryOutletContext {
   service: LibraryService;
   data: LibraryAssetState;
   basePath: string;
+  /** The relationship feature binds to this workspace for RLS-equivalent scoping. */
+  workspaceId: string;
+  engine: RelationshipEngine;
 }
 
 export function LibraryAssetProfileLayout() {
@@ -43,6 +56,7 @@ export function LibraryAssetProfileLayout() {
   const service = useMemo(() => new LibraryService(getLibraryRepository()), []);
   const { toast } = useToast();
   const data = useLibraryAssetData(service, assetId, SEED_LIBRARY_WORKSPACE_ID);
+  const workspaceId = useMemo(() => SEED_LIBRARY_WORKSPACE_ID, []);
 
   const [archiveOpen, setArchiveOpen] = useState(false);
   const basePath = `/library/${assetId ?? ''}`;
@@ -183,7 +197,19 @@ export function LibraryAssetProfileLayout() {
         </div>
       </nav>
 
-      <Outlet context={{ service, data, basePath } satisfies LibraryOutletContext} />
+      <LibraryDataProvider
+        engine={relationshipEngine}
+        workspaceId={workspaceId}
+        service={service}
+        data={data}
+        basePath={basePath}
+      >
+        {activeTab === 'relationships' ? (
+        <DefaultRelationshipsPanel />
+      ) : null}
+
+      <Outlet context={{ service, data, basePath, workspaceId, engine: relationshipEngine }}></Outlet>
+      </LibraryDataProvider>
 
       <Modal
         open={archiveOpen}

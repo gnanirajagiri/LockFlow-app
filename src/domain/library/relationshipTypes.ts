@@ -50,6 +50,13 @@ export const TYPE_CONTEXT_HINT: Record<RelationshipType, RelationshipContext> = 
 };
 
 /** Human-readable label for a relationship type. Used verbatim by the UI. */
+export const RELATIONSHIP_TYPES: RelationshipType[] = [
+  'recommended',
+  'default',
+  'suggested',
+  'bundle_member',
+];
+
 export const RELATIONSHIP_VARIANT_LABELS: Record<RelationshipType, string> = {
   recommended: 'Recommended default',
   default: 'Default',
@@ -83,7 +90,6 @@ export const RELATIONSHIP_TYPE_ORDER: Record<RelationshipType, number> = {
 export function relationshipContextLabel(
   context: RelationshipContext,
   sourceEntityId?: string,
-  sourceEntityName?: string,
 ): string {
   if (!sourceEntityId) return 'this target';
   if (context === 'model_version') return `model v${sourceEntityId}`;

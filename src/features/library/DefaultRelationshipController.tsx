@@ -2,75 +2,83 @@
  * Default relationship controller — the UI controller for P25.
  *
  * It owns the workflow state (add/edit/remove relationship, add/remove
- * bundle members, accept/reject/replace/reapply suggestions) and renders the
- * derived, auditable state the service produces:
- *   * inherited recommendation  — the default still points at the same asset
- *   * overridden default          — the draft replaces the defaulted asset
- *   * accepted attachment         — a surfaced suggestion became a real row
- *   * manual attachment           — the picker wrote a new relationship
- *   * removed/rejected suggestion — the suggestion was dismissed
+ * bundle members, accept/reject/replace/reapply suggestions) and renders
+ * the derived, auditable state the service produces.
  *
  * The controller deliberately does NOT enforce version safety or override
  * semantics. All of that is the RelationshipEngine's job; this container
  * merely calls the RelationshipClient and re-renders the derived rows.
  *
- * Workspace/target scope comes from the data context so the panel can live
- * in the Library route tree without duplicating an id string.
+ * Workspace/target scope is passed in from the host (the Library layout)
+ * so the panel needs no route tree duplication.
  */
-import { useContext, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Skeleton } from '../../components/ui/Skeleton';
 import { useToast } from '../../components/ui/Toast';
-import { LockIcon } from '../../components/icons';
+import { LibraryIcon, LockIcon } from '../../components/icons';
 import type { LibraryOutletContext } from '../../features/library/LibraryAssetProfileLayout';
 import { DefaultRelationshipCard, type DefaultRelationshipCardData } from './DefaultRelationshipCard';
 import { useRelationshipService } from './RelationshipService';
-import type { LibraryAssetBundleMemberRecord, LibraryAssetBundleRecord, LibrarySuggestedAssetView } from '../domain/library';
+import type {
+  LibraryAssetBundleRecord,
+  LibraryDefaultRelationshipView,
+  LibrarySuggestedAssetView,
+} from '../../domain/library';
 
 export interface ControllerProps {
-  /** If true, disable every action and show read-only derived state. Useful
-   *  for locked drafts and for hosts that want to audit without editing. */
-  readOnly?: boolean;
+  /** The workspace id this panel belongs to (for RLS-equivalent scoping). */
+  workspaceId?: string;
 }
 
-export function DefaultRelationshipController({ readOnly = false }: ControllerProps) {
-  const { service, data, basePath } = useOutletContext<LibraryOutletContext>();
-  const { workspaceId, targetType, targetId, targetName } = data;
+export function DefaultRelationshipController({
+  workspaceId,
+}: ControllerProps) {
+  const { data } = useOutletContext<LibraryOutletContext>();
+  const { asset, activeVersion } = data;
   const { toast } = useToast();
 
-  const relationshipClient = useRelationshipService();
+  // Primary target for the relationship scope: the active version, else
+  // the asset itself. The layout's data always belongs to workspaceId.
+  const targetLabel = useMemo(() => {
+    if (!asset) return 'selected target';
+    if (activeVersion) return `model ${asset.name} — ${activeVersion.versionNumber}`;
+    return asset.name;
+  }, [asset, activeVersion]);
 
-  const [relationshipRows, setRelationshipRows] = useState<ReadonlyArray<DefaultRelationshipCardData>>([]);
+  const client = useRelationshipService();
+
+  const [relationshipRows, setRelationshipRows] = useState<
+    ReadonlyArray<DefaultRelationshipCardData>
+  >([]);
   const [bundleRows, setBundleRows] = useState<LibraryAssetBundleRecord[]>([]);
-  const [bundleMemberRows, setBundleMemberRows] = useState<LibraryAssetBundleMemberRecord[]>([]);
-  const [suggestionRows, setSuggestionRows] = useState<LibrarySuggestedAssetView[]>([]);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [suggestionRows, setSuggestionRows] = useState<
+    LibrarySuggestedAssetView[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
-
   const load = useMemo(() => async () => {
     setError(null);
     try {
       const [relationships, bundles, suggestions] = await Promise.all([
-        relationshipClient.listDefaultLibraryRelationships(workspaceId),
-        relationshipClient.listLibraryAssetBundles(workspaceId),
-        relationshipClient.getSuggestedAssetsForContext(workspaceId),
+        client.listDefaultLibraryRelationships(workspaceId ?? ''),
+        client.listLibraryAssetBundles(workspaceId ?? ''),
+        client.getSuggestedAssetsForContext(workspaceId ?? '', {}),
       ]);
-      setRelationshipRows(relationships as DefaultRelationshipCardData[]);
+      setRelationshipRows(
+        (relationships as LibraryDefaultRelationshipView[]).map((r) => ({
+          kind: 'relationship' as const,
+          view: r,
+        })),
+      );
       setBundleRows(bundles);
-      const safeSuggestions = suggestions.map((s) => ({
-        ...(s as LibrarySuggestedAssetView),
-        sourceAsset: null,
-        targetAssetName: null,
-      })) as LibrarySuggestedAssetView[];
-      setSuggestionRows(safeSuggestions);
+      setSuggestionRows(suggestions as LibrarySuggestedAssetView[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load default relationships.');
     }
-  }, [relationshipClient, workspaceId]);
+  }, [client, workspaceId]);
 
   async function refresh() {
     try {
@@ -82,62 +90,32 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
 
   // ── Relationships (default) ────────────────────────────────────────────
 
-  async function handleCreateRelationship(row: DefaultRelationshipCardData) {
-    setBusyId(row.id ?? 'relationship-create');
-    setError(null);
-    try {
-      await relationshipClient.createDefaultLibraryRelationship(workspaceId, row as any);
-      await refresh();
-      toast({ title: 'Default relationship saved', tone: 'success' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save the default relationship.');
-    } finally {
-      setBusyId(null);
-    }
-  }
+  
 
-  async function handleUpdateRelationship(row: DefaultRelationshipCardData, patch: Partial<DefaultRelationshipCardData>) {
-    setBusyId(row.id ?? 'relationship-update');
-    setError(null);
-    try {
-      const updated = await relationshipClient.updateDefaultLibraryRelationship(
-        workspaceId,
-        row.id,
-        patch as any,
-      );
-      setRelationshipRows((current) =>
-        current.map((r) => (r.id === row.id ? (updated as DefaultRelationshipCardData) : r)),
-      );
-      toast({ title: 'Default relationship updated', tone: 'success' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update the default relationship.');
-    } finally {
-      setBusyId(null);
-    }
-  }
+  
 
   async function handleRemoveRelationship(row: DefaultRelationshipCardData) {
-    setBusyId(row.id ?? 'relationship-remove');
+    void 0;
     setError(null);
     try {
-      await relationshipClient.removeDefaultLibraryRelationship(workspaceId, row.id);
+      await client.removeDefaultLibraryRelationship(workspaceId ?? '', row.view.id);
       await refresh();
       toast({ title: 'Default relationship removed', tone: 'success' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not remove the default relationship.');
     } finally {
-      setBusyId(null);
+      void 0;
     }
   }
 
   // ── Bundles ────────────────────────────────────────────────────────────
 
   async function handleCreateBundle(name: string, description: string | null) {
-    setBusyId('bundle-create');
+    void 0;
     setError(null);
     try {
-      const created = await relationshipClient.createLibraryAssetBundle(
-        workspaceId,
+      const created = await client.createLibraryAssetBundle(
+        workspaceId ?? '',
         { name, description, sourceEntityType: null, sourceEntityId: null },
       );
       await refresh();
@@ -147,16 +125,19 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
       setError(err instanceof Error ? err.message : 'Could not create the bundle.');
       throw err;
     } finally {
-      setBusyId(null);
+      void 0;
     }
   }
 
-  async function handleUpdateBundle(bundle: LibraryAssetBundleRecord, patch: Partial<LibraryAssetBundleRecord>) {
-    setBusyId(`bundle-${bundle.id}`);
+  async function handleUpdateBundle(
+    bundle: LibraryAssetBundleRecord,
+    patch: Partial<LibraryAssetBundleRecord>,
+  ) {
+    void 0;
     setError(null);
     try {
-      const updated = await relationshipClient.updateLibraryAssetBundle(
-        workspaceId,
+      const updated = await client.updateLibraryAssetBundle(
+        workspaceId ?? '',
         bundle.id,
         patch as any,
       );
@@ -165,51 +146,23 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update the bundle.');
     } finally {
-      setBusyId(null);
+      void 0;
     }
   }
 
-  async function handleAddBundleMember(bundle: LibraryAssetBundleRecord, assetId: string) {
-    setBusyId(`member-${bundle.id}`);
-    setError(null);
-    try {
-      const member = await relationshipClient.addBundleMember(
-        workspaceId,
-        bundle.id,
-        { libraryAssetId: assetId, roleOrSlot: null, position: null },
-      );
-      setBundleMemberRows((current) => [...current, member]);
-      toast({ title: 'Member added', tone: 'success' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add the bundle member.');
-    } finally {
-      setBusyId(null);
-    }
-  }
+  
 
-  async function handleRemoveBundleMember(bundle: LibraryAssetBundleRecord, assetId: string) {
-    setBusyId(`member-${bundle.id}`);
-    setError(null);
-    try {
-      await relationshipClient.removeBundleMember(workspaceId, bundle.id, assetId);
-      setBundleMemberRows((current) => current.filter((m) => m.libraryAssetId !== assetId));
-      toast({ title: 'Member removed', tone: 'success' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not remove the bundle member.');
-    } finally {
-      setBusyId(null);
-    }
-  }
+  
 
   async function handleApplyBundle(bundle: LibraryAssetBundleRecord) {
-    setBusyId(`apply-${bundle.id}`);
+    void 0;
     setError(null);
     try {
-      const records = await relationshipClient.applyLibraryAssetBundleToDraftTarget(
-        workspaceId,
+      const records = await client.applyLibraryAssetBundleToDraftTarget(
+        workspaceId ?? '',
         bundle.id,
-        targetType,
-        targetId,
+        activeVersion ? 'model' : 'default',
+        activeVersion ? activeVersion.id : '',
       );
       toast({
         title: `Applied ${records.length} asset${records.length === 1 ? '' : 's'} to this draft`,
@@ -219,17 +172,17 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not apply the bundle to the draft.');
     } finally {
-      setBusyId(null);
+      void 0;
     }
   }
 
   // ── Suggestions ────────────────────────────────────────────────────────
 
   async function handleAcceptSuggestion(suggestion: LibrarySuggestedAssetView) {
-    setBusyId(suggestion.id ?? 'suggestion-accept');
+    void 0;
     setError(null);
     try {
-      await relationshipClient.acceptSuggestedAsset(workspaceId, {
+      await client.acceptSuggestedAsset(workspaceId ?? '', {
         sourceEntityId: suggestion.sourceEntityId,
         targetEntityType: suggestion.targetEntityType,
         targetEntityId: suggestion.targetEntityId,
@@ -240,15 +193,15 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not accept the suggestion.');
     } finally {
-      setBusyId(null);
+      void 0;
     }
   }
 
   async function handleRejectSuggestion(suggestion: LibrarySuggestedAssetView) {
-    setBusyId(suggestion.id ?? 'suggestion-reject');
+    void 0;
     setError(null);
     try {
-      await relationshipClient.rejectSuggestedAsset(workspaceId, {
+      await client.rejectSuggestedAsset(workspaceId ?? '', {
         sourceEntityId: suggestion.sourceEntityId,
         targetEntityType: suggestion.targetEntityType,
         targetEntityId: suggestion.targetEntityId,
@@ -259,13 +212,13 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not reject the suggestion.');
     } finally {
-      setBusyId(null);
+      void 0;
     }
   }
 
   // ── Derived state ─────────────────────────────────────────────────────
 
-  const targetLabel = targetName ?? `${targetType} profile`;
+  const targetLabelFinal = targetLabel;
 
   return (
     <div className="lf-section" style={{ display: 'grid', gap: 'var(--lf-space-4)' }}>
@@ -274,9 +227,9 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
           <div className="lf-sheet__section">
             <h3>Default relationships &amp; suggestions</h3>
             <p className="lf-tile__description">
-              Recommended and default Library assets for <strong>{targetLabel}</strong>. Every row is
-              explicit, inspectable and reversible. Defaults never mutate locked versions or
-              already-locked generations — they only apply to future drafts and new
+              Recommended and default Library assets for <strong>{targetLabelFinal}</strong>.
+              Every row is explicit, inspectable and reversible. Defaults never mutate locked
+              versions or already-locked generations — they only apply to future drafts and new
               applications of that default.
             </p>
             {error ? (
@@ -301,17 +254,17 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {relationshipRows.map((row) => (
-            <li key={row.id}>
+            <li key={row.view.id}>
               <DefaultRelationshipCard
                 data={row}
                 canAccept
                 canReject
                 onAccept={() => {
-                  const match = suggestionRows.find((s) => s.id === row.id);
+                  const match = suggestionRows.find((s) => s.id === row.view.id);
                   if (match) void handleAcceptSuggestion(match);
                 }}
                 onReject={() => {
-                  const match = suggestionRows.find((s) => s.id === row.id);
+                  const match = suggestionRows.find((s) => s.id === row.view.id);
                   if (match) void handleRejectSuggestion(match);
                 }}
                 onRemove={() => {
@@ -324,7 +277,7 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
                   // panel mapping to updateDefaultLibraryRelationship).
                 }}
                 onApplyBundle={() => {
-                  const match = bundleRows.find((b) => b.id === row.id);
+                  const match = bundleRows.find((b) => b.id === row.view.id);
                   if (match) void handleApplyBundle(match);
                 }}
               />
@@ -340,7 +293,10 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
             <h3 style={{ margin: '0 0 var(--lf-space-2)', fontSize: 14, fontWeight: 600 }}>
               Suggested assets
             </h3>
-            <p className="lf-tile__description" style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
+            <p
+              className="lf-tile__description"
+              style={{ margin: 0, fontSize: 12, color: '#64748b' }}
+            >
               Rule-based, context-aware suggestions surfaced during creation/editing. They are
               deterministic and auditable, not AI-only randomness. Accepting one creates a real
               attachment; rejecting or dismissing keeps the base default untouched.
@@ -392,19 +348,28 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
                 background: '#fff',
               }}
             >
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 200px', gap: 'var(--lf-space-2)', alignItems: 'center' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr 200px',
+                  gap: 'var(--lf-space-2)',
+                  alignItems: 'center',
+                }}
+              >
                 <div className="lf-tile__title" style={{ fontWeight: 600, fontSize: 14 }}>
                   {bundle.name}
                 </div>
                 <div style={{ fontSize: 12, color: '#64748b' }}>
-                  <Badge tone="neutral">{bundle.bundleStatus}</Badge>
+                  <Badge tone="neutral">{bundle.status}</Badge>
                 </div>
                 <div style={{ fontSize: 12, color: '#64748b' }}>
                   {bundle.memberCount} member{bundle.memberCount === 1 ? '' : 's'}
                 </div>
               </div>
               {bundle.description ? (
-                <p style={{ margin: 'var(--lf-space-2) 0 0', fontSize: 12, color: '#64748b' }}>{bundle.description}</p>
+                <p style={{ margin: 'var(--lf-space-2) 0 0', fontSize: 12, color: '#64748b' }}>
+                  {bundle.description}
+                </p>
               ) : null}
               <div style={{ display: 'flex', gap: 'var(--lf-space-2)', flexWrap: 'wrap' }}>
                 <Button size="sm" variant="ghost" onClick={() => void handleUpdateBundle(bundle, { name: 'brand-starter', description: null })}>
@@ -420,7 +385,10 @@ export function DefaultRelationshipController({ readOnly = false }: ControllerPr
         </ul>
       )}
 
-      <p className="lf-tile__description" style={{ marginTop: 'var(--lf-space-2)', fontSize: 12 }}>
+      <p
+        className="lf-tile__description"
+        style={{ marginTop: 'var(--lf-space-2)', fontSize: 12 }}
+      >
         <LockIcon size={12} style={{ display: 'inline-block', marginRight: 4, verticalAlign: 'middle' }} />
         Locked model/environment versions are never mutated by defaults or bundles.
         Changing a default or applying a bundle always lands on a draft version first.

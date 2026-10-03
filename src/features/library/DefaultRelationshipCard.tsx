@@ -20,9 +20,9 @@
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { LockIcon } from '../../components/icons';
-import type { LibraryDefaultRelationshipView } from '../../services/libraryRelationshipClient';
-import type { LibrarySuggestedAssetView } from '../../services/libraryRelationshipClient';
+
+import type { LibraryDefaultRelationshipView } from '../../domain/library';
+import type { LibrarySuggestedAssetView } from '../../domain/library';
 import type { LibraryAssetRecord } from '../../domain/library';
 
 export type DefaultRelationshipCardData =
@@ -93,6 +93,10 @@ function overrideLabel(status: string): string {
   return 'Inherited recommendation — unchanged default';
 }
 
+function isDefaultRelationshipView(rv: LibraryDefaultRelationshipView | LibrarySuggestedAssetView): rv is LibraryDefaultRelationshipView {
+  return (rv as LibraryDefaultRelationshipView).context !== undefined;
+}
+
 const WEIGHT = 600;
 const SMALL = 12;
 const BODY = 13;
@@ -108,15 +112,14 @@ export function DefaultRelationshipCard({
   onApplyBundle,
 }: DefaultRelationshipCardProps) {
   const isSuggestion = data.kind === 'suggestion';
-  const { view } = isSuggestion ? data : { ...data, sourceAsset: undefined };
+  const rv = data.view;
+  const isRel = isDefaultRelationshipView(rv);
 
-  const title = isSuggestion
-    ? view.targetAssetName ?? view.targetAssetType ?? 'Suggested asset'
-    : view.targetAssetName ?? view.targetAssetType ?? 'Unresolved asset';
+  const title = isRel
+    ? (rv.sourceAssetName ?? rv.sourceAssetId ?? 'Unresolved asset')
+    : (rv.assetName ?? rv.assetId ?? 'Suggested asset');
 
-  const contextLabel = view.targetEntityType
-    ? `${view.targetEntityType} “${view.targetEntityId}”`
-    : 'this target';
+  const contextLabel = `${rv.targetEntityType} “${rv.targetEntityId}”`;
 
   return (
     <Card style={{ padding: 'var(--lf-space-2) var(--lf-space-3)' }}>
@@ -125,10 +128,10 @@ export function DefaultRelationshipCard({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: 'var(--lf-space-2)', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--lf-space-2)' }}>
               <span style={{ fontSize: SMALL, fontWeight: WEIGHT }}>
-                {variantForRelationshipType(view.relationshipType)}
+                {variantForRelationshipType(rv.relationshipType)}
               </span>
-              <Badge tone={toneForRelationshipType(view.relationshipType)}>
-                {view.relationshipType}
+              <Badge tone={toneForRelationshipType(rv.relationshipType)}>
+                {rv.relationshipType}
               </Badge>
             </div>
 
@@ -140,38 +143,39 @@ export function DefaultRelationshipCard({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 'var(--lf-space-2)', alignItems: 'center' }}>
             <div>
               <div style={{ fontWeight: WEIGHT, fontSize: BODY }}>{title}</div>
-              {view.targetAssetType ? (
-                <div style={{ fontSize: SMALL, color: '#64748b' }}>
-                  {view.targetAssetType} · {view.roleOrSlot}
-                </div>
-              ) : null}
-              {view.roleOrSlot ? (
-                <div style={{ fontSize: SMALL, color: '#64748b' }}>Role/slot · {view.roleOrSlot}</div>
-              ) : null}
-              {view.priority !== null ? (
-                <div style={{ fontSize: SMALL, color: '#64748b' }}>Priority · {view.priority}</div>
-              ) : null}
-              {view.conditionsJson ? (
-                <div style={{ fontSize: SMALL, color: '#64748b' }}>
-                  Conditions · {JSON.stringify(view.conditionsJson)}
-                </div>
+              {isRel ? (
+                <>
+                  {rv.versionSafety ? (
+                    <div style={{ fontSize: SMALL, color: '#64748b' }}>
+                      {rv.versionSafety.replace(/_/g, ' ')}
+                    </div>
+                  ) : null}
+                  {rv.priority !== null ? (
+                    <div style={{ fontSize: SMALL, color: '#64748b' }}>Priority · {rv.priority}</div>
+                  ) : null}
+                  {rv.conditionsJson ? (
+                    <div style={{ fontSize: SMALL, color: '#64748b' }}>
+                      Conditions · {JSON.stringify(rv.conditionsJson)}
+                    </div>
+                  ) : null}
+                </>
               ) : null}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--lf-space-1)' }}>
-              <Badge tone="neutral">{versionSafetyLabel(view.versionSafety)}</Badge>
+              <Badge tone="neutral">{versionSafetyLabel(isRel ? rv.versionSafety : 'future_drafts_and_new_applications')}</Badge>
               {isSuggestion ? (
-                <Badge tone={statusTone(view.status)}>{view.status}</Badge>
+                <Badge tone={statusTone(rv.status)}>{rv.status}</Badge>
               ) : null}
-              {view.appliedOnDraftCount > 0 ? (
-                <Badge tone="info">Affects {view.appliedOnDraftCount} draft{view.appliedOnDraftCount === 1 ? '' : 's'}</Badge>
+              {isRel ? (
+                <Badge tone="info">Affects {rv.appliedOnDraftCount} draft{rv.appliedOnDraftCount === 1 ? '' : 's'}</Badge>
               ) : null}
             </div>
           </div>
 
-          {view.reason ? (
+          {rv.reason ? (
             <p style={{ margin: 0, fontSize: 12, color: '#64748b', lineHeight: 1.4 }}>
-              {view.reason}
+              {rv.reason}
             </p>
           ) : null}
 
@@ -179,7 +183,7 @@ export function DefaultRelationshipCard({
             {isSuggestion ? (
               <>
                 {canAccept ? (
-                  <Button size="sm" variant="success" onClick={onAccept}>
+                  <Button size="sm" variant="primary" onClick={onAccept}>
                     Accept
                   </Button>
                 ) : null}
@@ -213,7 +217,7 @@ export function DefaultRelationshipCard({
 
           {isSuggestion ? (
             <p style={{ margin: 'var(--lf-space-2) 0 0', fontSize: 11, color: '#94a3b8' }}>
-              {overrideLabel(view.status)}
+              {overrideLabel(rv.status)}
             </p>
           ) : null}
         </div>
@@ -221,3 +225,6 @@ export function DefaultRelationshipCard({
     </Card>
   );
 }
+
+
+

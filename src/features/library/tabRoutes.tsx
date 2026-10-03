@@ -6,6 +6,7 @@ import { LibraryAssetOverviewTab } from './LibraryAssetOverviewTab';
 import { LibraryAssetDetailsTab } from './LibraryAssetDetailsTab';
 import { LibraryAssetReferencesTab } from './LibraryAssetReferencesTab';
 import { LibraryAssetVersionsTab } from './LibraryAssetVersionsTab';
+import { DefaultRelationshipsPanel } from './DefaultRelationshipsPanel';
 import type { LibraryOutletContext } from './LibraryAssetProfileLayout';
 
 export function useLibraryOutletContext(): LibraryOutletContext {
@@ -27,4 +28,8 @@ export function LibraryReferencesRoute() {
 export function LibraryVersionsRoute() {
   const { service, data, basePath } = useLibraryOutletContext();
   return <LibraryAssetVersionsTab service={service} versions={data.versions} data={data} basePath={basePath} />;
+}
+
+export function LibraryRelationshipsRoute() {
+  return <DefaultRelationshipsPanel />;
 }

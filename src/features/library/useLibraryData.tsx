@@ -3,7 +3,7 @@
  * useEnvironmentData (promise-based reload so navigation after mutations
  * always sees fresh data).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useContext as useReactContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LibraryService } from '../../services/libraryService';
 import type {
   LibraryAssetRecord,
@@ -109,4 +109,58 @@ export function useSelectedAssetVersion(
       null
     );
   }, [versions, activeVersionId, requested]);
+}
+
+
+/** Context value used by the Library relationship feature. It unifies the
+ *  data-loaded state, the engine instance the feature operates on, and the
+ *  workspace id for the RLS-equivalent scoping boundary.
+ */
+
+export interface LibraryDataContextValue {
+  /** Per-workspace deterministic engine the feature owns. */
+  engine: any;
+  /** Workspace id used for the relationship store scoping. */
+  workspaceId: string;
+  /** Library asset profile data (service + asset + versions). */
+  service: any;
+  data: LibraryAssetState;
+  basePath: string;
+}
+
+/** Provider that supplies the relationship feature context. */
+export const LibraryDataContext = createContext<LibraryDataContextValue | null>(null);
+
+/** Wraps the relationship-enabled part of the Library profile in the
+ *  context provider. The layout wires { engine, workspaceId } here.
+ */
+export function LibraryDataProvider({
+  engine,
+  workspaceId,
+  service,
+  data,
+  basePath,
+  children,
+}: {
+  engine: any;
+  workspaceId: string;
+  service: any;
+  data: LibraryAssetState;
+  basePath: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <LibraryDataContext.Provider value={{ engine, workspaceId, service, data, basePath }}>
+      {children}
+    </LibraryDataContext.Provider>
+  );
+}
+
+/** Reads the relationship feature context. Throws if not inside a provider. */
+export function useLibraryDataContext(): LibraryDataContextValue {
+  const ctx = useReactContext(LibraryDataContext);
+  if (!ctx) {
+    throw new Error('useLibraryDataContext must be used inside a LibraryDataProvider.');
+  }
+  return ctx;
 }

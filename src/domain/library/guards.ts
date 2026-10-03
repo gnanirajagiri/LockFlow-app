@@ -8,7 +8,6 @@
 import { isInWorkspace, isInWorkspaceStrict, nextVersionNumber } from '../models/guards';
 import type {
   LibraryAssetRecord,
-  LibraryAssetType,
   LibraryAssetVersionRecord,
 } from './types';
 
@@ -70,6 +69,4 @@ export function canTransitionAssetVersion(
 }
 
 /** Convenience: is this asset type one of the physical reusable inputs? */
-export function isPhysicalAssetType(assetType: LibraryAssetType): boolean {
-  return ['product', 'prop', 'wardrobe', 'accessory', 'personal_item', 'creator_tool'].includes(assetType);
-}
+

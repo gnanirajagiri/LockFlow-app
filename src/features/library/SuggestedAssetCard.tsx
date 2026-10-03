@@ -14,8 +14,8 @@
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { LockIcon } from '../../components/icons';
-import type { LibrarySuggestedAssetView } from '../../services/libraryRelationshipClient';
+
+import type { LibrarySuggestedAssetView } from '../../domain/library';
 
 export interface SuggestedAssetCardProps {
   suggestion: LibrarySuggestedAssetView;
@@ -71,7 +71,7 @@ export function SuggestedAssetCard({
           </div>
 
           <div style={{ display: 'grid', gap: 'var(--lf-space-1)' }}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{suggestion.targetAssetName ?? suggestion.sourceAsset?.name ?? 'Asset'}</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{suggestion.assetName ?? suggestion.sourceAssetId ?? 'Asset'}</div>
             <div style={{ fontSize: 12, color: '#64748b' }}>
               {suggestion.targetEntityType} “{suggestion.targetEntityId}” · {suggestion.reason}
             </div>
@@ -87,7 +87,7 @@ export function SuggestedAssetCard({
 
           <div style={{ display: 'flex', gap: 'var(--lf-space-2)', flexWrap: 'wrap' }}>
             {canAccept ? (
-              <Button size="sm" variant="success" onClick={onAccept}>
+              <Button size="sm" variant="primary" onClick={onAccept}>
                 Accept
               </Button>
             ) : null}

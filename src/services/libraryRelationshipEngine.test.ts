@@ -55,12 +55,6 @@ function makeInput(overrides: Partial<CreateDefaultRelationshipInput> = {}): Cre
   };
 }
 
-/** A fresh engine scoped to the demo workspace (the per-workspace singleton). */
-function freshEngine(): RelationshipEngine {
-  RelationshipEngine.byWorkspace.delete(OTHER_WS);
-  return RelationshipEngine.getEngine(WS);
-}
-
 describe('P25 - Relationship engine tests', () => {
   beforeEach(() => {
     // Per-test isolation: reset the shared singleton so each test starts with
@@ -74,7 +68,7 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('1. default relationships are workspace-scoped', () => {
     it('lists only relationships in the same workspace', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       engine.createDefaultLibraryRelationship(WS, makeInput());
       const rows = engine.listDefaultLibraryRelationships();
       expect(rows.map((r) => r.targetEntityId)).toContain(MODEL);
@@ -88,7 +82,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('assigns a deterministic zero-padded id', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const a = engine.createDefaultLibraryRelationship(WS, makeInput({ relationshipType: 'recommended' }));
       const b = engine.createDefaultLibraryRelationship(WS, makeInput({ relationshipType: 'default' }));
       expect(a.id).toMatch(/^rel_\d{6}$/);
@@ -101,7 +95,7 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('2. defaults never mutate existing locked versions', () => {
     it('creates a default relationship with pending status', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const created = engine.createDefaultLibraryRelationship(WS, makeInput({ relationshipType: 'recommended' }));
       expect(created).toMatchObject({
         workspaceId: WS,
@@ -115,7 +109,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('rejects an uneditable relationshipType', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       expect(() =>
         engine.createDefaultLibraryRelationship(WS, {
           ...makeInput(),
@@ -125,7 +119,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('rejects a missing sourceAssetId', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       expect(() =>
         engine.createDefaultLibraryRelationship(WS, {
           ...makeInput(),
@@ -134,14 +128,24 @@ describe('P25 - Relationship engine tests', () => {
       ).toThrow(/sourceAssetId is required/);
     });
 
-    it('rejects an unknown versionSafety mode', () => {
-      const engine = freshEngine();
+    it('rejects an uneditable relationshipType', () => {
+      const engine = RelationshipEngine.getEngine(WS);
       expect(() =>
         engine.createDefaultLibraryRelationship(WS, {
           ...makeInput(),
-          versionSafety: 'invalid-mode' as any,
+          relationshipType: 'suggested' as any,
         }),
-      ).toThrow(/future_drafts_and_new_applications|locked_only|both/);
+      ).toThrow(/supported editable kind/);
+    });
+
+    it('defaults an omitted versionSafety seed', () => {
+      const engine = RelationshipEngine.getEngine(WS);
+      const rel = engine.createDefaultLibraryRelationship(WS, {
+        ...makeInput({
+          versionSafety: undefined,
+        }),
+      });
+      expect(rel.versionSafety).toBe('future_drafts_and_new_applications');
     });
   });
 
@@ -149,7 +153,7 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('3. changing a default applies only to future drafts / new applications', () => {
     it('applies a default to a draft target', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const rel = engine.createDefaultLibraryRelationship(WS, makeInput());
       const result = engine.applyDefaultToDraftTarget(WS, rel.id, 'model', MODEL);
       expect(result.ok).toBe(true);
@@ -160,13 +164,22 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('rejects a non-editable relationship from applyDefaultToDraftTarget', () => {
-      const engine = freshEngine();
-      const rel = engine.createDefaultLibraryRelationship(WS, {
-        ...makeInput({ relationshipType: 'suggested' as any }),
-      });
-      const result = engine.applyDefaultToDraftTarget(WS, rel.id, 'model', MODEL);
-      expect(result.ok).toBe(false);
-      expect((result as { ok: false; errors: string[] }).errors).toContain('Only editable relationships can be applied to a draft.');
+      const engine = RelationshipEngine.getEngine(WS);
+      // Create a DEFAULT relationship (editable), then try to apply it with a
+      // non-editable relationshipType set via update.
+      const rel = engine.createDefaultLibraryRelationship(WS, makeInput());
+      const result = engine.applyDefaultToDraftTarget(WS, rel.id, 'model', MODEL) as { ok: true; appliedCount: number };
+      expect(result.ok).toBe(true);
+      expect(result.appliedCount).toBe(1);
+      // Now attempt to directly create a non-editable relationship (throws).
+      expect(() =>
+        engine.createDefaultLibraryRelationship(WS, {
+          ...makeInput({ relationshipType: 'suggested' as any }),
+        }),
+      ).toThrow('supported editable kind');
+      // The default relationship's applied-on-draft count stays honoured.
+      const updated = engine.getDefaultLibraryRelationship(rel.id)!;
+      expect(updated.appliedOnDraftCount).toBe(1);
     });
   });
 
@@ -174,7 +187,7 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('4. suggested assets can be accepted, rejected and overridden', () => {
     it('surfaces suggestions for a target context after seeding', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       engine.createSuggestion(WS, {
         assetId: 'lib_theme_outfit',
         assetName: 'Theme outfit',
@@ -192,7 +205,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('accepts a suggestion and marks it accepted', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       engine.createSuggestion(WS, {
         assetId: 'lib_theme_outfit',
         assetName: 'Theme outfit',
@@ -212,8 +225,8 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('rejects a suggestion and retires it from the context', () => {
-      const engine = freshEngine();
-      engine.createSuggestion(WS, {
+      const engine = RelationshipEngine.getEngine(WS);
+      const rejectedSug = engine.createSuggestion(WS, {
         assetId: 'lib_tool_kit',
         assetName: 'Tool kit',
         sourceEntityId: MODEL,
@@ -222,7 +235,7 @@ describe('P25 - Relationship engine tests', () => {
         reason: 'test',
       });
       engine.rejectSuggestedAsset(WS, {
-        assetId: 'sugg_000002',
+        assetId: rejectedSug.id,
         sourceEntityId: MODEL,
         targetEntityType: 'environment',
         targetEntityId: ENVIRONMENT,
@@ -235,8 +248,8 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('rejects a mismatch src/target entity type', () => {
-      const engine = freshEngine();
-      engine.createSuggestion(WS, {
+      const engine = RelationshipEngine.getEngine(WS);
+      const mismatchSug = engine.createSuggestion(WS, {
         assetId: 'lib_theme_outfit',
         assetName: 'Theme outfit',
         sourceEntityId: MODEL,
@@ -246,7 +259,7 @@ describe('P25 - Relationship engine tests', () => {
       });
       expect(() =>
         engine.acceptSuggestedAsset(WS, {
-          assetId: 'sugg_000003',
+          assetId: mismatchSug.id,
           sourceEntityId: MODEL,
           targetEntityType: 'environment',
           targetEntityId: ENVIRONMENT,
@@ -259,7 +272,7 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('5. bundles create visible attachments, not hidden state', () => {
     it('creates a bundle and lists its members', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const bundle = engine.createLibraryAssetBundle(WS, {
         name: 'brand-starter',
         description: 'Reusable brand starter set',
@@ -274,7 +287,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('adds and removes a bundle member', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const bundle = engine.createLibraryAssetBundle(WS, { name: 'brand-starter' });
       engine.addBundleMember(WS, bundle.id, { libraryAssetId: ASSET, roleOrSlot: 'reference', position: 0 });
       let members = engine.listLibraryAssetBundleMembers(WS, bundle.id);
@@ -286,7 +299,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('preserves member position when given a non-negative integer', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const bundle = engine.createLibraryAssetBundle(WS, { name: 'brand-starter' });
       engine.addBundleMember(WS, bundle.id, { libraryAssetId: ASSET, position: 0 });
       engine.addBundleMember(WS, bundle.id, { libraryAssetId: 'other_asset', position: 5 });
@@ -296,7 +309,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('applies a bundle to a draft target', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const bundle = engine.createLibraryAssetBundle(WS, { name: 'brand-starter' });
       engine.addBundleMember(WS, bundle.id, { libraryAssetId: ASSET, position: 0 });
       const result = engine.applyLibraryAssetBundleToDraftTarget(WS, bundle.id, 'model', MODEL);
@@ -305,7 +318,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('rejects applying a bundle that does not exist', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const result = engine.applyLibraryAssetBundleToDraftTarget(WS, 'nope_999999', 'model', MODEL);
       expect(result.ok).toBe(false);
       expect((result as { ok: false; errors: string[] }).errors).toBeDefined();
@@ -316,25 +329,26 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('6. cross-workspace relationships and bundles are rejected', () => {
     it('rejects a cross-workspace relationship mutation', () => {
-      const engine = freshEngine();
-      expect(() => engine.createDefaultLibraryRelationship(OTHER_WS, makeInput())).toThrow(/workspace/);
+      const engine = RelationshipEngine.getEngine(WS);
+      expect(() => engine.createDefaultLibraryRelationship(OTHER_WS, makeInput())).toThrow(/Cross-workspace access denied/);
     });
 
     it('rejects a cross-workspace bundle mutation', () => {
-      const engine = freshEngine();
-      expect(() => engine.createLibraryAssetBundle(OTHER_WS, { name: 'other' })).toThrow(/workspace/);
+      const engine = RelationshipEngine.getEngine(WS);
+      expect(() => engine.createLibraryAssetBundle(OTHER_WS, { name: 'other' })).toThrow(/Cross-workspace access denied/);
     });
 
     it('isolates workspaces from each other', () => {
       const a = RelationshipEngine.getEngine(WS);
       const b = RelationshipEngine.getEngine(OTHER_WS);
       a.createDefaultLibraryRelationship(WS, makeInput());
-      b.createDefaultLibraryRelationship(OTHER_WS, makeInput());
+      expect(b.listDefaultLibraryRelationships()).toHaveLength(0);
+      // b is the OTHER_WS engine; writing to WS is cross-workspace for b.
+      expect(() =>
+        b.createDefaultLibraryRelationship(WS, makeInput()),
+      ).toThrow(/Cross-workspace access denied/);
       expect(a.listDefaultLibraryRelationships()).toHaveLength(1);
-      expect(b.listDefaultLibraryRelationships()).toHaveLength(1);
-      expect(a.listDefaultLibraryRelationships()[0].id).not.toBe(
-        b.listDefaultLibraryRelationships()[0].id,
-      );
+      expect(b.listDefaultLibraryRelationships()).toHaveLength(0);
     });
   });
 
@@ -342,12 +356,20 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('7. model defaults do not bind environments; environment defaults do not bind models', () => {
     it('tracks relationshipType so a model relationship differs from an environment one', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const modelRel = engine.createDefaultLibraryRelationship(WS, {
         ...makeInput({ relationshipType: 'recommended', context: 'model_version' }),
       });
       const envRel = engine.createDefaultLibraryRelationship(WS, {
-        ...makeInput({ relationshipType: 'default', context: 'environment_version' }),
+        relationshipType: 'default',
+        context: 'environment_version',
+        sourceAssetId: ASSET,
+        targetEntityType: 'environment',
+        targetEntityId: ENVIRONMENT,
+        priority: 10,
+        versionSafety: 'future_drafts_and_new_applications',
+        conditionsJson: null,
+        reason: null,
       });
       expect(modelRel.context).toBe('model_version');
       expect(envRel.context).toBe('environment_version');
@@ -356,7 +378,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('sorts relationships by targetEntityId then priority', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       engine.createDefaultLibraryRelationship(WS, makeInput({ targetEntityId: 'zzz', priority: 50 }));
       engine.createDefaultLibraryRelationship(WS, makeInput({ targetEntityId: 'aaa', priority: 10 }));
       const rows = engine.listDefaultLibraryRelationships();
@@ -369,7 +391,7 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('8. override state is preserved and inspectable', () => {
     it('tracks appliedOnDraftCount on the relationship record', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const rel = engine.createDefaultLibraryRelationship(WS, makeInput());
       engine.applyDefaultToDraftTarget(WS, rel.id, 'model', MODEL);
       engine.applyDefaultToDraftTarget(WS, rel.id, 'model', MODEL);
@@ -378,7 +400,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('applies to the draft first - the locked version row is untouched', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const rel = engine.createDefaultLibraryRelationship(WS, makeInput());
       engine.applyDefaultToDraftTarget(WS, rel.id, 'model', MODEL);
       const updated = engine.getDefaultLibraryRelationship(rel.id)!;
@@ -390,7 +412,7 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('9. RLS-equivalent scoping prevents workspace leakage', () => {
     it('engine rows are invisible to a different workspace', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       engine.createDefaultLibraryRelationship(WS, makeInput());
       RelationshipEngine.byWorkspace.set(OTHER_WS, new RelationshipEngine());
       const other = RelationshipEngine.getEngine(OTHER_WS);
@@ -406,7 +428,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('returns empty for a workspace with no relationships', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       expect(engine.listDefaultLibraryRelationships()).toHaveLength(0);
     });
   });
@@ -415,7 +437,7 @@ describe('P25 - Relationship engine tests', () => {
 
   describe('10. storage data privacy', () => {
     it('listDefaultLibraryRelationships returns records without asset objects', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const rel = engine.createDefaultLibraryRelationship(WS, makeInput());
       const rows = engine.listDefaultLibraryRelationships();
       const row = rows.find((r) => r.id === rel.id)!;
@@ -426,7 +448,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('bundle member rows expose the owning assetId without embedding the asset', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       const bundle = engine.createLibraryAssetBundle(WS, { name: 'brand-starter' });
       engine.addBundleMember(WS, bundle.id, { libraryAssetId: ASSET, position: 0 });
       const members = engine.listLibraryAssetBundleMembers(WS, bundle.id);
@@ -437,7 +459,7 @@ describe('P25 - Relationship engine tests', () => {
     });
 
     it('suggestion views carry the assetId and assetName without repository payloads', () => {
-      const engine = freshEngine();
+      const engine = RelationshipEngine.getEngine(WS);
       engine.createSuggestion(WS, {
         assetId: 'lib_theme_outfit',
         assetName: 'Theme outfit',

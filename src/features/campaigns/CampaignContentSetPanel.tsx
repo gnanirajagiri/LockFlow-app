@@ -17,10 +17,11 @@ import { Button } from '../../components/ui/Button';
 import { Card, CardBody } from '../../components/ui/Card';
 import { useToast } from '../../components/ui/Toast';
 import { LockIcon } from '../../components/icons';
-import { CampaignRunService, InMemoryCampaignRunStore } from '../../generation/campaignRunService';
+import { getRunService } from './campaignRunStore';
 import type { CampaignGenerationRunRecord, CampaignRunJobRecord } from '../../generation/campaignRunService';
 import { describePlanMix } from '../../generation/campaignOrchestration';
-import { SEED_CONTENT_WORKSPACE_ID } from '../../mock/contentSeed';
+import { stampRunOutputs } from './campaignRunStore';
+import { SEED_GALLERY_WORKSPACE_ID } from '../../mock/gallerySeed';
 import type { ContentJobPinRecord } from '../../domain/content';
 
 const RUN_STATUS_LABEL: Record<string, string> = {
@@ -44,13 +45,6 @@ const JOB_STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
-/** Shared store so run state survives remounts (same pattern as generation). */
-let storeInstance: InMemoryCampaignRunStore | null = null;
-function getStore(): InMemoryCampaignRunStore {
-  if (!storeInstance) storeInstance = new InMemoryCampaignRunStore();
-  return storeInstance;
-}
-
 export interface CampaignContentSetPanelProps {
   campaignId: string;
   /** Resolved job pins (model/environment/asset versions) for the baseline. */
@@ -73,123 +67,9 @@ export function CampaignContentSetPanel({
   assetIds,
 }: CampaignContentSetPanelProps) {
   const { toast } = useToast();
-  const service = useMemo(
-    () =>
-      new CampaignRunService(getStore(), {
-        content: {
-          createDraftJobRequest: async (input, createdBy, workspaceId) => ({
-            id: `cjob_${crypto.randomUUID()}`,
-            ...(input as Record<string, never>),
-            createdBy,
-            workspaceId,
-          }),
-        },
-        // In demo mode the child runs are stubbed as instantly-completed
-        // image/video runs; real deployments wire the GenerationService and
-        // VideoGenerationService here (same contracts as prompts 27/28).
-        submitImageRun: async ({ jobId }) => ({
-          run: {
-            id: `run_${crypto.randomUUID()}`,
-            workspaceId: SEED_CONTENT_WORKSPACE_ID,
-            contentJobRequestId: jobId,
-            createdBy: 'demo-user',
-            providerName: 'development-fake',
-            providerRequestId: null,
-            idempotencyKey: `k_${crypto.randomUUID()}`,
-            status: 'completed',
-            requestSnapshot: {},
-            responseSnapshot: null,
-            providerCostMetadata: null,
-            errorCode: null,
-            errorMessage: null,
-            attemptNumber: 1,
-            startedAt: null,
-            completedAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-          eligible: true,
-          blocking: [],
-        }),
-        submitVideoRun: async ({ jobId }) => ({
-          run: {
-            id: `run_${crypto.randomUUID()}`,
-            workspaceId: SEED_CONTENT_WORKSPACE_ID,
-            contentJobRequestId: jobId,
-            createdBy: 'demo-user',
-            providerName: 'development-fake-video',
-            providerRequestId: null,
-            idempotencyKey: `k_${crypto.randomUUID()}`,
-            status: 'completed',
-            requestSnapshot: {},
-            responseSnapshot: null,
-            providerCostMetadata: null,
-            errorCode: null,
-            errorMessage: null,
-            attemptNumber: 1,
-            startedAt: null,
-            completedAt: new Date().toISOString(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-          eligible: true,
-          blocking: [],
-        }),
-        resolveBaseline: async () => {
-          const modelPins = pins.filter((pin) => pin.pinType === 'model_version');
-          const environmentPins = pins.filter((pin) => pin.pinType === 'environment_version');
-          if (modelPins.length === 0 && environmentPins.length === 0 && assetIds.length === 0) {
-            return null;
-          }
-          const details = modelPins[0]?.resolvedDetails as { modelName?: string; versionNumber?: number } | undefined;
-          return {
-            source: { model: null, characterSheet: null, environment: null, assets: [], references: [] },
-            snapshot: {
-              prompt: { userPrompt: '', cleanedPrompt: '' },
-              aspectRatio: '1:1',
-              outputCount: 1,
-              lockedInputs: [
-                ...modelPins.map((pin) => ({
-                  kind: 'model_version' as const,
-                  id: pin.sourceVersionId,
-                  label: `${details?.modelName ?? pin.sourceRecordId} v${details?.versionNumber ?? 1}`,
-                  versionNumber: details?.versionNumber ?? 1,
-                  resolvedVia: 'campaign brief model pin',
-                })),
-                ...environmentPins.map((pin) => ({
-                  kind: 'environment_version' as const,
-                  id: pin.sourceVersionId,
-                  label: pin.sourceRecordId,
-                  versionNumber: (pin.resolvedDetails as { versionNumber?: number }).versionNumber ?? 1,
-                  resolvedVia: 'campaign brief environment pin',
-                })),
-                ...assetIds.map((assetId) => ({
-                  kind: 'library_asset' as const,
-                  id: assetId,
-                  label: assetId,
-                  versionNumber: null,
-                  resolvedVia: 'campaign brief asset pin',
-                })),
-              ],
-              characterSheetConstraints: modelPins.map((pin) => ({
-                modelId: pin.sourceRecordId,
-                modelVersionId: pin.sourceVersionId,
-                characterSheetId: `cs:${pin.sourceVersionId}`,
-                protectedTraitKeys: [],
-                protectedTraitCount: 0,
-              })),
-              referencePlan: [],
-              assembledAt: new Date().toISOString(),
-            },
-            identityTraits: {},
-            modelPinIds: modelPins.map((pin) => pin.sourceRecordId),
-          };
-        },
-      }),
-    // Recreated when the resolved inputs change so the baseline stays honest.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [campaignId, modelId, modelVersionId, environmentId, environmentVersionId, assetIds.join(',')],
-  );
+  // Prompt 30: the run service/store are shared module-level singletons so
+  // the review panel below sees the same runs and their ingested outputs.
+  const service = useMemo(() => getRunService(), []);
 
   const [briefText, setBriefText] = useState('');
   const [images, setImages] = useState(2);
@@ -202,7 +82,7 @@ export function CampaignContentSetPanel({
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    const runs = await service.listRuns(SEED_CONTENT_WORKSPACE_ID);
+    const runs = await service.listRuns(SEED_GALLERY_WORKSPACE_ID);
     const latest = runs.find((candidate) => candidate.campaignId === campaignId) ?? null;
     setRun(latest);
     setJobs(latest ? await (service as unknown as { store: { listJobs(runId: string): Promise<CampaignRunJobRecord[]> } }).store.listJobs(latest.id) : []);
@@ -226,7 +106,7 @@ export function CampaignContentSetPanel({
     if (busy) return;
     setBusy(true);
     try {
-      const created = await service.createCampaignGenerationRun(SEED_CONTENT_WORKSPACE_ID, 'demo-user', {
+      const created = await service.createCampaignGenerationRun(SEED_GALLERY_WORKSPACE_ID, 'demo-user', {
         briefText,
         mediaPlan: { images, videos, stories, storyFrames },
         variations: { allowStyleVariation, notes: allowStyleVariation ? 'Style may vary per child; identity and environment stay locked.' : undefined },
@@ -242,7 +122,10 @@ export function CampaignContentSetPanel({
         await refresh();
         return;
       }
-      const submitted = await service.submitCampaignGenerationRun(created.run.id, SEED_CONTENT_WORKSPACE_ID, 'demo-user');
+      const submitted = await service.submitCampaignGenerationRun(created.run.id, SEED_GALLERY_WORKSPACE_ID, 'demo-user');
+      // Stamp run provenance onto the ingested outputs so the prompt-30
+      // review panel can group them as one coordinated set.
+      await stampRunOutputs(created.run.id, SEED_GALLERY_WORKSPACE_ID);
       if (submitted.blocking.length > 0) {
         toast({
           title: 'Content set partially completed',
@@ -272,7 +155,7 @@ export function CampaignContentSetPanel({
     if (!run || busy) return;
     setBusy(true);
     try {
-      await service.retryFailedRunJobs(SEED_CONTENT_WORKSPACE_ID, run.id, 'demo-user');
+      await service.retryFailedRunJobs(SEED_GALLERY_WORKSPACE_ID, run.id, 'demo-user');
       toast({ title: 'Retry finished', description: 'Failed child jobs were resubmitted under the same run.', tone: 'success' });
       await refresh();
     } catch (error) {

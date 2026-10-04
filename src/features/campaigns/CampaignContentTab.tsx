@@ -23,6 +23,7 @@ import { SEED_GALLERY_WORKSPACE_ID } from '../../mock/gallerySeed';
 import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { LibraryAttachDrawer } from '../library/LibraryAttachDrawer';
 import { CampaignContentSetPanel } from './CampaignContentSetPanel';
+import { CampaignContentSetReviewPanel } from './CampaignContentSetReviewPanel';
 import { LibraryAttachedAssetsPanel } from '../library/LibraryAttachedAssetsPanel';
 import { useLibraryOpsService } from '../library/useLibraryOpsService';
 import type { LibraryAttachmentRecord, LibraryAttachmentRoleName } from '../../domain/library';
@@ -36,6 +37,8 @@ const ITEM_ATTACH_ROLES: LibraryAttachmentRoleName[] = [
 const CAMPAIGN_ATTACH_ROLES: LibraryAttachmentRoleName[] = [
   'reference', 'brand-asset', 'supporting',
 ];
+import { OutputReviewService } from '../../generation/outputReviewService';
+import { getReviewStore } from './campaignRunStore';
 import { ContentStudioService } from '../../services/contentService';
 import { LibraryService } from '../../services/libraryService';
 import { ModelsService } from '../../services/modelsService';
@@ -109,6 +112,8 @@ export function CampaignContentTab() {
   const [variantCaption, setVariantCaption] = useState('');
   const [variantCta, setVariantCta] = useState('');
   const [hasVerifiedConnection, setHasVerifiedConnection] = useState(false);
+  // Prompt 30 — campaign-side visibility of handed-off Gallery outputs.
+  const [handedOffLinks, setHandedOffLinks] = useState<Array<{ id: string; galleryOutputId: string; sourceRunLabel: string | null }>>([]);
 
   const channelKeys = useMemo(() => detail?.channels.map((ch) => ch.channel) ?? [], [detail]);
 
@@ -158,6 +163,26 @@ export function CampaignContentTab() {
         setHasVerifiedConnection(rows.some((c) => c.status === 'connected'));
       } catch {
         setHasVerifiedConnection(false);
+      }
+      // Prompt 30 — handed-off outputs appear as linked approved content with
+      // a reference back to their source generation run.
+      try {
+        const reviewService = new OutputReviewService(
+          getReviewStore(),
+          { addCampaignItem: async () => { throw new Error('not used for listing'); } },
+        );
+        const links = await reviewService.listCampaignLinks(SEED_GALLERY_WORKSPACE_ID, campaign.id);
+        setHandedOffLinks(
+          links.map((link) => ({
+            id: link.id,
+            galleryOutputId: link.galleryOutputId,
+            sourceRunLabel: link.sourceCampaignGenerationRunId
+              ? `run ${link.sourceCampaignGenerationRunId.slice(0, 12)}…`
+              : null,
+          })),
+        );
+      } catch {
+        setHandedOffLinks([]);
       }
     } finally {
       setLoading(false);
@@ -385,6 +410,12 @@ export function CampaignContentTab() {
         />
       ) : null}
 
+      {/* Prompt 30 — review/selection/handoff for the generated set. Shows for
+          archived campaigns too (read-only) so handed-off state stays visible. */}
+      <div style={{ marginTop: 'var(--lf-space-4)' }}>
+        <CampaignContentSetReviewPanel campaignId={campaign.id} readOnly={readOnly} />
+      </div>
+
       <div className="lf-dialogactions" style={{ justifyContent: 'space-between', marginTop: 'var(--lf-space-4)' }}>
         <p className="lf-tile__description" style={{ margin: 0 }}>
           Add approved Gallery outputs and prepare their channel-specific plans.
@@ -577,6 +608,32 @@ export function CampaignContentTab() {
           })}
         </div>
       )}
+
+      {handedOffLinks.length > 0 ? (
+        <Card style={{ marginTop: 'var(--lf-space-4)' }}>
+          <CardBody>
+            <h4 style={{ margin: '0 0 var(--lf-space-2)' }}>Handed-off generated content</h4>
+            <p className="lf-tile__description">
+              These campaign items reference approved Gallery outputs from a generated content set.
+              The outputs stay in Gallery — full traceability back to their generation run.
+            </p>
+            <ul className="lf-sheet__trait-list" style={{ margin: 0 }}>
+              {handedOffLinks.map((link) => (
+                <li key={link.id} className="lf-sheet__trait-row">
+                  <span className="lf-sheet__trait-key">
+                    <Link to={`/gallery/${link.galleryOutputId}`} className="lf-library__rowlink">
+                      {link.galleryOutputId}
+                    </Link>
+                  </span>
+                  <span className="lf-sheet__trait-value">
+                    {link.sourceRunLabel ?? 'generated output'} · linked approved content
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <p className="lf-tile__description" style={{ marginTop: 'var(--lf-space-4)' }}>
         Publishing connections are not configured yet — plans here never post to any platform.

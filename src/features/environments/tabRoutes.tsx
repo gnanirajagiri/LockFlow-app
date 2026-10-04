@@ -8,6 +8,7 @@
 import { Navigate, useOutletContext, useParams } from 'react-router-dom';
 import { EnvironmentOverviewTab } from './EnvironmentOverviewTab';
 import { EnvironmentEditorTab } from './EnvironmentEditorTab';
+import { EnvironmentBuilderTab } from './EnvironmentBuilderTab';
 import { EnvironmentReferencesTab } from './EnvironmentReferencesTab';
 import { EnvironmentVersionsTab } from './EnvironmentVersionsTab';
 import { SEED_ENVIRONMENT_WORKSPACE_ID } from '../../mock/environmentsSeed';
@@ -48,6 +49,11 @@ export function EnvironmentEditRoute() {
       basePath={basePath}
     />
   );
+}
+
+/** /environments/:environmentId/builder */
+export function EnvironmentBuilderRoute() {
+  return <EnvironmentBuilderTab />;
 }
 
 /** /environments/:environmentId/references */

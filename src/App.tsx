@@ -10,6 +10,7 @@ import { ModelsPage } from './pages/ModelsPage';
 import { EnvironmentsPage } from './pages/EnvironmentsPage';
 import { EnvironmentProfileLayout } from './features/environments/EnvironmentProfileLayout';
 import {
+  EnvironmentBuilderRoute,
   EnvironmentEditRoute,
   EnvironmentOverviewRoute,
   EnvironmentReferencesRoute,
@@ -119,6 +120,7 @@ export default function App() {
               <Route path="environments/:environmentId/lock" element={<EnvironmentLockPage />} />
               <Route path="environments/:environmentId" element={<EnvironmentProfileLayout />}>
                 <Route index element={<EnvironmentOverviewRoute />} />
+                <Route path="builder" element={<EnvironmentBuilderRoute />} />
                 <Route path="edit" element={<EnvironmentEditRoute />} />
                 <Route path="references" element={<EnvironmentReferencesRoute />} />
                 <Route path="versions" element={<EnvironmentVersionsRoute />} />

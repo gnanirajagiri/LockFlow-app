@@ -21,10 +21,11 @@ import { SEED_ENVIRONMENT_WORKSPACE_ID } from '../../mock/environmentsSeed';
 import { useEnvironmentData } from './useEnvironmentData';
 import type { EnvironmentRecord, EnvironmentVersionRecord } from '../../domain/environments';
 
-type TabKey = 'overview' | 'edit' | 'references' | 'versions';
+type TabKey = 'overview' | 'builder' | 'edit' | 'references' | 'versions';
 
 const TABS: Array<{ key: TabKey; label: string; to: string }> = [
   { key: 'overview', label: 'Overview', to: '' },
+  { key: 'builder', label: 'Builder', to: 'builder' },
   { key: 'edit', label: 'Environment Specs', to: 'edit' },
   { key: 'references', label: 'References', to: 'references' },
   { key: 'versions', label: 'Versions', to: 'versions' },

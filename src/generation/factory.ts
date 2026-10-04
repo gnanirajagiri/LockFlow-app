@@ -340,5 +340,86 @@ export function createVideoGenerationService(options?: {
     actorId: 'generation-worker',
   };
 
+  // ── Prompt 28 bridges: shared identity enforcement + snapshots + variants ─
+  const videoModelsService = new ModelsService(getModelsRepository());
+  deps.models = {
+    validateGenerationAgainstCharacterSheet: async (modelId, candidateTraits, workspaceId) => {
+      const sheet = await videoModelsService.getActiveCharacterSheet(modelId, workspaceId);
+      if (!sheet) return null;
+      return videoModelsService.validateModelGenerationAgainstCharacterSheet(modelId, candidateTraits, workspaceId);
+    },
+  };
+  const videoEnvironments = new EnvironmentsService(getEnvironmentsRepository());
+  deps.assembleLockedInputSnapshot = async ({ normalizedPrompt, outputCount, modelPins, environmentPins, assetPins }) => {
+    const modelPin = modelPins[0] ?? null;
+    const environmentPin = environmentPins[0] ?? null;
+    if (!modelPin && !environmentPin && assetPins.length === 0) return null;
+
+    let modelSource: Parameters<typeof buildLockedGenerationInputSnapshot>[0]['model'] = null;
+    let sheet = null;
+    let references: Awaited<ReturnType<typeof videoModelsService.getCharacterSheetReferencesForGeneration>> = [];
+    if (modelPin) {
+      const model = await videoModelsService.getModel(modelPin.sourceRecordId, 'ws_demo');
+      const version = await videoModelsService.getVersion(modelPin.sourceVersionId, 'ws_demo');
+      modelSource = { modelId: model.id, modelName: model.name, version: { id: version.id, versionNumber: version.versionNumber, status: version.status } };
+      sheet = await videoModelsService.getActiveCharacterSheet(model.id, 'ws_demo');
+      references = await videoModelsService.getCharacterSheetReferencesForGeneration(model.id, 'ws_demo');
+    }
+
+    let environmentSource: Parameters<typeof buildLockedGenerationInputSnapshot>[0]['environment'] = null;
+    if (environmentPin) {
+      const environment = await videoEnvironments.getEnvironment(environmentPin.sourceRecordId, 'ws_demo');
+      const version = await videoEnvironments.getVersion(environmentPin.sourceVersionId, 'ws_demo');
+      environmentSource = {
+        environmentId: environment.id,
+        environmentName: environment.name,
+        version: { id: version.id, versionNumber: version.versionNumber, status: version.status },
+      };
+    }
+
+    const library = new LibraryService(getLibraryRepository());
+    const assets = await Promise.all(
+      assetPins.map(async (pin) => {
+        const asset = await library.getAsset(pin.sourceRecordId, 'ws_demo').catch(() => null);
+        return {
+          assetId: pin.sourceRecordId,
+          label: asset?.name ?? pin.resolvedDetails?.assetName ?? pin.sourceRecordId,
+          kind: (pin.pinType === 'look' ? 'look' : 'library_asset') as 'look' | 'library_asset',
+        };
+      }),
+    );
+
+    return buildLockedGenerationInputSnapshot({
+      normalizedPrompt,
+      aspectRatio: normalizedPrompt.aspectRatio,
+      outputCount,
+      model: modelSource,
+      characterSheet: sheet,
+      environment: environmentSource,
+      assets,
+      references: getCharacterSheetReferencesForGeneration(references),
+    });
+  };
+  deps.createVariantJob = async ({ sourceJobId, workspaceId, userId, prompt, mediaFlavor }) => {
+    const created = await content.createDraftJobRequest(
+      {
+        workspaceId,
+        name: `${mediaFlavor === 'story' ? 'Story' : 'Video'} variant of job ${sourceJobId}`,
+        requestedOutputType: mediaFlavor === 'story' ? 'story' : 'video',
+        requestedVariants: 1,
+        briefSnapshot: {
+          variantOf: sourceJobId,
+          inheritedPrompt: prompt,
+          capturedAt: new Date().toISOString(),
+        },
+      },
+      userId,
+      workspaceId,
+    );
+    return created.id;
+  };
+  (deps.content as { copyPinsToJob?: unknown }).copyPinsToJob = (sourceJobId: string, targetJobId: string, wsId: string) =>
+    content.copyJobPins(sourceJobId, targetJobId, wsId);
+
   return { service: new VideoGenerationService(repo, deps), repo };
 }

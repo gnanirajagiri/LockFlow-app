@@ -66,6 +66,12 @@ export function VideoGenerationPanel({
   const [runStatus, setRunStatus] = useState<string | null>(null);
   const [outputsReady, setOutputsReady] = useState(0);
   const [blocking, setBlocking] = useState<string[]>([]);
+  // Prompt 28 — media flavor (video vs story), prompt bar, story frame plan.
+  const [mediaFlavor, setMediaFlavor] = useState<'video' | 'story'>(
+    requestedOutputType === 'story' ? 'story' : 'video',
+  );
+  const [promptText, setPromptText] = useState('');
+  const [variantBusy, setVariantBusy] = useState(false);
 
   useEffect(() => {
     void repo.getConfig().then(setConfig).catch(() => undefined);
@@ -132,7 +138,34 @@ export function VideoGenerationPanel({
   const completedInReview = runStatus === 'completed' || jobStatus === 'review' || jobStatus === 'completed';
   const isDraftJob = jobStatus === 'draft' && !isRunning && runStatus !== 'completed';
   const eligibleType = ['video', 'story', 'content_set'].includes(requestedOutputType);
-  const buttonLabel = requestedOutputType === 'story' ? 'Generate story clip' : 'Generate clip';
+  const buttonLabel = mediaFlavor === 'story' ? `Generate story (${outputCount} frames)` : `Generate clip${outputCount > 1 ? ` (${outputCount})` : ''}`;
+
+  /** Prompt 28 — media variant from the completed run (inherits baseline). */
+  async function handleVariant() {
+    if (!jobId || variantBusy) return;
+    setVariantBusy(true);
+    try {
+      const result = await service.createMediaVariantJob(jobId, SEED_CONTENT_WORKSPACE_ID, 'demo-user', {});
+      if (!result.eligible) {
+        toast({ title: 'Variant blocked', description: result.blocking[0], tone: 'error' });
+        return;
+      }
+      toast({
+        title: 'Media variant started',
+        description: 'The variant inherits the original locked inputs and appears in Gallery when ready.',
+        tone: 'success',
+      });
+      onSubmitted();
+    } catch (error) {
+      toast({
+        title: 'Could not create the variant',
+        description: error instanceof Error ? error.message : 'Something went wrong.',
+        tone: 'error',
+      });
+    } finally {
+      setVariantBusy(false);
+    }
+  }
 
   async function handleSubmit(isRetry: boolean) {
     if (!jobId || submitting) return;
@@ -144,10 +177,25 @@ export function VideoGenerationPanel({
         durationSeconds: duration,
         aspectRatio: aspect,
         outputCount,
+        // Prompt 28 — story runs derive an ordered frame plan from the count;
+        // each frame intent is recorded in the locked snapshot and on the
+        // grouped Gallery outputs.
+        ...(mediaFlavor === 'story'
+          ? {
+              mediaFlavor: 'story' as const,
+              storyFrames: Array.from({ length: outputCount }, (_, index) => ({
+                label: `Frame ${index + 1}`,
+                actionDescription: promptText.trim() || 'Follow the brief prompt',
+              })),
+            }
+          : { mediaFlavor: 'video' as const }),
       };
       const result = isRetry
         ? await service.retryVideoGeneration(jobId, SEED_CONTENT_WORKSPACE_ID, 'demo-user')
-        : await service.submitVideoGeneration(jobId, SEED_CONTENT_WORKSPACE_ID, 'demo-user', { selection, prompt: 'LockFlow demo video generation run' });
+        : await service.submitVideoGeneration(jobId, SEED_CONTENT_WORKSPACE_ID, 'demo-user', {
+            selection,
+            prompt: promptText.trim() || 'LockFlow demo video generation run',
+          });
       if (!result.eligible) {
         setBlocking(result.blocking);
         toast({ title: 'Clip is not eligible for generation', description: result.blocking[0], tone: 'error' });
@@ -155,8 +203,15 @@ export function VideoGenerationPanel({
       }
       setBlocking([]);
       toast({
-        title: isRetry ? 'Video retry submitted' : 'Video generation submitted',
-        description: 'Clips will appear in Gallery when ingestion completes.',
+        title: isRetry
+          ? 'Media retry submitted'
+          : mediaFlavor === 'story'
+            ? 'Story generation submitted'
+            : 'Video generation submitted',
+        description:
+          mediaFlavor === 'story'
+            ? 'Ordered story frames will appear grouped in Gallery when ingestion completes.'
+            : 'Clips will appear in Gallery when ingestion completes.',
         tone: 'success',
       });
       await refreshStatus();
@@ -215,6 +270,42 @@ export function VideoGenerationPanel({
 
         {isDraftJob && providerConfigured ? (
           <>
+            {/* Prompt 28 — media-type selection: standalone video vs story sequence. */}
+            <div className="lf-sheet__section" style={{ marginBottom: 'var(--lf-space-3)' }}>
+              <label className="lf-field__label" htmlFor="lf-vid-flavor">Media type</label>
+              <select
+                id="lf-vid-flavor"
+                className="lf-input"
+                value={mediaFlavor}
+                onChange={(event) => setMediaFlavor(event.target.value as 'video' | 'story')}
+              >
+                <option value="video">Video — standalone clip(s)</option>
+                <option value="story">Story — ordered frame sequence (grouped in Gallery)</option>
+              </select>
+              <span className="lf-field__hint">
+                {mediaFlavor === 'story'
+                  ? `Story runs produce ${outputCount} ordered frame${outputCount === 1 ? '' : 's'} under one grouped story set.`
+                  : 'Video runs produce independent clip(s) with scene/beat provenance.'}
+              </span>
+            </div>
+
+            {/* Prompt 28 — prompt bar for media intent. */}
+            <div className="lf-sheet__section" style={{ marginBottom: 'var(--lf-space-3)' }}>
+              <label className="lf-field__label" htmlFor="lf-vid-prompt">Prompt</label>
+              <textarea
+                id="lf-vid-prompt"
+                className="lf-textarea"
+                placeholder="Describe the motion, subject and setting…"
+                value={promptText}
+                onChange={(event) => setPromptText(event.target.value)}
+              />
+              <span className="lf-field__hint">
+                The prompt is kept verbatim and normalized with deterministic, auditable rules; the
+                transformation record is stored with the run. Locked model inputs are enforced against
+                their Character Sheet identity baseline.
+              </span>
+            </div>
+
             <div className="lf-sheet__section">
               <label className="lf-field__label" htmlFor="lf-vid-scene">Scene</label>
               <select
@@ -322,6 +413,15 @@ export function VideoGenerationPanel({
           <div className="lf-dialogactions" style={{ justifyContent: 'flex-start' }}>
             <Button variant="secondary" onClick={() => void handleSubmit(true)} disabled={submitting}>
               {submitting ? 'Retrying…' : 'Retry failed run'}
+            </Button>
+          </div>
+        ) : null}
+
+        {/* Prompt 28 — media variant from a completed run. */}
+        {completedInReview && !isRunning ? (
+          <div className="lf-dialogactions" style={{ justifyContent: 'flex-start' }}>
+            <Button variant="secondary" disabled={variantBusy} onClick={() => void handleVariant()}>
+              {variantBusy ? 'Creating variant…' : 'Generate variant (inherits locked inputs)'}
             </Button>
           </div>
         ) : null}

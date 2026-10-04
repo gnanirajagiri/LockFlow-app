@@ -254,7 +254,7 @@ describe('fake provider + ingestion (spec cases 10, 11, 13)', () => {
     }
     const events = await repo.listAuditEventsForJob(JOB);
     expect(events.map((event) => event.eventType)).toContain('output_created');
-    expect(events.map((event) => event.eventType)).toContain('result_ingested');
+    expect(events.map((event) => event.eventType)).toContain('media_generation_completed');
   });
 
   it('freezes scene/beat snapshots into the run and output metadata', async () => {

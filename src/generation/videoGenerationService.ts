@@ -6,6 +6,8 @@
  * guarded job transitions, private lockflow-gallery-media ingestion, audit
  * events. Server-side only — React components never import providers.
  */
+import { normalizeGenerationPrompt } from './promptNormalization';
+import type { LockedGenerationInputSnapshot, NormalizedPromptRecord } from './types';
 import type {
   VideoGenerationProvider,
   VideoGenerationStatusResult,
@@ -36,6 +38,18 @@ export interface VideoSelection {
   durationSeconds: AllowedDuration;
   aspectRatio: AllowedAspectRatio;
   outputCount: number;
+  /**
+   * Prompt 28 — media flavor of this run: 'video' renders standalone clips;
+   * 'story' produces an ordered, grouped sequence under one parent job.
+   * Defaults to the job's requested output type when omitted.
+   */
+  mediaFlavor?: 'video' | 'story';
+  /**
+   * Prompt 28 — story sequence plan: ordered frame intents for story runs.
+   * Each entry becomes one grouped, ordered Gallery output. Ignored for
+   * plain video runs.
+   */
+  storyFrames?: Array<{ label: string; actionDescription: string }>;
 }
 
 /** Minimal contract of the domain services the video flow depends on. */
@@ -53,6 +67,8 @@ export interface VideoGenerationDependencies {
     listScenes(projectId: string, workspaceId: string): Promise<Array<{ id: string }>>;
     getSceneSnapshot(sceneId: string, workspaceId: string): Promise<SceneSnapshot | null>;
     getBeatSnapshot(beatId: string, workspaceId: string): Promise<BeatSnapshot | null>;
+    /** Prompt 28 — copies source-job pins onto a draft variant job. */
+    copyPinsToJob?(sourceJobId: string, targetJobId: string, workspaceId: string): Promise<unknown>;
   };
   gallery: {
     createGeneratedOutput(input: {
@@ -94,6 +110,44 @@ export interface VideoGenerationDependencies {
   /** Server-side pin resolution — never trusts caller-supplied pin lists. */
   loadPinsForJob(jobId: string): Promise<VideoEligibilityInput['pins']>;
   actorId: string;
+  /**
+   * Prompt 28 — Character Sheet identity validation against the pinned
+   * model's protected traits. Optional; returns null when the model has no
+   * active sheet. Shared with the image service (same prompt-26 hooks).
+   */
+  models?: {
+    validateGenerationAgainstCharacterSheet(
+      modelId: string,
+      candidateTraits: Record<string, unknown>,
+      workspaceId: string,
+    ): Promise<{ valid: boolean; mismatches: string[]; protectedTraitCount: number } | null>;
+  };
+  /**
+   * Prompt 28 — assembles the deterministic locked media-input snapshot
+   * (shared assembler with the image path). Null when a baseline cannot be
+   * resolved.
+   */
+  assembleLockedInputSnapshot?: (input: {
+    jobId: string;
+    workspaceId: string;
+    normalizedPrompt: NormalizedPromptRecord;
+    outputCount: number;
+    modelPins: VideoEligibilityInput['pins'];
+    environmentPins: VideoEligibilityInput['pins'];
+    assetPins: VideoEligibilityInput['pins'];
+  }) => Promise<LockedGenerationInputSnapshot | null>;
+  /**
+   * Prompt 28 — creates a fresh DRAFT content job for a media variant and
+   * copies the source job's pins onto it (variant inherits locked inputs).
+   */
+  createVariantJob?: (input: {
+    sourceJobId: string;
+    workspaceId: string;
+    sourceRunId: string;
+    userId: string;
+    prompt: string;
+    mediaFlavor: 'video' | 'story';
+  }) => Promise<string>;
 }
 
 export class VideoGenerationService {
@@ -114,6 +168,13 @@ export class VideoGenerationService {
       assets?: VideoEligibilityInput['assets'];
       prompt?: string;
       negativePrompt?: string;
+      /**
+       * Prompt 28 — candidate identity traits per model pin (modelId-keyed);
+       * any provided protected trait must agree with the model's sheet.
+       */
+      identityTraits?: Record<string, Record<string, unknown>>;
+      /** Prompt 28 — require an identity baseline for these model pins. */
+      requireIdentityBaseline?: Record<string, boolean>;
     },
   ): Promise<VideoSubmissionResult> {
     const job = await this.deps.content.getJobRequest(jobId, workspaceId);
@@ -190,6 +251,103 @@ export class VideoGenerationService {
       return { run: null, reused: false, eligible: false, blocking: eligibility.blocking };
     }
 
+    // ── Prompt 28: media flavor + Character Sheet identity enforcement ────
+    // Story runs come from story/story-type jobs; video from video-type or
+    // explicit flavor override. Identity gating mirrors the image path:
+    // required baselines block, mismatching protected traits block, and
+    // everything else is recorded (never guessed).
+    const mediaFlavor: 'video' | 'story' =
+      input.selection.mediaFlavor ?? (job.requestedOutputType === 'story' ? 'story' : 'video');
+    const identityChecks: Array<{
+      modelId: string;
+      status: 'passed' | 'failed' | 'skipped';
+      mismatches: string[];
+      protectedTraitCount: number;
+    }> = [];
+    const identityBlocking: string[] = [];
+    for (const pin of pins.filter((candidate) => candidate.pinType === 'model')) {
+      const candidateTraits = input.identityTraits?.[pin.sourceRecordId];
+      if (!this.deps.models || !candidateTraits) {
+        if (input.requireIdentityBaseline?.[pin.sourceRecordId]) {
+          const modelLabel = pin.resolvedDetails?.modelName ?? pin.sourceRecordId;
+          identityChecks.push({
+            modelId: pin.sourceRecordId,
+            status: 'failed',
+            mismatches: ['No candidate identity traits supplied for a protected model.'],
+            protectedTraitCount: 0,
+          });
+          identityBlocking.push(
+            `Model ${modelLabel}: no Character Sheet baseline supplied — protected identity traits are required.`,
+          );
+          continue;
+        }
+        identityChecks.push({ modelId: pin.sourceRecordId, status: 'skipped', mismatches: [], protectedTraitCount: 0 });
+        continue;
+      }
+      const sheetResult = await this.deps.models.validateGenerationAgainstCharacterSheet(
+        pin.sourceRecordId,
+        candidateTraits,
+        workspaceId,
+      );
+      const modelLabel = pin.resolvedDetails?.modelName ?? pin.sourceRecordId;
+      if (!sheetResult) {
+        identityChecks.push({ modelId: pin.sourceRecordId, status: 'failed', mismatches: ['No active Character Sheet for this model.'], protectedTraitCount: 0 });
+        identityBlocking.push(`Model ${modelLabel}: no active Character Sheet to validate identity against.`);
+        continue;
+      }
+      if (
+        input.requireIdentityBaseline?.[pin.sourceRecordId] &&
+        (sheetResult.protectedTraitCount === 0 || !sheetResult.valid)
+      ) {
+        identityChecks.push({
+          modelId: pin.sourceRecordId,
+          status: 'failed',
+          mismatches: sheetResult.valid
+            ? ['The active Character Sheet has no protected identity traits recorded.']
+            : sheetResult.mismatches,
+          protectedTraitCount: sheetResult.protectedTraitCount,
+        });
+        identityBlocking.push(
+          sheetResult.valid
+            ? `Model ${modelLabel}: Character Sheet has no protected identity traits — record the identity baseline before generating.`
+            : `Model ${modelLabel}: identity mismatch — ${sheetResult.mismatches.join('; ')}`,
+        );
+        continue;
+      }
+      if (!sheetResult.valid) {
+        identityChecks.push({ modelId: pin.sourceRecordId, status: 'failed', mismatches: sheetResult.mismatches, protectedTraitCount: sheetResult.protectedTraitCount });
+        identityBlocking.push(`Model ${modelLabel}: identity mismatch — ${sheetResult.mismatches.join('; ')}`);
+        continue;
+      }
+      identityChecks.push({ modelId: pin.sourceRecordId, status: 'passed', mismatches: [], protectedTraitCount: sheetResult.protectedTraitCount });
+    }
+    if (identityBlocking.length > 0) {
+      await this.repo.addAuditEvent({
+        workspaceId,
+        contentJobRequestId: jobId,
+        providerRunId: null,
+        actorId: userId,
+        eventType: 'character_sheet_media_generation_validation_failed',
+        message: 'Media submission blocked: candidate identity disagrees with the model protected Character Sheet traits.',
+        metadata: { checks: identityChecks, blocking: identityBlocking, mediaFlavor },
+      });
+      return { run: null, reused: false, eligible: false, blocking: identityBlocking };
+    }
+    await this.repo.addAuditEvent({
+      workspaceId,
+      contentJobRequestId: jobId,
+      providerRunId: null,
+      actorId: userId,
+      eventType: mediaFlavor === 'story' ? 'story_generation_requested' : 'video_generation_requested',
+      message: mediaFlavor === 'story' ? 'Story generation requested.' : 'Video generation requested.',
+      metadata: {
+        mediaFlavor,
+        identityChecks,
+        validated: true,
+        storyFrameCount: input.selection.storyFrames?.length ?? 0,
+      },
+    });
+
     const adapter = getVideoProvider(config.videoProviderName);
     if (!adapter) {
       throw new Error(`No video provider adapter registered for "${config.videoProviderName}".`);
@@ -224,19 +382,83 @@ export class VideoGenerationService {
       beatSnapshot: beat ?? undefined,
     });
 
+    // ── Prompt 28: deterministic locked media-input snapshot ───────────────
+    // Same assembler the image path uses; extended with the media flavor and
+    // the ordered story plan so the baseline records exactly what governed
+    // the run. Best-effort enrichment — never blocks on its own.
+    const normalized = normalizeGenerationPrompt({
+      userPrompt: input.prompt ?? '',
+      aspectRatio: input.selection.aspectRatio,
+      outputCount: input.selection.storyFrames?.length ?? input.selection.outputCount,
+    });
+    const normalizedRecord: NormalizedPromptRecord = {
+      userPrompt: normalized.userPrompt,
+      cleanedPrompt: normalized.cleanedPrompt,
+      aspectRatio: normalized.aspectRatio,
+      outputCount: normalized.outputCount,
+      extracted: normalized.extracted,
+      warnings: normalized.warnings,
+      rulesApplied: normalized.rulesApplied,
+      normalizedAt: new Date().toISOString(),
+    };
+    let lockedInputSnapshot: LockedGenerationInputSnapshot | null = null;
+    try {
+      lockedInputSnapshot = this.deps.assembleLockedInputSnapshot
+        ? await this.deps.assembleLockedInputSnapshot({
+            jobId,
+            workspaceId,
+            normalizedPrompt: normalizedRecord,
+            outputCount: input.selection.storyFrames?.length ?? input.selection.outputCount,
+            modelPins: pins.filter((candidate) => candidate.pinType === 'model'),
+            environmentPins: pins.filter((candidate) => candidate.pinType === 'environment'),
+            assetPins: pins.filter(
+              (candidate) => candidate.pinType === 'library_asset' || candidate.pinType === 'look',
+            ),
+          })
+        : null;
+    } catch {
+      lockedInputSnapshot = null;
+    }
+    if (lockedInputSnapshot) {
+      await this.repo.addAuditEvent({
+        workspaceId,
+        contentJobRequestId: jobId,
+        providerRunId: null,
+        actorId: userId,
+        eventType: 'locked_media_input_snapshot_created',
+        message: 'Locked media input snapshot assembled.',
+        metadata: {
+          mediaFlavor,
+          lockedInputCount: lockedInputSnapshot.lockedInputs.length,
+          characterSheetConstraints: lockedInputSnapshot.characterSheetConstraints.length,
+          protectedTraitKeys: lockedInputSnapshot.characterSheetConstraints.flatMap(
+            (constraint) => constraint.protectedTraitKeys,
+          ),
+          storyFrames: mediaFlavor === 'story' ? (input.selection.storyFrames ?? []).map((frame) => frame.label) : undefined,
+        },
+      });
+    }
+
     const run = await this.repo.createVideoRun({
       workspaceId,
       contentJobRequestId: jobId,
       createdBy: userId,
       providerName: config.videoProviderName,
       idempotencyKey,
-      requestSnapshot,
+      requestSnapshot: {
+        ...requestSnapshot,
+        mediaFlavor,
+        identityValidation: identityChecks,
+        normalizedPrompt: normalizedRecord,
+        storyFrames: mediaFlavor === 'story' ? input.selection.storyFrames ?? [] : undefined,
+      },
       contentSceneId: input.selection.sceneId,
       contentBeatId: input.selection.beatId,
       sceneSnapshot: scene ? (scene as unknown as Record<string, unknown>) : null,
       beatSnapshot: beat ? (beat as unknown as Record<string, unknown>) : null,
       requestedAspectRatio: input.selection.aspectRatio,
       requestedDurationSeconds: input.selection.durationSeconds,
+      lockedInputSnapshot: lockedInputSnapshot as unknown as Record<string, unknown> | null,
     });
 
     await this.repo.addAuditEvent({
@@ -244,9 +466,9 @@ export class VideoGenerationService {
       contentJobRequestId: jobId,
       providerRunId: run.id,
       actorId: userId,
-      eventType: 'provider_run_created',
-      message: `Video provider run created (attempt ${run.attemptNumber}).`,
-      metadata: { idempotencyKey, provider: config.videoProviderName, seconds: eligibility.secondsRequested },
+      eventType: 'media_generation_submitted',
+      message: `${mediaFlavor === 'story' ? 'Story' : 'Video'} provider run created (attempt ${run.attemptNumber}).`,
+      metadata: { idempotencyKey, provider: config.videoProviderName, seconds: eligibility.secondsRequested, mediaFlavor },
     });
 
     await this.processRun(run.id);
@@ -369,11 +591,22 @@ export class VideoGenerationService {
       const { bytes, contentType } = await this.deps.media.fetchBytes(result.remoteUrlOrBytes);
       const outputIndex = await this.deps.gallery.nextOutputIndex(run.contentJobRequestId);
 
+      // Prompt 28 — story runs keep an explicit ordering plan: every output
+      // of one run shares a group key and carries its sequence position, so
+      // Gallery can render the set as one coherent story.
+      const snapshot = run.requestSnapshot as {
+        mediaFlavor?: 'video' | 'story';
+        storyFrames?: Array<{ label: string; actionDescription: string }>;
+      };
+      const isStory = snapshot.mediaFlavor === 'story';
+      const storyFrames = snapshot.storyFrames ?? [];
+      const frame = isStory ? storyFrames[index] : undefined;
+
       const output = await this.deps.gallery.createGeneratedOutput({
         workspaceId: run.workspaceId,
         contentJobRequestId: run.contentJobRequestId,
-        title: `Generated clip ${run.attemptNumber}.${index + 1}`,
-        outputType: 'video',
+        title: frame ? `Story frame ${index + 1} — ${frame.label}` : `Generated clip ${run.attemptNumber}.${index + 1}`,
+        outputType: isStory ? 'story' : 'video',
         status: 'ready_for_review',
         mediaStoragePath: '',
         width: result.width,
@@ -388,6 +621,14 @@ export class VideoGenerationService {
           provider_name: run.providerName,
           provider_run_id: run.id,
           generation_kind: 'video',
+          media_flavor: isStory ? 'story' : 'video',
+          // Story grouping: one run = one story group; outputs carry their
+          // 1-based sequence position and total, plus the frame intent.
+          story_group_key: isStory ? `story:${run.id}` : undefined,
+          story_sequence: isStory ? index + 1 : undefined,
+          story_sequence_total: isStory ? results.length : undefined,
+          story_frame_label: frame?.label,
+          story_frame_action: frame?.actionDescription,
           attempt_number: run.attemptNumber,
           scene_snapshot: run.sceneSnapshot ?? null,
           beat_snapshot: run.beatSnapshot ?? null,
@@ -463,9 +704,12 @@ export class VideoGenerationService {
       contentJobRequestId: run.contentJobRequestId,
       providerRunId: run.id,
       actorId: this.deps.actorId,
-      eventType: 'result_ingested',
+      eventType: 'media_generation_completed',
       message: `Ingested ${outputs.length} clip(s); job moved to review.`,
-      metadata: { outputs: outputs.length },
+      metadata: {
+        outputs: outputs.length,
+        mediaFlavor: (run.requestSnapshot as { mediaFlavor?: string }).mediaFlavor ?? 'video',
+      },
     });
   }
 
@@ -511,6 +755,89 @@ export class VideoGenerationService {
         metadata: { detail: transitionError instanceof Error ? transitionError.message : String(transitionError) },
       });
     }
+  }
+
+  // ── Prompt 28: media variant generation ─────────────────────────────────
+  // Variants are derived media generations of a completed run: the locked
+  // baseline (pins, snapshot, flavor, story plan) is inherited verbatim
+  // unless the caller overrides, and the parent linkage is audited.
+
+  async createMediaVariantJob(
+    sourceJobId: string,
+    workspaceId: string,
+    userId: string,
+    variantInput: {
+      prompt?: string;
+      durationSeconds?: AllowedDuration;
+      aspectRatio?: AllowedAspectRatio;
+      identityTraits?: Record<string, Record<string, unknown>>;
+    } = {},
+  ): Promise<VideoSubmissionResult> {
+    const sourceRun = await this.repo.latestVideoRunForJob(sourceJobId);
+    if (!sourceRun) {
+      throw new Error('No media generation run exists for the source job.');
+    }
+    if (sourceRun.status !== 'completed') {
+      throw new Error('Media variants can only be created from a completed generation run.');
+    }
+    if (sourceRun.workspaceId !== workspaceId) {
+      throw new Error('You do not have access to this workspace.');
+    }
+
+    const sourceSnapshot = sourceRun.requestSnapshot as {
+      mediaFlavor?: 'video' | 'story';
+      prompt?: string;
+      negativePrompt?: string | null;
+      storyFrames?: Array<{ label: string; actionDescription: string }>;
+    };
+    const mediaFlavor = sourceSnapshot.mediaFlavor ?? 'video';
+
+    await this.repo.addAuditEvent({
+      workspaceId,
+      contentJobRequestId: sourceJobId,
+      providerRunId: sourceRun.id,
+      actorId: userId,
+      eventType: 'media_generation_variant_requested',
+      message: `${mediaFlavor === 'story' ? 'Story' : 'Video'} variant requested from a completed run.`,
+      metadata: {
+        parentRunId: sourceRun.id,
+        mediaFlavor,
+        promptOverride: variantInput.prompt ?? null,
+        durationOverride: variantInput.durationSeconds ?? null,
+        aspectRatioOverride: variantInput.aspectRatio ?? null,
+      },
+    });
+
+    const inheritedPrompt = variantInput.prompt ?? sourceSnapshot.prompt ?? '';
+    let variantJobId = sourceJobId;
+    if (this.deps.createVariantJob) {
+      variantJobId = await this.deps.createVariantJob({
+        sourceJobId,
+        workspaceId,
+        sourceRunId: sourceRun.id,
+        userId,
+        prompt: inheritedPrompt,
+        mediaFlavor,
+      });
+      if (this.deps.content?.copyPinsToJob) {
+        await this.deps.content.copyPinsToJob(sourceJobId, variantJobId, workspaceId);
+      }
+    }
+
+    return this.submitVideoGeneration(variantJobId, workspaceId, userId, {
+      selection: {
+        sceneId: sourceRun.contentSceneId ?? null,
+        beatId: sourceRun.contentBeatId ?? null,
+        durationSeconds: variantInput.durationSeconds ?? (sourceRun.requestedDurationSeconds ?? 4) as AllowedDuration,
+        aspectRatio: variantInput.aspectRatio ?? (sourceRun.requestedAspectRatio ?? '9:16') as AllowedAspectRatio,
+        outputCount: ((sourceRun.requestSnapshot as { outputCount?: number }).outputCount) ?? 1,
+        mediaFlavor,
+        storyFrames: sourceSnapshot.storyFrames,
+      },
+      prompt: inheritedPrompt,
+      negativePrompt: sourceSnapshot.negativePrompt ?? undefined,
+      identityTraits: variantInput.identityTraits,
+    });
   }
 
   // ── Retry (new attempt, same immutable pins + snapshots) ──────────────────

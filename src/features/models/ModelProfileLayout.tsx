@@ -21,10 +21,11 @@ import { SEED_WORKSPACE_ID } from '../../mock/modelsSeed';
 import { useModelData } from './useModelData';
 import type { ModelWithVersion } from '../../domain/models';
 
-type TabKey = 'overview' | 'character-sheet' | 'looks' | 'closet-props' | 'versions' | 'usage-history';
+type TabKey = 'overview' | 'builder' | 'character-sheet' | 'looks' | 'closet-props' | 'versions' | 'usage-history';
 
 const TABS: Array<{ key: TabKey; label: string; to: string }> = [
   { key: 'overview', label: 'Overview', to: '' },
+  { key: 'builder', label: 'Builder', to: 'builder' },
   { key: 'character-sheet', label: 'Character Sheet', to: 'character-sheet' },
   { key: 'looks', label: 'Looks', to: 'looks' },
   { key: 'closet-props', label: 'Closet & Props', to: 'closet-props' },

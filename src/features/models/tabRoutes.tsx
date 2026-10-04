@@ -10,6 +10,7 @@ import { useOutletContext, useParams } from 'react-router-dom';
 import { ModelsService } from '../../services/modelsService';
 import { OverviewTab } from './OverviewTab';
 import { CharacterSheetTab } from './CharacterSheetTab';
+import { BuilderTab } from './BuilderTab';
 import { VersionsTab } from './VersionsTab';
 import { ClosetPropsTab, LooksTab, UsageHistoryTab } from './PlaceholderTabs';
 import type { ModelState } from './useModelData';
@@ -52,6 +53,11 @@ export function ModelCharacterSheetRoute() {
       basePath={basePath}
     />
   );
+}
+
+/** /models/:modelId/builder */
+export function ModelBuilderRoute() {
+  return <BuilderTab />;
 }
 
 /** /models/:modelId/versions */

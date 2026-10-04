@@ -89,6 +89,7 @@ import { HelpPage } from './pages/HelpPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ModelProfileLayout } from './features/models/ModelProfileLayout';
 import {
+  ModelBuilderRoute,
   ModelCharacterSheetRoute,
   ModelClosetPropsRoute,
   ModelLooksRoute,
@@ -125,6 +126,7 @@ export default function App() {
               </Route>
               <Route path="models/:modelId" element={<ModelProfileLayout />}>
                 <Route index element={<ModelOverviewRoute />} />
+                <Route path="builder" element={<ModelBuilderRoute />} />
                 <Route path="character-sheet" element={<ModelCharacterSheetRoute />} />
                 <Route path="versions" element={<ModelVersionsRoute />} />
                 <Route path="looks" element={<ModelLooksRoute />} />

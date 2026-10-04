@@ -14,6 +14,7 @@ import { useToast } from '../../components/ui/Toast';
 import { SEED_CONTENT_WORKSPACE_ID as SEED_WS } from '../../mock/contentSeed';
 import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { ContentIntentBar } from './ContentIntentBar';
+import { SceneGenerationHandoffPanel } from './SceneGenerationHandoffPanel';
 import { useContentProjectOutletContext } from './tabRoutes';
 import { LibraryAttachDrawer } from '../library/LibraryAttachDrawer';
 import { LibraryAttachedAssetsPanel } from '../library/LibraryAttachedAssetsPanel';
@@ -394,9 +395,7 @@ export function StoryboardTab() {
                     + Add beat
                   </Button>
                 </div>
-              ) : null}
-
-              <LibraryAttachedAssetsPanel
+              ) : null}              <LibraryAttachedAssetsPanel
                 service={libraryOps}
                 workspaceId={SEED_LIBRARY_WORKSPACE_ID}
                 targetType="content_scene"
@@ -407,6 +406,15 @@ export function StoryboardTab() {
                 onAttach={() => setAttachScene(scene)}
                 onChanged={() => void refreshSceneAttachments(scene.id)}
                 refreshKey={attachmentEpoch}
+              />
+
+              {/* Prompt 34 — locked generation handoff (version-pinned inputs,
+                  server-side readiness, explicit image/video/story CTA). */}
+              <SceneGenerationHandoffPanel
+                sceneId={scene.id}
+                sceneTitle={scene.title}
+                scenePurpose={scene.purpose}
+                canHandoff={isDraft && !busy}
               />
             </CardBody>
           </Card>

@@ -5,6 +5,11 @@
  * Reuses `slugify` and the shared ValidationResult type.
  */
 import { slugify } from '../models/schemas';
+
+/** JSON-object check for structured prompt-34 fields (motion config). */
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
 import type { ValidationResult } from '../models/schemas';
 import type {
   ContentInputRole,
@@ -288,6 +293,14 @@ export function validateCreateContentBeat(
     errors.push('durationSeconds must be a non-negative number');
   }
 
+  const BEAT_TYPES = ['action', 'camera', 'dialogue', 'product', 'transition'];
+  if (raw.beatType !== undefined) {
+    const beatType = str(raw.beatType);
+    if (!BEAT_TYPES.includes(beatType)) {
+      errors.push(`beatType must be one of: ${BEAT_TYPES.join(', ')}`);
+    }
+  }
+
   return errors.length
     ? { ok: false, errors }
     : {
@@ -299,6 +312,10 @@ export function validateCreateContentBeat(
           ...(raw.dialogueOrOverlay !== undefined ? { dialogueOrOverlay: str(raw.dialogueOrOverlay).slice(0, 2000) } : {}),
           ...(raw.cameraDirection !== undefined ? { cameraDirection: str(raw.cameraDirection).slice(0, 2000) } : {}),
           ...(duration !== undefined ? { durationSeconds: duration as number } : {}),
+          ...(raw.beatType !== undefined ? { beatType: str(raw.beatType) } : {}),
+          ...(raw.motionConfig !== undefined && raw.motionConfig !== null
+            ? (isJsonObject(raw.motionConfig) ? { motionConfig: raw.motionConfig } : {})
+            : {}),
         },
       };
 }
@@ -323,6 +340,19 @@ export function validateUpdateContentBeat(
     if (duration === null) out.durationSeconds = null;
     else if (typeof duration === 'number' && duration >= 0 && Number.isFinite(duration)) out.durationSeconds = duration;
     else errors.push('durationSeconds must be a non-negative number or null');
+  }
+  if (raw.beatType !== undefined) {
+    const beatType = str(raw.beatType);
+    if (['action', 'camera', 'dialogue', 'product', 'transition'].includes(beatType)) {
+      out.beatType = beatType;
+    } else {
+      errors.push('beatType must be one of: action, camera, dialogue, product, transition');
+    }
+  }
+  if (raw.motionConfig !== undefined) {
+    if (raw.motionConfig === null) out.motionConfig = null;
+    else if (isJsonObject(raw.motionConfig)) out.motionConfig = raw.motionConfig;
+    else errors.push('motionConfig must be a JSON object');
   }
   if (Object.keys(out).length === 0) errors.push('at least one field must be provided');
 

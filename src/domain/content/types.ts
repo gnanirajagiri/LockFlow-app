@@ -108,6 +108,10 @@ export interface ContentBeatRecord {
   dialogueOrOverlay: string | null;
   cameraDirection: string | null;
   durationSeconds: number | null;
+  /** Prompt 34 — structured beat kind (action/camera/dialogue/product/transition). */
+  beatType?: string;
+  /** Prompt 34 — structured motion/dolly metadata (JSONB in Postgres). */
+  motionConfig?: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -236,6 +240,10 @@ export interface CreateContentBeatInput {
   dialogueOrOverlay?: string;
   cameraDirection?: string;
   durationSeconds?: number;
+  /** Prompt 34 — structured beat kind. */
+  beatType?: string;
+  /** Prompt 34 — structured motion/dolly metadata. */
+  motionConfig?: Record<string, unknown> | null;
 }
 
 export interface UpdateContentBeatInput {
@@ -244,6 +252,10 @@ export interface UpdateContentBeatInput {
   dialogueOrOverlay?: string | null;
   cameraDirection?: string | null;
   durationSeconds?: number | null;
+  /** Prompt 34 — structured beat kind. */
+  beatType?: string;
+  /** Prompt 34 — structured motion/dolly metadata. */
+  motionConfig?: Record<string, unknown> | null;
 }
 
 export interface CreateContentJobRequestInput {

@@ -84,6 +84,8 @@ function mapBeat(row: Record<string, unknown>): ContentBeatRecord {
     actionDescription: (row.action_description as string | null) ?? null,
     dialogueOrOverlay: (row.dialogue_or_overlay as string | null) ?? null,
     cameraDirection: (row.camera_direction as string | null) ?? null,
+    beatType: (row.beat_type as string | undefined) ?? 'action',
+    motionConfig: (row.motion_config as Record<string, unknown> | null | undefined) ?? null,
     durationSeconds: (row.duration_seconds as number | null) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
@@ -399,6 +401,8 @@ export class SupabaseContentRepository implements ContentRepository {
         action_description: input.actionDescription,
         dialogue_or_overlay: input.dialogueOrOverlay,
         camera_direction: input.cameraDirection,
+        beat_type: input.beatType ?? 'action',
+        motion_config: input.motionConfig ?? null,
         duration_seconds: input.durationSeconds,
       })
       .select('*')
@@ -413,6 +417,8 @@ export class SupabaseContentRepository implements ContentRepository {
     if (patch.actionDescription !== undefined) payload.action_description = patch.actionDescription;
     if (patch.dialogueOrOverlay !== undefined) payload.dialogue_or_overlay = patch.dialogueOrOverlay;
     if (patch.cameraDirection !== undefined) payload.camera_direction = patch.cameraDirection;
+    if (patch.beatType !== undefined) payload.beat_type = patch.beatType;
+    if (patch.motionConfig !== undefined) payload.motion_config = patch.motionConfig;
     if (patch.durationSeconds !== undefined) payload.duration_seconds = patch.durationSeconds;
     const { data, error } = await this.client
       .from('content_beats')

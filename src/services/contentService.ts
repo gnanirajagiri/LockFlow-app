@@ -315,6 +315,8 @@ export class ContentStudioService {
       dialogueOrOverlay: result.value.dialogueOrOverlay ?? null,
       cameraDirection: result.value.cameraDirection ?? null,
       durationSeconds: result.value.durationSeconds ?? null,
+      beatType: result.value.beatType ?? 'action',
+      motionConfig: result.value.motionConfig ?? null,
     });
   }
 

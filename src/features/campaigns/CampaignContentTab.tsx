@@ -22,6 +22,7 @@ import type { CampaignContextValue } from './CampaignLayout';
 import { SEED_GALLERY_WORKSPACE_ID } from '../../mock/gallerySeed';
 import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { LibraryAttachDrawer } from '../library/LibraryAttachDrawer';
+import { CampaignContentSetPanel } from './CampaignContentSetPanel';
 import { LibraryAttachedAssetsPanel } from '../library/LibraryAttachedAssetsPanel';
 import { useLibraryOpsService } from '../library/useLibraryOpsService';
 import type { LibraryAttachmentRecord, LibraryAttachmentRoleName } from '../../domain/library';
@@ -371,7 +372,20 @@ export function CampaignContentTab() {
 
   return (
     <div>
-      <div className="lf-dialogactions" style={{ justifyContent: 'space-between' }}>
+      {/* Prompt 29 — one brief → one coordinated multi-format generation run. */}
+      {!readOnly ? (
+        <CampaignContentSetPanel
+          campaignId={campaign.id}
+          pins={[]}
+          modelId={null}
+          modelVersionId={null}
+          environmentId={null}
+          environmentVersionId={null}
+          assetIds={[]}
+        />
+      ) : null}
+
+      <div className="lf-dialogactions" style={{ justifyContent: 'space-between', marginTop: 'var(--lf-space-4)' }}>
         <p className="lf-tile__description" style={{ margin: 0 }}>
           Add approved Gallery outputs and prepare their channel-specific plans.
         </p>

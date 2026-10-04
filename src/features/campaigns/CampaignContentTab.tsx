@@ -24,6 +24,7 @@ import { SEED_LIBRARY_WORKSPACE_ID } from '../../mock/librarySeed';
 import { LibraryAttachDrawer } from '../library/LibraryAttachDrawer';
 import { CampaignContentSetPanel } from './CampaignContentSetPanel';
 import { CampaignContentSetReviewPanel } from './CampaignContentSetReviewPanel';
+import { CampaignPackagePanel } from './CampaignPackagePanel';
 import { LibraryAttachedAssetsPanel } from '../library/LibraryAttachedAssetsPanel';
 import { useLibraryOpsService } from '../library/useLibraryOpsService';
 import type { LibraryAttachmentRecord, LibraryAttachmentRoleName } from '../../domain/library';
@@ -114,6 +115,8 @@ export function CampaignContentTab() {
   const [hasVerifiedConnection, setHasVerifiedConnection] = useState(false);
   // Prompt 30 — campaign-side visibility of handed-off Gallery outputs.
   const [handedOffLinks, setHandedOffLinks] = useState<Array<{ id: string; galleryOutputId: string; sourceRunLabel: string | null }>>([]);
+  // Prompt 31 — approved outputs offered for channel packaging.
+  const [approvedOutputs, setApprovedOutputs] = useState<Array<{ id: string; title: string; outputType: 'image' | 'video' | 'story' }>>([]);
 
   const channelKeys = useMemo(() => detail?.channels.map((ch) => ch.channel) ?? [], [detail]);
 
@@ -183,6 +186,17 @@ export function CampaignContentTab() {
         );
       } catch {
         setHandedOffLinks([]);
+      }
+      // Prompt 31 — approved outputs are the only packaging sources.
+      try {
+        const rows = await service.listEligibleOutputs(SEED_GALLERY_WORKSPACE_ID);
+        setApprovedOutputs(rows.map(({ output, title }) => ({
+          id: output.id,
+          title,
+          outputType: output.outputType,
+        })));
+      } catch {
+        setApprovedOutputs([]);
       }
     } finally {
       setLoading(false);
@@ -414,6 +428,12 @@ export function CampaignContentTab() {
           archived campaigns too (read-only) so handed-off state stays visible. */}
       <div style={{ marginTop: 'var(--lf-space-4)' }}>
         <CampaignContentSetReviewPanel campaignId={campaign.id} readOnly={readOnly} />
+      </div>
+
+      {/* Prompt 31 — channel packaging over approved outputs (packages are
+          per-channel presentations; the Gallery source is never modified). */}
+      <div style={{ marginTop: 'var(--lf-space-4)' }}>
+        <CampaignPackagePanel campaignId={campaign.id} readOnly={readOnly} approvedOutputs={approvedOutputs} />
       </div>
 
       <div className="lf-dialogactions" style={{ justifyContent: 'space-between', marginTop: 'var(--lf-space-4)' }}>

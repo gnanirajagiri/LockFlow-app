@@ -61,6 +61,15 @@
   font-weight: var(--lf-font-weight-semibold);
   letter-spacing: var(--lf-tracking-tight);
   white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.lf-sidebar__brandsub {
+  font-size: 0.6875rem;
+  font-weight: var(--lf-font-weight-medium);
+  color: var(--lf-color-navy-text-muted);
+  letter-spacing: 0.02em;
 }
 .lf-sidebar__brandname--hidden {
   display: none;

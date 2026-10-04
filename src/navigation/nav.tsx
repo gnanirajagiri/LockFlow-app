@@ -49,6 +49,15 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    id: 'create',
+    label: 'Create · builders',
+    items: [
+      { label: 'Overview', to: '/create', icon: <SparkIcon />, end: true },
+      { label: 'Model Builder', to: '/models', icon: <ModelIcon /> },
+      { label: 'Environment Builder', to: '/environments', icon: <EnvironmentIcon /> },
+    ],
+  },
+  {
     id: 'work',
     label: 'Work',
     items: [

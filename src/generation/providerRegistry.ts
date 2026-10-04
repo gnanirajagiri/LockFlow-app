@@ -5,6 +5,7 @@
  */
 import type { ImageGenerationProvider } from './types';
 import { DevelopmentFakeImageProvider } from './fakeProvider';
+import { OpenAiImageProvider } from './openAiImageProvider';
 import type { VideoGenerationProvider } from './videoTypes';
 import { DevelopmentFakeVideoProvider } from './videoFakeProvider';
 
@@ -14,6 +15,9 @@ const videoAdapters = new Map<string, VideoGenerationProvider>();
 /** The development fakes are always registered; they are only *selected*
  *  when the config names them (dev/tests) — never as production fallbacks. */
 adapters.set('development-fake', new DevelopmentFakeImageProvider());
+// Real AI provider — registered always, only *selected* when the workspace
+// generation config names it (and the user supplied a key in Settings).
+adapters.set('openai', new OpenAiImageProvider());
 videoAdapters.set('development-fake-video', new DevelopmentFakeVideoProvider());
 
 export function registerImageProvider(adapter: ImageGenerationProvider): void {

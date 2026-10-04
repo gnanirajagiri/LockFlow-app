@@ -29,15 +29,15 @@
   --lf-color-ink-faint: #a3abbd;
   --lf-color-ink-inverse: #ffffff;
 
-  /* ── Colour · primary (indigo → violet) ─────────────────────────────── */
-  --lf-color-primary-50: #eef0fe;
-  --lf-color-primary-100: #e0e2fd;
-  --lf-color-primary-200: #c6c8fb;
-  --lf-color-primary-500: #6366f1;
-  --lf-color-primary-600: #5457e5;
-  --lf-color-primary-700: #4648ce;
-  --lf-color-primary-soft: #eef0fe; /* tinted chips, focus washes */
-  --lf-gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  /* ── Colour · primary (Maya violet) ─────────────────────────────────── */
+  --lf-color-primary-50: #efedfe;
+  --lf-color-primary-100: #e2dffd;
+  --lf-color-primary-200: #cbc5fb;
+  --lf-color-primary-500: #6157e8;
+  --lf-color-primary-600: #5245d8;
+  --lf-color-primary-700: #4438c4;
+  --lf-color-primary-soft: #efedfe; /* tinted chips, focus washes */
+  --lf-gradient-primary: linear-gradient(135deg, #6157e8 0%, #8f6cf6 100%);
 
   /* ── Colour · feedback ──────────────────────────────────────────────── */
   --lf-color-success-bg: #e6f4ea;

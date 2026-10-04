@@ -28,15 +28,16 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
   return (
     <aside className={`lf-sidebar${collapsed ? ' lf-sidebar--collapsed' : ''}`} aria-label="Primary">
       <div className="lf-sidebar__top">
-        <a href="/" className="lf-sidebar__brand" aria-label="LockFlow home">
+        <a href="/" className="lf-sidebar__brand" aria-label="Maya AI home">
           <span className="lf-brandmark" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="5" y="10.5" width="14" height="9.5" rx="2.5" />
-              <path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+              <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
+              <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
             </svg>
           </span>
           <span className={`lf-sidebar__brandname${collapsed ? ' lf-sidebar__brandname--hidden' : ''}`}>
-            LockFlow
+            Maya
+            <span className="lf-sidebar__brandsub">AI Content Studio</span>
           </span>
         </a>
       </div>

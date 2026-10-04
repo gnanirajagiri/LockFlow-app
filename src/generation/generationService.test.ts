@@ -430,8 +430,8 @@ describe('provider error mapping', () => {
 // ── Provider boundary (spec cases 1, 15) ────────────────────────────────────
 
 describe('provider boundary', () => {
-  it('registers only the fake provider (no real adapter ships yet)', () => {
-    expect(listImageProviders()).toEqual(['development-fake']);
+  it('registers the fake provider plus the OpenAI adapter', () => {
+    expect([...listImageProviders()].sort()).toEqual(['development-fake', 'openai']);
   });
 
   it('the fake provider is configured and never uses the network', async () => {

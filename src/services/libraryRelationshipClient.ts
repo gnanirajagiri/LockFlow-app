@@ -191,6 +191,7 @@ export class RelationshipClient {
     bundleId: string,
     targetType: string,
     targetId: string,
+    openDraftVersionId?: string,
   ): Promise<LibraryAttachmentRecordView[]> {
     this.enforceWorkspace(workspaceId);
     const result = this.engine.applyLibraryAssetBundleToDraftTarget(
@@ -198,6 +199,7 @@ export class RelationshipClient {
       bundleId,
       targetType,
       targetId,
+      openDraftVersionId,
     );
     if (!result.ok) {
       throw new Error(result.errors[0] ?? 'Bundle could not be applied.');

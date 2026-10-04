@@ -22,7 +22,7 @@ import { ReferencesMediaService } from '../media/referencesMediaService';
 import { ReferenceUploadDialog } from '../media/ReferenceUploadDialog';
 import { ReferenceMedia, UploadStatusChip } from '../media/ReferenceMedia';
 import { findDraftVersion, type ModelState } from './useModelData';
-import { validateUpdateCharacterSheet } from '../../domain/models';
+import { getProtectedIdentityTraits, validateUpdateCharacterSheet } from '../../domain/models';
 import type {
   CharacterSheetRecord,
   ModelReferenceRecord,
@@ -266,6 +266,10 @@ export function CharacterSheetTab({
   const isLocked = selectedVersion.status === 'locked';
   const isDraft = selectedVersion.status === 'draft';
 
+  /** Prompt 26 — protected identity rows, derived from the same classification
+   *  the generation-time hooks read. Shown for drafts and locked versions. */
+  const protectedRows = useMemo(() => (sheet ? getProtectedIdentityTraits(sheet) : []), [sheet]);
+
   function updateField(key: keyof SheetFormState, value: string) {
     setForm((current) => (current ? { ...current, [key]: value } : current));
   }
@@ -328,6 +332,26 @@ export function CharacterSheetTab({
         <Card>
           <CardBody>
             <div className="lf-sheet__form">
+              {protectedRows.length > 0 ? (
+                <div className="lf-sheet__section">
+                  <h4>Protected identity traits</h4>
+                  <p className="lf-field__hint">
+                    Physical and facial traits that define this identity. They survive styling,
+                    clothing, props and environment changes —{' '}
+                    {isDraft
+                      ? 'edits here become part of the next locked identity version.'
+                      : 'immutable in a locked version; create a draft to change them.'}
+                  </p>
+                  <ul className="lf-sheet__trait-list">
+                    {protectedRows.map((row) => (
+                      <li key={row.id} className="lf-sheet__trait-row is-protected">
+                        <span className="lf-sheet__trait-key">{row.traitKey}</span>
+                        <span className="lf-sheet__trait-value">{row.traitValue}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               {isDraft ? (
                 <>
                   <SheetInput

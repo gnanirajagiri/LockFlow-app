@@ -163,6 +163,7 @@ export function DefaultRelationshipController({
         bundle.id,
         activeVersion ? 'model' : 'default',
         activeVersion ? activeVersion.id : '',
+        activeVersion?.id,
       );
       toast({
         title: `Applied ${records.length} asset${records.length === 1 ? '' : 's'} to this draft`,

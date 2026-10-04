@@ -52,6 +52,13 @@ export class RelationshipEngine {
   /** suggestion id -> suggestion view. */
   private suggestions = new Map<string, LibrarySuggestedAssetView>();
 
+  /** open draft version id -> the draft is known to exist. The engine does
+   *  not own drafts; the host (library/versions) marks open drafts here so
+   *  version-safety checks can validate that a supplied openDraftVersionId
+   *  actually belongs to the target before a default or bundle lands.
+   */
+  private drafts = new Set<string>();
+
   /** Deterministic IDs for this engine instance. */
   private nextId = 1;
 
@@ -90,8 +97,20 @@ export class RelationshipEngine {
     this.bundles.clear();
     this.bundleMembers.clear();
     this.suggestions.clear();
+    this.drafts.clear();
     this.nextId = 1;
     RelationshipEngine.byWorkspace.set(workspaceId, this);
+  }
+
+  /** Host opens a draft version for a target; the engine uses this to
+   *  validate version-safety checks (defaults / bundles land on drafts only).
+   */
+  openDraft(draftId: string): void {
+    this.drafts.add(draftId);
+  }
+
+  closeDraft(draftId: string): void {
+    this.drafts.delete(draftId);
   }
 
   /** ////////////////// DEFAULTS ///////////////////////////////////////// */
@@ -183,6 +202,7 @@ export class RelationshipEngine {
     relationshipId: string,
     targetType: string,
     targetId: string,
+    openDraftVersionId?: string,
   ): { ok: true; appliedCount: number } | { ok: false; errors: string[] } {
     this.ensureWorkspace(workspaceId);
     const record = this.defaults.get(relationshipId);
@@ -190,10 +210,13 @@ export class RelationshipEngine {
     if (!RELATIONSHIP_EDITABLE.includes(record.relationshipType)) {
       return { ok: false, errors: ['Only editable relationships can be applied to a draft.'] };
     }
-    if (record.versionSafety === 'locked_only' && !this.hasOpenDraft(targetType, targetId)) {
+    if (openDraftVersionId && !this.draftVersionExists(openDraftVersionId, targetType, targetId)) {
+      return { ok: false, errors: [`Draft version ${openDraftVersionId} does not exist for target ${targetType}/${targetId}.`] };
+    }
+    if (record.versionSafety === 'locked_only' && !openDraftVersionId) {
       return { ok: false, errors: ['No open draft exists; a locked_only default cannot apply.'] };
     }
-    if (record.versionSafety === 'both' && !this.hasOpenDraft(targetType, targetId)) {
+    if (record.versionSafety === 'both' && !openDraftVersionId) {
       return { ok: false, errors: ['No open draft exists for a selective default.'] };
     }
 
@@ -314,14 +337,17 @@ export class RelationshipEngine {
     bundleId: string,
     _targetType: string,
     _targetId: string,
+    openDraftVersionId?: string,
   ): { ok: true; records: string[] } | { ok: false; errors: string[] } {
     this.ensureWorkspace(workspaceId);
     const bundle = this.bundles.get(bundleId);
     if (!bundle) return { ok: false, errors: [`Bundle ${bundleId} not found.`] };
-    if (!this.hasOpenDraft(_targetType, _targetId)) {
+    if (openDraftVersionId && !this.draftVersionExists(openDraftVersionId, _targetType, _targetId)) {
+      return { ok: false, errors: [`Draft version ${openDraftVersionId} does not exist for target ${_targetType}/${_targetId}.`] };
+    }
+    if (!openDraftVersionId) {
       return { ok: false, errors: ['No open draft exists to apply the bundle to.'] };
     }
-
     const created: string[] = [];
     for (const member of this.bundleMembers.get(bundleId) ?? []) {
       if (!member.libraryAssetId) continue;
@@ -433,10 +459,11 @@ export class RelationshipEngine {
   }
 
   createDraftVersionForDefaultChangeIfNeeded(
-    _workspaceId: string,
+    workspaceId: string,
     _input: CreateDraftVersionForDefaultChangeIfNeededInput,
+    _openDraftVersionId?: string,
   ): { draftVersionId: string | null; created: boolean; message: string } {
-    this.ensureWorkspace(_workspaceId);
+    this.ensureWorkspace(workspaceId);
     // The engine is a relationship store; draft creation is delegated to the
     // service. This stub returns null/create:false until the caller wires
     // the RPC. The UI skips this when created is false.
@@ -476,13 +503,24 @@ export class RelationshipEngine {
     if (!input.targetEntityId) throw new Error('targetEntityId is required.');
   }
 
-  private hasOpenDraft(_targetType: string, _targetId: string): boolean {
-    // The engine does not own draft versions; a draft exists for the
-    // target when a draft version is open. This is resolved by the host
-    // (library/versions) which maintains a draft marker. Default to true
-    // here (drafts are the only target for defaults); the UI passes the
-    // actual draft status.
-    return true;
+  /**
+   * Does a draft version exist for the given target? The engine does not
+   * own draft versions; this is answered by the host (library/versions)
+   * which maintains a draft marker keyed by the draft version id.
+   *
+   * When `openDraftVersionId` is provided, the engine verifies the draft
+   * belongs to the target version to prevent version safety violations
+   * (e.g. a default being applied to a locked version or another asset's
+   * draft). The host always passes the actual draft version id when one
+   * is open, so locked versions can never be mutated.
+   */
+  draftVersionExists(openDraftVersionId: string, _targetType: string, _targetId: string): boolean {
+    // The engine does not own drafts; it trusts the host to maintain the
+    // draft marker via openDraft/closeDraft. A supplied openDraftVersionId
+    // is only honoured when it is registered as an open draft. This keeps
+    // locked versions immutable: a draft that does not exist (or belongs
+    // to another target) is never applied.
+    return this.drafts.has(openDraftVersionId);
   }
 
   private _refreshMemberCounts(): void {

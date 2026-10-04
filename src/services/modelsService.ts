@@ -6,15 +6,21 @@
  * repository touch, in demo mode or against Supabase alike.
  */
 import {
+  compareCandidateTraitsToProtectedTraits,
+  getCharacterSheetReferencesForGeneration,
+  getProtectedIdentityTraits,
   isInWorkspaceStrict,
   refuseIfLocked,
+  selectActiveIdentityVersion,
   validateCreateModel,
   validateCreateVersion,
+  validateModelGenerationAgainstCharacterSheet,
   validateUpdateCharacterSheet,
   validateUpdateModelDraft,
 } from '../domain/models';
 import type {
   CharacterSheetRecord,
+  CharacterSheetTraitRow,
   ModelAssetShortcutRecord,
   ModelRecord,
   ModelReferenceRecord,
@@ -200,5 +206,84 @@ export class ModelsService {
     const result = validateUpdateCharacterSheet(patch);
     if (!result.ok) throw new Error(`Invalid character sheet update: ${result.errors.join('; ')}`);
     return this.repo.updateCharacterSheet(versionId, result.value);
+  }
+
+  // ── Prompt 26: generation-time Character Sheet hooks ────────────────────
+  // Every hook re-checks workspace ownership before reading; consumers can
+  // never see another workspace's identity data through these paths.
+
+  /**
+   * The Character Sheet of the version that governs the model's current
+   * identity (active locked version, else latest locked, else newest draft).
+   * Null when the model has no version with a sheet.
+   */
+  async getActiveCharacterSheet(
+    modelId: string,
+    activeWorkspaceId: string,
+  ): Promise<CharacterSheetRecord | null> {
+    const model = await this.repo.getModel(modelId);
+    isInWorkspaceStrict(model.workspaceId, activeWorkspaceId);
+    const versions = await this.repo.getVersions(modelId);
+    const version = selectActiveIdentityVersion(model, versions);
+    if (!version) return null;
+    try {
+      return await this.repo.getCharacterSheet(version.id);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Protected identity traits of the active sheet, as explicit rows. */
+  async getProtectedIdentityTraits(
+    modelId: string,
+    activeWorkspaceId: string,
+  ): Promise<CharacterSheetTraitRow[]> {
+    const sheet = await this.getActiveCharacterSheet(modelId, activeWorkspaceId);
+    return sheet ? getProtectedIdentityTraits(sheet) : [];
+  }
+
+  /**
+   * The active identity version's references, ordered for generation
+   * (portrait evidence first).
+   */
+  async getCharacterSheetReferencesForGeneration(
+    modelId: string,
+    activeWorkspaceId: string,
+  ): Promise<ModelReferenceRecord[]> {
+    const model = await this.repo.getModel(modelId);
+    isInWorkspaceStrict(model.workspaceId, activeWorkspaceId);
+    const versions = await this.repo.getVersions(modelId);
+    const version = selectActiveIdentityVersion(model, versions);
+    if (!version) return [];
+    return getCharacterSheetReferencesForGeneration(await this.repo.getReferences(version.id));
+  }
+
+  /**
+   * Validates a candidate generation's claimed identity against the active
+   * sheet's protected traits. Invalid when any provided protected trait
+   * disagrees with the sheet.
+   */
+  async validateModelGenerationAgainstCharacterSheet(
+    modelId: string,
+    candidateTraits: Record<string, unknown>,
+    activeWorkspaceId: string,
+  ): Promise<{ valid: boolean; mismatches: string[]; protectedTraitCount: number }> {
+    const sheet = await this.getActiveCharacterSheet(modelId, activeWorkspaceId);
+    if (!sheet) {
+      return {
+        valid: false,
+        mismatches: ['No active Character Sheet exists for this model.'],
+        protectedTraitCount: 0,
+      };
+    }
+    return validateModelGenerationAgainstCharacterSheet(sheet, candidateTraits);
+  }
+
+  /** Pure comparison seam for callers holding their own protected rows. */
+  compareCandidateTraitsToProtectedTraits(
+    candidateTraits: Record<string, unknown>,
+    protectedTraits: CharacterSheetTraitRow[],
+  ): { matches: boolean; mismatches: string[] } {
+    return compareCandidateTraitsToProtectedTraits(candidateTraits, protectedTraits);
   }
 }

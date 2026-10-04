@@ -312,7 +312,8 @@ describe('P25 - Relationship engine tests', () => {
       const engine = RelationshipEngine.getEngine(WS);
       const bundle = engine.createLibraryAssetBundle(WS, { name: 'brand-starter' });
       engine.addBundleMember(WS, bundle.id, { libraryAssetId: ASSET, position: 0 });
-      const result = engine.applyLibraryAssetBundleToDraftTarget(WS, bundle.id, 'model', MODEL);
+      engine.openDraft('model/model_aisha');
+      const result = engine.applyLibraryAssetBundleToDraftTarget(WS, bundle.id, 'model', MODEL, 'model/model_aisha');
       expect(result.ok).toBe(true);
       expect((result as { ok: true; records: string[] }).records).toContain(ASSET);
     });

@@ -5,6 +5,8 @@
  * applies domain guards, which then calls one of these adapters.
  */
 import type {
+  CharacterSheetAuditEvent,
+  CharacterSheetAuditRow,
   CharacterSheetRecord,
   CreateModelInput,
   CreateVersionInput,
@@ -76,4 +78,15 @@ export interface ModelsRepository {
     versionId: string,
     patch: UpdateCharacterSheetInput,
   ): Promise<CharacterSheetRecord>;
+
+  /** Audit trail for a version's Character Sheet, oldest first. */
+  listCharacterSheetAudit(versionId: string): Promise<CharacterSheetAuditRow[]>;
+
+  /** Appends one audit event to a version's Character Sheet trail. */
+  appendCharacterSheetAudit(
+    versionId: string,
+    event: CharacterSheetAuditEvent,
+    detail: string | null,
+    actorId?: string | null,
+  ): Promise<void>;
 }

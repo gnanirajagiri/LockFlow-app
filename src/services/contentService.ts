@@ -783,6 +783,40 @@ export class ContentStudioService {
     return this.repo.listJobPins(jobRequestId);
   }
 
+  /**
+   * Prompt 27 — copies one job's immutable pins onto another DRAFT job
+   * (variant generations inherit the source's locked input set verbatim).
+   * Both jobs are workspace-checked; the target must still be a draft, so
+   * pins remain immutable under the same rule 5 that governs the original.
+   */
+  async copyJobPins(
+    sourceJobId: string,
+    targetJobId: string,
+    activeWorkspaceId: string,
+  ): Promise<ContentJobPinRecord[]> {
+    const source = await this.getJobRequest(sourceJobId, activeWorkspaceId);
+    const target = await this.getJobRequest(targetJobId, activeWorkspaceId);
+    if (source.workspaceId !== target.workspaceId) {
+      throw new Error('Cross-workspace pin copy denied.');
+    }
+    if (target.status !== 'draft') {
+      throw new Error(`Job pins are immutable while the job is ${target.status}.`);
+    }
+    const sourcePins = await this.repo.listJobPins(sourceJobId);
+    if (sourcePins.length === 0) return [];
+    return this.repo.createJobPins(
+      sourcePins.map((pin) => ({
+        contentJobRequestId: targetJobId,
+        pinType: pin.pinType,
+        sourceRecordId: pin.sourceRecordId,
+        sourceVersionId: pin.sourceVersionId,
+        resolvedDetails: { ...pin.resolvedDetails },
+        role: pin.role,
+        sortOrder: pin.sortOrder,
+      })),
+    );
+  }
+
   // ── Internals ──────────────────────────────────────────────────────────────
 
   private assertProjectWorkspace(project: ContentProjectRecord, activeWorkspaceId: string): void {

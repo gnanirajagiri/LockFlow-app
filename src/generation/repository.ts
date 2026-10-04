@@ -40,6 +40,11 @@ export interface GenerationProviderRunRecord {
   beatSnapshot?: Record<string, unknown> | null;
   requestedAspectRatio?: string | null;
   requestedDurationSeconds?: number | null;
+  // ── Prompt 27: variants + locked input baseline ─────────────────────────
+  /** Parent run for variants; null for original generations. */
+  parentRunId?: string | null;
+  /** The deterministic locked-input baseline this run was assembled under. */
+  lockedInputSnapshot?: Record<string, unknown> | null;
 }
 
 export interface GenerationQuotaUsageRecord {
@@ -109,6 +114,11 @@ export interface CreateProviderRunInput {
   beatSnapshot?: Record<string, unknown> | null;
   requestedAspectRatio?: string | null;
   requestedDurationSeconds?: number | null;
+  // ── Prompt 27: variants + locked input baseline ────────────────────────
+  /** Parent run for variants; null/undefined for original generations. */
+  parentRunId?: string | null;
+  /** The deterministic locked-input baseline this run was assembled under. */
+  lockedInputSnapshot?: Record<string, unknown> | null;
 }
 
 export interface GenerationRepository {
@@ -131,6 +141,7 @@ export interface GenerationRepository {
         | 'errorMessage'
         | 'startedAt'
         | 'completedAt'
+        | 'lockedInputSnapshot'
       >
     >,
   ): Promise<GenerationProviderRunRecord>;

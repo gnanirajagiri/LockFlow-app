@@ -85,6 +85,8 @@ export class MockGenerationRepository implements GenerationRepository {
       beatSnapshot: input.beatSnapshot ?? null,
       requestedAspectRatio: input.requestedAspectRatio ?? null,
       requestedDurationSeconds: input.requestedDurationSeconds ?? null,
+      parentRunId: input.parentRunId ?? null,
+      lockedInputSnapshot: input.lockedInputSnapshot ?? null,
     };
     this.runs.set(record.id, record);
     return structuredClone(record);

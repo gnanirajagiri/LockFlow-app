@@ -472,3 +472,97 @@ describe('private media paths', () => {
     expect(path.startsWith('http')).toBe(false);
   });
 });
+
+// ── Prompt 26: identity validation against protected Character Sheets ────────
+
+describe('prompt 26 — identity validation against Character Sheets', () => {
+  const mismatchingTraits = { 'faceFeatures.eyes': 'round, green' };
+
+  function modelBridge(
+    result: { valid: boolean; mismatches: string[]; protectedTraitCount: number } | null,
+  ): Partial<GenerationDependencies> {
+    return {
+      models: {
+        validateGenerationAgainstCharacterSheet: async () => result,
+      },
+    };
+  }
+
+  it('blocks submission when candidate traits mismatch the pinned model sheet', async () => {
+    const { service, repo } = await enabledService(
+      modelBridge({
+        valid: false,
+        mismatches: ['faceFeatures.eyes: expected "almond, dark brown", candidate "round, green"'],
+        protectedTraitCount: 3,
+      }),
+    );
+    const result = await service.submitImageGeneration(JOB, WS, USER, {
+      ...GOOD_INPUT,
+      identityTraits: { 'model-1': mismatchingTraits },
+    });
+    expect(result.run).toBeNull();
+    expect(result.reused).toBe(false);
+    expect(result.eligible).toBe(false);
+    expect(result.blocking.join(' ')).toMatch(/identity mismatch/i);
+
+    const events = await repo.listAuditEventsForJob(JOB);
+    expect(events.map((event) => event.eventType)).toContain('character_sheet_generation_validation_failed');
+  });
+
+  it('passes matching traits and records the check in the run snapshot', async () => {
+    const { service, repo } = await enabledService(
+      modelBridge({ valid: true, mismatches: [], protectedTraitCount: 3 }),
+    );
+    const result = await service.submitImageGeneration(JOB, WS, USER, {
+      ...GOOD_INPUT,
+      identityTraits: { 'model-1': { 'faceFeatures.eyes': 'almond, dark brown' } },
+    });
+    expect(result.run?.status).toBe('completed');
+    const run = await repo.getRun(result.run!.id);
+    const checks = (
+      run?.requestSnapshot as {
+        identityValidation?: Array<{ status: string; protectedTraitCount: number }>;
+      }
+    ).identityValidation;
+    expect(checks).toHaveLength(1);
+    expect(checks?.[0]?.status).toBe('passed');
+    expect(checks?.[0]?.protectedTraitCount).toBe(3);
+  });
+
+  it('records skipped — never guessed — when no candidate traits are supplied', async () => {
+    const { service, repo } = await enabledService(
+      modelBridge({ valid: true, mismatches: [], protectedTraitCount: 3 }),
+    );
+    const result = await service.submitImageGeneration(JOB, WS, USER, GOOD_INPUT);
+    expect(result.run?.status).toBe('completed');
+    const run = await repo.getRun(result.run!.id);
+    const checks = (
+      run?.requestSnapshot as { identityValidation?: Array<{ status: string }> }
+    ).identityValidation;
+    expect(checks?.[0]?.status).toBe('skipped');
+  });
+
+  it('blocks when the model has no active Character Sheet', async () => {
+    const { service } = await enabledService(modelBridge(null));
+    const result = await service.submitImageGeneration(JOB, WS, USER, {
+      ...GOOD_INPUT,
+      identityTraits: { 'model-1': mismatchingTraits },
+    });
+    expect(result.eligible).toBe(false);
+    expect(result.blocking.join(' ')).toMatch(/no active Character Sheet/i);
+  });
+
+  it('skips identity validation entirely when the models bridge is absent', async () => {
+    const { service, repo } = await enabledService();
+    const result = await service.submitImageGeneration(JOB, WS, USER, {
+      ...GOOD_INPUT,
+      identityTraits: { 'model-1': mismatchingTraits },
+    });
+    expect(result.run?.status).toBe('completed');
+    const run = await repo.getRun(result.run!.id);
+    const checks = (
+      run?.requestSnapshot as { identityValidation?: Array<{ status: string }> }
+    ).identityValidation;
+    expect(checks?.[0]?.status).toBe('skipped');
+  });
+});

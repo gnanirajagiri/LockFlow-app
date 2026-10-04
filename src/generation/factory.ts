@@ -23,6 +23,8 @@ import { getLibraryRepository } from '../data/libraryFactory';
 import { getModelsRepository } from '../data';
 import { getEnvironmentsRepository } from '../data/environmentsFactory';
 import { InMemoryGeneratedMediaStore } from './mediaStore';
+import { buildLockedGenerationInputSnapshot } from './lockedInputSnapshot';
+import { getCharacterSheetReferencesForGeneration } from '../domain/models';
 
 /** Demo-mode defaults for the UI readiness display (fail-closed in prod). */
 export const DEMO_GENERATION_CONFIG = {
@@ -154,6 +156,89 @@ export function createGenerationService(options?: {
     },
     actorId: 'generation-worker',
   };
+
+  // ── Prompt 27 bridges: Character Sheet enforcement + locked snapshots + variants ─
+  const modelsService = new ModelsService(getModelsRepository());
+  deps.models = {
+    validateGenerationAgainstCharacterSheet: async (modelId, candidateTraits, workspaceId) => {
+      const sheet = await modelsService.getActiveCharacterSheet(modelId, workspaceId);
+      if (!sheet) return null;
+      return modelsService.validateModelGenerationAgainstCharacterSheet(modelId, candidateTraits, workspaceId);
+    },
+  };
+  deps.assembleLockedInputSnapshot = async ({ normalizedPrompt, outputCount, modelPins, environmentPins, assetPins }) => {
+    const modelPin = modelPins[0] ?? null;
+    const environmentPin = environmentPins[0] ?? null;
+    if (!modelPin && !environmentPin && assetPins.length === 0) return null;
+
+    let modelSource: Parameters<typeof buildLockedGenerationInputSnapshot>[0]['model'] = null;
+    let sheet = null;
+    let references: Awaited<ReturnType<typeof modelsService.getCharacterSheetReferencesForGeneration>> = [];
+    if (modelPin) {
+      const model = await modelsService.getModel(modelPin.sourceRecordId, 'ws_demo');
+      const version = await modelsService.getVersion(modelPin.sourceVersionId, 'ws_demo');
+      modelSource = { modelId: model.id, modelName: model.name, version };
+      sheet = await modelsService.getActiveCharacterSheet(model.id, 'ws_demo');
+      references = await modelsService.getCharacterSheetReferencesForGeneration(model.id, 'ws_demo');
+    }
+
+    let environmentSource: Parameters<typeof buildLockedGenerationInputSnapshot>[0]['environment'] = null;
+    if (environmentPin) {
+      const environments = new EnvironmentsService(getEnvironmentsRepository());
+      const environment = await environments.getEnvironment(environmentPin.sourceRecordId, 'ws_demo');
+      const version = await environments.getVersion(environmentPin.sourceVersionId, 'ws_demo');
+      environmentSource = {
+        environmentId: environment.id,
+        environmentName: environment.name,
+        version: { id: version.id, versionNumber: version.versionNumber, status: version.status },
+      };
+    }
+
+    const assets = await Promise.all(
+      assetPins.map(async (pin) => {
+        const library = new LibraryService(getLibraryRepository());
+        const asset = await library
+          .getAsset(pin.sourceRecordId, 'ws_demo')
+          .catch(() => null);
+        return {
+          assetId: pin.sourceRecordId,
+          label: asset?.name ?? pin.resolvedDetails?.assetName ?? pin.sourceRecordId,
+          kind: (pin.pinType === 'look' ? 'look' : 'library_asset') as 'look' | 'library_asset',
+        };
+      }),
+    );
+
+    return buildLockedGenerationInputSnapshot({
+      normalizedPrompt,
+      aspectRatio: normalizedPrompt.aspectRatio,
+      outputCount,
+      model: modelSource,
+      characterSheet: sheet,
+      environment: environmentSource,
+      assets,
+      references: getCharacterSheetReferencesForGeneration(references),
+    });
+  };
+  deps.createVariantJob = async ({ sourceJobId, workspaceId, userId, prompt }) => {
+    const created = await content.createDraftJobRequest(
+      {
+        workspaceId,
+        name: `Variant of job ${sourceJobId}`,
+        requestedOutputType: 'photo',
+        requestedVariants: 1,
+        briefSnapshot: {
+          variantOf: sourceJobId,
+          inheritedPrompt: prompt,
+          capturedAt: new Date().toISOString(),
+        },
+      },
+      userId,
+      workspaceId,
+    );
+    return created.id;
+  };
+  (deps.content as { copyPinsToJob?: unknown }).copyPinsToJob = (sourceJobId: string, targetJobId: string, wsId: string) =>
+    content.copyJobPins(sourceJobId, targetJobId, wsId);
 
   return { service: new GenerationService(repo, deps), repo };
 }

@@ -284,3 +284,28 @@ export function validateModelGenerationAgainstCharacterSheet(
   const { matches, mismatches } = compareCandidateTraitsToProtectedTraits(candidateTraits, protectedRows);
   return { valid: matches, mismatches, protectedTraitCount: protectedRows.length };
 }
+
+// ── Audit trail (mirrors the character_sheet_audit table) ────────────────────
+
+/** The structured Character Sheet events recorded in the audit trail. */
+export type CharacterSheetAuditEvent =
+  | 'character_sheet_created'
+  | 'character_sheet_updated'
+  | 'character_sheet_locked'
+  | 'character_sheet_activated'
+  | 'character_sheet_draft_created'
+  | 'protected_trait_edit_blocked'
+  | 'protected_trait_updated_in_draft'
+  | 'character_sheet_reference_added'
+  | 'character_sheet_reference_removed';
+
+/** One append-only audit row for a Character Sheet. */
+export interface CharacterSheetAuditRow {
+  id: string;
+  workspaceId: string;
+  characterSheetId: string;
+  event: CharacterSheetAuditEvent;
+  actorId: string | null;
+  detail: string | null;
+  createdAt: string;
+}

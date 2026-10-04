@@ -8,6 +8,8 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
+  CharacterSheetAuditEvent,
+  CharacterSheetAuditRow,
   CharacterSheetRecord,
   CreateModelInput,
   CreateVersionInput,
@@ -350,5 +352,71 @@ export class SupabaseModelsRepository implements ModelsRepository {
       .single();
     if (error) throw error;
     return mapSheet(data);
+  }
+
+  // ── Character Sheet audit trail (prompt 26) ─────────────────────────────
+
+  /** Resolves a version's sheet id + owning workspace for audit attribution. */
+  private async sheetContextForVersion(
+    versionId: string,
+  ): Promise<{ sheetId: string; workspaceId: string }> {
+    const { data: sheetRow, error: sheetError } = await this.client
+      .from('character_sheets')
+      .select('id, model_version_id')
+      .eq('model_version_id', versionId)
+      .single();
+    if (sheetError) throw sheetError;
+
+    const { data: versionRow, error: versionError } = await this.client
+      .from('model_versions')
+      .select('model_id')
+      .eq('id', sheetRow.model_version_id as string)
+      .single();
+    if (versionError) throw versionError;
+
+    const { data: modelRow, error: modelError } = await this.client
+      .from('models')
+      .select('workspace_id')
+      .eq('id', versionRow.model_id as string)
+      .single();
+    if (modelError) throw modelError;
+
+    return { sheetId: sheetRow.id as string, workspaceId: modelRow.workspace_id as string };
+  }
+
+  async listCharacterSheetAudit(versionId: string): Promise<CharacterSheetAuditRow[]> {
+    const { sheetId } = await this.sheetContextForVersion(versionId);
+    const { data, error } = await this.client
+      .from('character_sheet_audit')
+      .select('*')
+      .eq('character_sheet_id', sheetId)
+      .order('created_at');
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+      id: row.id as string,
+      workspaceId: row.workspace_id as string,
+      characterSheetId: row.character_sheet_id as string,
+      event: row.event as CharacterSheetAuditRow['event'],
+      actorId: (row.actor_id as string | null) ?? null,
+      detail: (row.detail as string | null) ?? null,
+      createdAt: row.created_at as string,
+    }));
+  }
+
+  async appendCharacterSheetAudit(
+    versionId: string,
+    event: CharacterSheetAuditEvent,
+    detail: string | null,
+    actorId: string | null = null,
+  ): Promise<void> {
+    const { sheetId, workspaceId } = await this.sheetContextForVersion(versionId);
+    const { error } = await this.client.from('character_sheet_audit').insert({
+      workspace_id: workspaceId,
+      character_sheet_id: sheetId,
+      event,
+      actor_id: actorId,
+      detail,
+    });
+    if (error) throw error;
   }
 }

@@ -10,6 +10,7 @@ import {
   getCharacterSheetReferencesForGeneration,
   getProtectedIdentityTraits,
   isInWorkspaceStrict,
+  LockedVersionError,
   refuseIfLocked,
   selectActiveIdentityVersion,
   validateCreateModel,
@@ -19,6 +20,7 @@ import {
   validateUpdateModelDraft,
 } from '../domain/models';
 import type {
+  CharacterSheetAuditRow,
   CharacterSheetRecord,
   CharacterSheetTraitRow,
   ModelAssetShortcutRecord,
@@ -201,7 +203,23 @@ export class ModelsService {
     const model = await this.repo.getModel(version.modelId);
     isInWorkspaceStrict(model.workspaceId, activeWorkspaceId);
 
-    refuseIfLocked(version); // guard before repository write
+    // Guard before repository write. A refusal is audited best-effort so the
+    // trail shows every blocked attempt to touch a locked identity — the
+    // audit failure itself must never mask the guard error.
+    try {
+      refuseIfLocked(version);
+    } catch (err) {
+      if (err instanceof LockedVersionError) {
+        await this.repo
+          .appendCharacterSheetAudit(
+            versionId,
+            'protected_trait_edit_blocked',
+            `Refused Character Sheet edit on locked version ${versionId} (workspace ${activeWorkspaceId}).`,
+          )
+          .catch(() => undefined);
+      }
+      throw err;
+    }
 
     const result = validateUpdateCharacterSheet(patch);
     if (!result.ok) throw new Error(`Invalid character sheet update: ${result.errors.join('; ')}`);
@@ -285,5 +303,16 @@ export class ModelsService {
     protectedTraits: CharacterSheetTraitRow[],
   ): { matches: boolean; mismatches: string[] } {
     return compareCandidateTraitsToProtectedTraits(candidateTraits, protectedTraits);
+  }
+
+  /** Audit trail of a version's Character Sheet, oldest first. */
+  async getCharacterSheetAudit(
+    versionId: string,
+    activeWorkspaceId: string,
+  ): Promise<CharacterSheetAuditRow[]> {
+    const version = await this.repo.getVersion(versionId);
+    const model = await this.repo.getModel(version.modelId);
+    isInWorkspaceStrict(model.workspaceId, activeWorkspaceId);
+    return this.repo.listCharacterSheetAudit(versionId);
   }
 }

@@ -31,6 +31,8 @@ import type { EligibilityInput, EligibilityResult } from './eligibility';
 import { buildProviderRequest } from './requestBuilder';
 import { mapProviderError } from './errorMapper';
 import { GALLERY_MEDIA_BUCKET, buildOutputMediaPath } from './mediaStore';
+import { normalizeGenerationPrompt } from './promptNormalization';
+import type { LockedGenerationInputSnapshot, NormalizedPromptRecord } from './types';
 
 /** Result of a submission attempt (idempotent by job). */
 export interface SubmissionResult {
@@ -62,6 +64,13 @@ export interface GenerationDependencies {
       workspaceId: string,
       options?: { hasProvider?: boolean },
     ): Promise<unknown>;
+    /**
+     * Prompt 27 — copies the source job's immutable pins onto a draft job
+     * (variant generations inherit the locked input baseline). Optional so
+     * existing harnesses without the new ContentStudioService method keep
+     * compiling; variants fall back to same-job behavior when absent.
+     */
+    copyPinsToJob?(sourceJobId: string, targetJobId: string, workspaceId: string): Promise<unknown>;
   };
   /** Creates generated Gallery outputs + events (workspace-guarded). */
   gallery: {
@@ -114,6 +123,48 @@ export interface GenerationDependencies {
   loadPinsForJob(jobId: string): Promise<EligibilityInput['pins']>;
   /** Server-side actor id for audit rows (worker identity). */
   actorId: string;
+  /**
+   * Prompt 26 — identity validation against the pinned model's protected
+   * Character Sheet. Optional: when the bridge is absent (or no candidate
+   * identity traits are supplied), validation is recorded as skipped and
+   * never guessed. Returns null when the model has no active sheet.
+   */
+  models?: {
+    validateGenerationAgainstCharacterSheet(
+      modelId: string,
+      candidateTraits: Record<string, unknown>,
+      workspaceId: string,
+    ): Promise<{ valid: boolean; mismatches: string[]; protectedTraitCount: number } | null>;
+  };
+  /**
+   * Prompt 27 — resolves the workspace-checked records behind the pins into
+   * the deterministic locked-input snapshot (model/environment versions,
+   * active Character Sheet protected traits, asset labels, reference plan).
+   * Returns null when the host cannot assemble a baseline (no bridge, or the
+   * pinned records no longer resolve).
+   */
+  assembleLockedInputSnapshot?: (input: {
+    jobId: string;
+    workspaceId: string;
+    normalizedPrompt: NormalizedPromptRecord;
+    outputCount: number;
+    modelPins: EligibilityInput['pins'];
+    environmentPins: EligibilityInput['pins'];
+    assetPins: EligibilityInput['pins'];
+  }) => Promise<LockedGenerationInputSnapshot | null>;
+  /**
+   * Prompt 27 — creates a fresh DRAFT content job (the container a variant
+   * run submits under) and copies the source job's pins onto it, preserving
+   * the locked input baseline. Optional; variants fall back to same-job
+   * idempotency behavior when absent.
+   */
+  createVariantJob?: (input: {
+    sourceJobId: string;
+    workspaceId: string;
+    sourceRunId: string;
+    userId: string;
+    prompt: string;
+  }) => Promise<string>;
 }
 
 export class GenerationService {
@@ -135,6 +186,18 @@ export class GenerationService {
       prompt?: string;
       negativePrompt?: string;
       aspectRatio?: string;
+      /**
+       * Prompt 26 — candidate identity traits per model pin (modelId-keyed).
+       * Any provided protected trait must agree with the model's active
+       * Character Sheet, or the submission is blocked and audited.
+       */
+      identityTraits?: Record<string, Record<string, unknown>>;
+      /**
+       * Prompt 27 — candidate identity requirements per model pin. When
+       * true, the model MUST have an active Character Sheet with at least
+       * one protected trait; otherwise the submission is blocked.
+       */
+      requireIdentityBaseline?: Record<string, boolean>;
     },
   ): Promise<SubmissionResult> {
     const job = await this.deps.content.getJobRequest(jobId, workspaceId);
@@ -207,6 +270,96 @@ export class GenerationService {
       return { run: null, reused: false, eligible: false, blocking: eligibility.blocking };
     }
 
+    // ── Prompt 26: identity validation against protected Character Sheets ────
+    // For each model pin that supplies candidate identity traits, every
+    // provided protected trait must agree with the model's active sheet.
+    // Without the bridge or without candidate traits the check is recorded as
+    // skipped — never silently assumed to have passed. Failures block BEFORE
+    // quota increment and provider contact.
+    const identityChecks: Array<{
+      modelId: string;
+      status: 'passed' | 'failed' | 'skipped';
+      mismatches: string[];
+      protectedTraitCount: number;
+    }> = [];
+    const identityBlocking: string[] = [];
+    for (const pin of pins.filter((candidate) => candidate.pinType === 'model')) {
+      const candidateTraits = input.identityTraits?.[pin.sourceRecordId];
+      if (!this.deps.models || !candidateTraits) {
+        // Prompt 27: an explicit per-model requirement makes the identity
+        // baseline mandatory — no traits supplied then becomes a block, not
+        // a silent skip. Otherwise the check stays a recorded skip.
+        if (input.requireIdentityBaseline?.[pin.sourceRecordId]) {
+          const modelLabel = pin.resolvedDetails?.modelName ?? pin.sourceRecordId;
+          identityChecks.push({
+            modelId: pin.sourceRecordId,
+            status: 'failed',
+            mismatches: ['No candidate identity traits supplied for a protected model.'],
+            protectedTraitCount: 0,
+          });
+          identityBlocking.push(
+            `Model ${modelLabel}: no Character Sheet baseline supplied — protected identity traits are required.`,
+          );
+          continue;
+        }
+        identityChecks.push({
+          modelId: pin.sourceRecordId,
+          status: 'skipped',
+          mismatches: [],
+          protectedTraitCount: 0,
+        });
+        continue;
+      }
+      const result = await this.deps.models.validateGenerationAgainstCharacterSheet(
+        pin.sourceRecordId,
+        candidateTraits,
+        workspaceId,
+      );
+      const modelLabel = pin.resolvedDetails?.modelName ?? pin.sourceRecordId;
+      if (!result) {
+        identityChecks.push({ modelId: pin.sourceRecordId, status: 'failed', mismatches: ['No active Character Sheet for this model.'], protectedTraitCount: 0 });
+        identityBlocking.push(`Model ${modelLabel}: no active Character Sheet to validate identity against.`);
+        continue;
+      }
+      // Prompt 27: a present-but-empty sheet cannot protect identity — when
+      // the baseline is required, zero protected traits is a block.
+      if (input.requireIdentityBaseline?.[pin.sourceRecordId] && result.protectedTraitCount === 0) {
+        identityChecks.push({
+          modelId: pin.sourceRecordId,
+          status: 'failed',
+          mismatches: ['The active Character Sheet has no protected identity traits recorded.'],
+          protectedTraitCount: 0,
+        });
+        identityBlocking.push(
+          `Model ${modelLabel}: Character Sheet has no protected identity traits — record the identity baseline before generating.`,
+        );
+        continue;
+      }
+      if (!result.valid) {
+        identityChecks.push({ modelId: pin.sourceRecordId, status: 'failed', mismatches: result.mismatches, protectedTraitCount: result.protectedTraitCount });
+        identityBlocking.push(`Model ${modelLabel}: identity mismatch — ${result.mismatches.join('; ')}`);
+        continue;
+      }
+      identityChecks.push({
+        modelId: pin.sourceRecordId,
+        status: 'passed',
+        mismatches: [],
+        protectedTraitCount: result.protectedTraitCount,
+      });
+    }
+    if (identityBlocking.length > 0) {
+      await this.repo.addAuditEvent({
+        workspaceId,
+        contentJobRequestId: jobId,
+        providerRunId: null,
+        actorId: userId,
+        eventType: 'character_sheet_generation_validation_failed',
+        message: 'Submission blocked: candidate identity disagrees with the model protected Character Sheet traits.',
+        metadata: { checks: identityChecks, blocking: identityBlocking },
+      });
+      return { run: null, reused: false, eligible: false, blocking: identityBlocking };
+    }
+
     // Resolve the adapter — fail closed for unknown/unconfigured providers.
     const adapter = getImageProvider(config.providerName);
     if (!adapter) {
@@ -239,13 +392,73 @@ export class GenerationService {
       })),
     });
 
+    // ── Prompt 27: deterministic locked-input snapshot ─────────────────────
+    // Normalizes the prompt bar input (rule-based, auditable) and assembles
+    // the locked baseline: pinned versions, active Character Sheet protected
+    // traits, asset pins and the reference plan. Best-effort — the snapshot
+    // enriches the run but must never block submission on its own.
+    const normalized = normalizeGenerationPrompt({
+      userPrompt: input.prompt ?? '',
+      aspectRatio: input.aspectRatio,
+      outputCount: job.requestedVariants,
+    });
+    const normalizedRecord: NormalizedPromptRecord = {
+      userPrompt: normalized.userPrompt,
+      cleanedPrompt: normalized.cleanedPrompt,
+      aspectRatio: normalized.aspectRatio,
+      outputCount: normalized.outputCount,
+      extracted: normalized.extracted,
+      warnings: normalized.warnings,
+      rulesApplied: normalized.rulesApplied,
+      normalizedAt: new Date().toISOString(),
+    };
+
+    let lockedInputSnapshot: LockedGenerationInputSnapshot | null = null;
+    try {
+      lockedInputSnapshot = this.deps.assembleLockedInputSnapshot
+        ? await this.deps.assembleLockedInputSnapshot({
+            jobId,
+            workspaceId,
+            normalizedPrompt: normalizedRecord,
+            outputCount: job.requestedVariants,
+            modelPins: pins.filter((candidate) => candidate.pinType === 'model'),
+            environmentPins: pins.filter((candidate) => candidate.pinType === 'environment'),
+            assetPins: pins.filter(
+              (candidate) => candidate.pinType === 'library_asset' || candidate.pinType === 'look',
+            ),
+          })
+        : null;
+    } catch {
+      // Snapshot assembly is enrichment: a bridge failure never blocks the
+      // submission path itself (eligibility already gated the run).
+      lockedInputSnapshot = null;
+    }
+    if (lockedInputSnapshot) {
+      await this.repo.addAuditEvent({
+        workspaceId,
+        contentJobRequestId: jobId,
+        providerRunId: null,
+        actorId: userId,
+        eventType: 'locked_generation_input_snapshot_created',
+        message: 'Locked generation input snapshot assembled.',
+        metadata: {
+          lockedInputCount: lockedInputSnapshot.lockedInputs.length,
+          characterSheetConstraints: lockedInputSnapshot.characterSheetConstraints.length,
+          protectedTraitKeys: lockedInputSnapshot.characterSheetConstraints.flatMap(
+            (constraint) => constraint.protectedTraitKeys,
+          ),
+        },
+      });
+    }
+
     const runInput: CreateProviderRunInput = {
       workspaceId,
       contentJobRequestId: jobId,
       createdBy: userId,
       providerName: config.providerName,
       idempotencyKey,
-      requestSnapshot,
+      requestSnapshot: { ...requestSnapshot, identityValidation: identityChecks, normalizedPrompt: normalizedRecord },
+      lockedInputSnapshot: lockedInputSnapshot as unknown as Record<string, unknown> | null,
     };
     const run = await this.repo.createRun(runInput);
 
@@ -540,6 +753,18 @@ export class GenerationService {
       prompt?: string;
       negativePrompt?: string;
       aspectRatio?: string;
+      /**
+       * Prompt 26 — candidate identity traits per model pin (modelId-keyed).
+       * Any provided protected trait must agree with the model's active
+       * Character Sheet, or the submission is blocked and audited.
+       */
+      identityTraits?: Record<string, Record<string, unknown>>;
+      /**
+       * Prompt 27 — candidate identity requirements per model pin. When
+       * true, the model MUST have an active Character Sheet with at least
+       * one protected trait; otherwise the submission is blocked.
+       */
+      requireIdentityBaseline?: Record<string, boolean>;
     },
   ): Promise<SubmissionResult> {
     const latest = await this.repo.latestRunForJob(jobId);
@@ -565,6 +790,92 @@ export class GenerationService {
       prompt: input.prompt,
       negativePrompt: input.negativePrompt,
       aspectRatio: input.aspectRatio,
+      identityTraits: input.identityTraits,
+    });
+  }
+
+  // ── Prompt 27: variant generation ─────────────────────────────────────
+  // Variants are derived generations of a completed run. The locked input
+  // baseline (pins, Character Sheet constraints, snapshot) is inherited
+  // verbatim unless the caller explicitly overrides the prompt/settings; the
+  // parent-child linkage is recorded for audit. The variant runs in its own
+  // draft job (via the createVariantJob bridge) so the one-active-run-per-job
+  // idempotency rule stays intact and lineage is explicit.
+
+  async createImageVariantJob(
+    sourceJobId: string,
+    workspaceId: string,
+    userId: string,
+    variantInput: {
+      /** Optional explicit prompt; inherits the source prompt when omitted. */
+      prompt?: string;
+      /** Optional aspect-ratio override (normalized like any submission). */
+      aspectRatio?: string;
+      /** Optional output-count override (1–4, clamped). */
+      outputCount?: number;
+      /** Candidate identity traits re-checked against the same sheet. */
+      identityTraits?: Record<string, Record<string, unknown>>;
+    } = {},
+  ): Promise<SubmissionResult> {
+    const sourceRun = await this.repo.latestRunForJob(sourceJobId);
+    if (!sourceRun) {
+      throw new Error('No generation run exists for the source job.');
+    }
+    if (sourceRun.status !== 'completed') {
+      throw new Error('Variants can only be created from a completed generation run.');
+    }
+    if (sourceRun.workspaceId !== workspaceId) {
+      throw new Error('You do not have access to this workspace.');
+    }
+
+    await this.repo.addAuditEvent({
+      workspaceId,
+      contentJobRequestId: sourceJobId,
+      providerRunId: sourceRun.id,
+      actorId: userId,
+      eventType: 'image_generation_variant_requested',
+      message: 'Variant generation requested from a completed run.',
+      metadata: {
+        parentRunId: sourceRun.id,
+        promptOverride: variantInput.prompt ?? null,
+        aspectRatioOverride: variantInput.aspectRatio ?? null,
+        outputCountOverride: variantInput.outputCount ?? null,
+      },
+    });
+
+    const sourceSnapshot = sourceRun.requestSnapshot as {
+      prompt?: string;
+      negativePrompt?: string | null;
+      aspectRatio?: string | null;
+      outputCount?: number;
+    };
+    const inheritedPrompt = variantInput.prompt ?? sourceSnapshot.prompt ?? '';
+    const aspectRatio = variantInput.aspectRatio ?? sourceSnapshot.aspectRatio ?? undefined;
+
+    let variantJobId = sourceJobId;
+    if (this.deps.createVariantJob) {
+      variantJobId = await this.deps.createVariantJob({
+        sourceJobId,
+        workspaceId,
+        sourceRunId: sourceRun.id,
+        userId,
+        prompt: inheritedPrompt,
+      });
+      // Inherit the source job's immutable pins so the same locked inputs
+      // govern the variant (rule 5 keeps them uneditable on the draft).
+      if (this.deps.content?.copyPinsToJob) {
+        await this.deps.content.copyPinsToJob(sourceJobId, variantJobId, workspaceId);
+      }
+    }
+
+    return this.submitImageGeneration(variantJobId, workspaceId, userId, {
+      pins: [],
+      references: [],
+      assets: {},
+      prompt: inheritedPrompt,
+      negativePrompt: sourceSnapshot.negativePrompt ?? undefined,
+      aspectRatio,
+      identityTraits: variantInput.identityTraits,
     });
   }
 

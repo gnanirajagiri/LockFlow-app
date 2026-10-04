@@ -12,6 +12,8 @@ import {
   refuseIfLocked,
 } from '../domain/models';
 import type {
+  CharacterSheetAuditEvent,
+  CharacterSheetAuditRow,
   CharacterSheetRecord,
   CreateModelInput,
   CreateVersionInput,
@@ -37,7 +39,32 @@ export class MockModelsRepository implements ModelsRepository {
   private versions = new Map<string, ModelVersionRecord>();
   private sheets = new Map<string, CharacterSheetRecord>(); // key: versionId
   private references = new Map<string, ModelReferenceRecord[]>(); // key: versionId
+  private sheetAudit: CharacterSheetAuditRow[] = [];
   private shortcuts: ModelAssetShortcutRecord[] = MODELS_SEED.flatMap((seed) => seed.shortcuts ?? []);
+
+  /** Resolves a version's sheet id + workspace id for audit attribution. */
+  private sheetContextForVersion(versionId: string): { sheetId: string; workspaceId: string } | null {
+    const sheet = this.sheets.get(versionId);
+    if (!sheet) return null;
+    const version = this.versions.get(versionId);
+    const model = version ? this.models.get(version.modelId) : undefined;
+    return { sheetId: sheet.id, workspaceId: model?.workspaceId ?? '' };
+  }
+
+  /** Appends one Character Sheet audit row (append-only, like the DB table). */
+  private appendSheetAudit(versionId: string, event: CharacterSheetAuditEvent, detail: string | null): void {
+    const context = this.sheetContextForVersion(versionId);
+    if (!context) return; // sheet already gone — nothing to attribute
+    this.sheetAudit.push({
+      id: `audit_${crypto.randomUUID()}`,
+      workspaceId: context.workspaceId,
+      characterSheetId: context.sheetId,
+      event,
+      actorId: null, // repo layer has no actor; Supabase triggers record auth.uid()
+      detail,
+      createdAt: now(),
+    });
+  }
 
   constructor() {
     for (const seed of MODELS_SEED) {
@@ -107,6 +134,7 @@ export class MockModelsRepository implements ModelsRepository {
       updatedAt: stamp,
     };
     this.references.set(versionId, [...(this.references.get(versionId) ?? []), row]);
+    this.appendSheetAudit(versionId, 'character_sheet_reference_added', `Reference added: ${input.caption || input.referenceType}`);
     return structuredClone(row);
   }
 
@@ -130,7 +158,11 @@ export class MockModelsRepository implements ModelsRepository {
     const version = await this.getVersion(versionId);
     refuseIfLocked(version);
     const rows = this.references.get(versionId) ?? [];
+    const removed = rows.find((row) => row.id === referenceId);
     this.references.set(versionId, rows.filter((row) => row.id !== referenceId));
+    if (removed) {
+      this.appendSheetAudit(versionId, 'character_sheet_reference_removed', `Reference removed: ${removed.caption || removed.referenceType}`);
+    }
   }
 
   /** Library shortcut pointers for this model (pointers only — canonical records live in the Library). */
@@ -199,6 +231,7 @@ export class MockModelsRepository implements ModelsRepository {
       updatedAt: stamp2,
     });
     this.references.set(created.id, []);
+    this.appendSheetAudit(created.id, 'character_sheet_created', `Character Sheet created for v${created.versionNumber} (first draft).`);
 
     // A first draft is the only version, so it is the active one.
     this.models.set(modelId, { ...model, activeVersionId: created.id, updatedAt: now() });
@@ -249,6 +282,7 @@ export class MockModelsRepository implements ModelsRepository {
       updatedAt: stamp2,
     });
     this.references.set(created.id, []);
+    this.appendSheetAudit(created.id, 'character_sheet_draft_created', `Draft v${created.versionNumber} created from source version ${source.id}.`);
 
     return structuredClone(created);
   }
@@ -299,6 +333,9 @@ export class MockModelsRepository implements ModelsRepository {
       updatedAt: now(),
     });
 
+    this.appendSheetAudit(version.id, 'character_sheet_locked', `Version v${version.versionNumber} locked — protected identity is now immutable.`);
+    this.appendSheetAudit(version.id, 'character_sheet_activated', `Version v${version.versionNumber} set as the model's active identity.`);
+
     return structuredClone(locked);
   }
 
@@ -307,7 +344,10 @@ export class MockModelsRepository implements ModelsRepository {
     patch: UpdateCharacterSheetInput,
   ): Promise<CharacterSheetRecord> {
     const version = await this.getVersion(versionId);
-    if (version.status === 'locked') throw new LockedVersionError(versionId);
+    if (version.status === 'locked') {
+      this.appendSheetAudit(versionId, 'protected_trait_edit_blocked', `Refused Character Sheet edit on locked version ${versionId}.`);
+      throw new LockedVersionError(versionId);
+    }
 
     const sheet = await this.getCharacterSheet(versionId);
     const next: CharacterSheetRecord = {
@@ -316,6 +356,49 @@ export class MockModelsRepository implements ModelsRepository {
       updatedAt: now(),
     };
     this.sheets.set(versionId, next);
+
+    const touchedGroups = (
+      ['faceFeatures', 'hairIdentity', 'complexion', 'bodyProportions', 'distinctiveDetails'] as const
+    ).filter((group) => patch[group] !== undefined);
+    if (touchedGroups.length > 0) {
+      this.appendSheetAudit(
+        versionId,
+        'protected_trait_updated_in_draft',
+        `Draft edit touched protected trait groups: ${touchedGroups.join(', ')}.`,
+      );
+    }
+    this.appendSheetAudit(versionId, 'character_sheet_updated', `Draft v${version.versionNumber} Character Sheet updated.`);
     return structuredClone(next);
+  }
+
+  /** Audit trail for a version's Character Sheet, oldest first. */
+  async listCharacterSheetAudit(versionId: string): Promise<CharacterSheetAuditRow[]> {
+    const context = this.sheetContextForVersion(versionId);
+    if (!context) notFound('Character sheet', versionId);
+    return structuredClone(
+      this.sheetAudit
+        .filter((row) => row.characterSheetId === context.sheetId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    );
+  }
+
+  /** Appends one audit event to a version's Character Sheet trail. */
+  async appendCharacterSheetAudit(
+    versionId: string,
+    event: CharacterSheetAuditEvent,
+    detail: string | null,
+    actorId: string | null = null,
+  ): Promise<void> {
+    const context = this.sheetContextForVersion(versionId);
+    if (!context) notFound('Character sheet', versionId);
+    this.sheetAudit.push({
+      id: `audit_${crypto.randomUUID()}`,
+      workspaceId: context.workspaceId,
+      characterSheetId: context.sheetId,
+      event,
+      actorId,
+      detail,
+      createdAt: now(),
+    });
   }
 }

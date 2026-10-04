@@ -197,3 +197,86 @@ describe('no sensitive storage data on identity views', () => {
     expect(serialized).not.toMatch(/signed|signature|token|X-Amz/i);
   });
 });
+
+describe('character sheet audit trail', () => {
+  it('records draft edits and protected-trait updates', async () => {
+    await service.updateCharacterSheet(
+      'mv_aisha_v2',
+      { hairIdentity: { colour: 'deep black', styling: 'softer volume' } },
+      WS,
+    );
+    const audit = await service.getCharacterSheetAudit('mv_aisha_v2', WS);
+    const events = audit.map((row) => row.event);
+    expect(events).toContain('character_sheet_updated');
+    expect(events).toContain('protected_trait_updated_in_draft');
+    const protectedUpdate = audit.find((row) => row.event === 'protected_trait_updated_in_draft');
+    expect(protectedUpdate?.detail).toContain('hairIdentity');
+  });
+
+  it('records the refusal of a locked-sheet edit', async () => {
+    await expect(
+      service.updateCharacterSheet('mv_aisha_v1', { identitySummary: 'changed' }, WS),
+    ).rejects.toThrow(LockedVersionError);
+    const audit = await service.getCharacterSheetAudit('mv_aisha_v1', WS);
+    const blocked = audit.filter((row) => row.event === 'protected_trait_edit_blocked');
+    expect(blocked).toHaveLength(1);
+    expect(blocked[0]?.detail).toContain('mv_aisha_v1');
+  });
+
+  it('records the version lifecycle: created, locked, activated, draft created', async () => {
+    const model = await service.createModel({ workspaceId: WS, name: 'Lifecycle' }, USER);
+    const versions = await service.getVersions(model.id, WS);
+    await service.lockVersion(versions[0].id, WS);
+    const draft = await service.createVersion(
+      { modelId: model.id, sourceVersionId: versions[0].id, changeSummary: 'next' },
+      USER,
+      WS,
+    );
+
+    const audit = await service.getCharacterSheetAudit(versions[0].id, WS);
+    const events = audit.map((row) => row.event);
+    expect(events[0]).toBe('character_sheet_created');
+    expect(events).toContain('character_sheet_locked');
+    expect(events).toContain('character_sheet_activated');
+    expect(events.indexOf('character_sheet_locked')).toBeLessThan(
+      events.indexOf('character_sheet_activated'),
+    );
+
+    const draftAudit = await service.getCharacterSheetAudit(draft.id, WS);
+    expect(draftAudit.map((row) => row.event)).toContain('character_sheet_draft_created');
+  });
+
+  it('records reference add/remove on the draft', async () => {
+    const reference = await service.addReference(
+      'mv_aisha_v2',
+      {
+        storagePath: 'placeholders/models/aisha/jawline-detail.svg',
+        referenceType: 'detail',
+        caption: 'Jawline detail',
+      },
+      WS,
+    );
+    await service.removeReference('mv_aisha_v2', reference.id, WS);
+
+    const audit = await service.getCharacterSheetAudit('mv_aisha_v2', WS);
+    const events = audit.map((row) => row.event);
+    expect(events).toContain('character_sheet_reference_added');
+    expect(events).toContain('character_sheet_reference_removed');
+    expect(
+      audit.find((row) => row.event === 'character_sheet_reference_added')?.detail,
+    ).toContain('Jawline detail');
+  });
+
+  it('refuses cross-workspace audit reads', async () => {
+    await expect(
+      service.getCharacterSheetAudit('mv_aisha_v2', OTHER_WS),
+    ).rejects.toThrow(/Cross-workspace access denied/);
+  });
+
+  it('audit rows carry no storage internals', async () => {
+    await service.updateCharacterSheet('mv_aisha_v2', { identitySummary: 'audit probe' }, WS);
+    const audit = await service.getCharacterSheetAudit('mv_aisha_v2', WS);
+    const serialized = JSON.stringify(audit);
+    expect(serialized).not.toMatch(/signed|signature|token|X-Amz|storagePath|storageBucket/i);
+  });
+});

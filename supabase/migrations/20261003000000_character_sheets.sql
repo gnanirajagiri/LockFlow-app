@@ -205,3 +205,105 @@ create policy "character_sheet_audit_insert_member" on public.character_sheet_au
         and m.workspace_id = workspace_id
     )
   );
+
+-- ═════════════════════════════════════════════════════════════════════
+-- Real-mode audit emission — DB triggers produce the same trail the demo
+-- store emits in the repository. security definer so audit writes always
+-- succeed for members; actor_id is recorded as auth.uid().
+-- Note: the demo store additionally emits character_sheet_draft_created and
+-- protected_trait_updated_in_draft; hosted drafts are covered by the
+-- character_sheet_created event (every sheet is born with its draft version).
+-- ═════════════════════════════════════════════════════════════════════
+
+create function public.audit_character_sheet_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_workspace uuid;
+begin
+  select m.workspace_id into v_workspace
+  from public.model_versions v
+  join public.models m on m.id = v.model_id
+  where v.id = new.model_version_id;
+
+  insert into public.character_sheet_audit (workspace_id, character_sheet_id, event, actor_id, detail)
+  values (
+    v_workspace,
+    new.id,
+    case tg_op when 'INSERT' then 'character_sheet_created' else 'character_sheet_updated' end,
+    auth.uid(),
+    case tg_op
+      when 'INSERT' then 'Character Sheet created (hosted trigger).'
+      else 'Character Sheet updated (hosted trigger).'
+    end
+  );
+  return coalesce(new, old);
+end;
+$$;
+
+create trigger trg_character_sheets_audit
+  after insert or update on public.character_sheets
+  for each row execute function public.audit_character_sheet_change();
+
+create function public.audit_character_sheet_lock()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_workspace uuid;
+begin
+  if new.status = 'locked' and old.status is distinct from 'locked' then
+    select m.workspace_id into v_workspace from public.models m where m.id = new.model_id;
+    insert into public.character_sheet_audit (workspace_id, character_sheet_id, event, actor_id, detail)
+      select v_workspace, cs.id, 'character_sheet_locked', auth.uid(),
+             'Version locked — protected identity is now immutable (hosted trigger).'
+      from public.character_sheets cs where cs.model_version_id = new.id;
+    insert into public.character_sheet_audit (workspace_id, character_sheet_id, event, actor_id, detail)
+      select v_workspace, cs.id, 'character_sheet_activated', auth.uid(),
+             'Version set as the model active identity (hosted trigger).'
+      from public.character_sheets cs where cs.model_version_id = new.id;
+  end if;
+  return new;
+end;
+$$;
+
+create trigger trg_model_versions_audit_lock
+  after update on public.model_versions
+  for each row execute function public.audit_character_sheet_lock();
+
+create function public.audit_character_sheet_reference()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_workspace uuid;
+  v_version uuid := coalesce(new.model_version_id, old.model_version_id);
+begin
+  select m.workspace_id into v_workspace
+  from public.model_versions v
+  join public.models m on m.id = v.model_id
+  where v.id = v_version;
+
+  insert into public.character_sheet_audit (workspace_id, character_sheet_id, event, actor_id, detail)
+    select v_workspace, cs.id,
+      case tg_op when 'INSERT' then 'character_sheet_reference_added' else 'character_sheet_reference_removed' end,
+      auth.uid(),
+      case tg_op
+        when 'INSERT' then 'Reference added to the version (hosted trigger).'
+        else 'Reference removed from the version (hosted trigger).'
+      end
+    from public.character_sheets cs where cs.model_version_id = v_version;
+  return coalesce(new, old);
+end;
+$$;
+
+create trigger trg_model_references_audit
+  after insert or delete on public.model_references
+  for each row execute function public.audit_character_sheet_reference();

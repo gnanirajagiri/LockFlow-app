@@ -59,6 +59,82 @@ export interface ImageGenerationStatusResult {
   providerMetadata?: unknown;
 }
 
+// ── Prompt 27: auditable prompt normalization record ───────────────────────
+
+/**
+ * The stored normalization record for a generation run: the verbatim user
+ * prompt, the deterministic rule-based extraction, and the exact rules
+ * applied. Replaying `rulesApplied` against `userPrompt` reproduces the
+ * extraction — the transformation is auditable, never an opaque call.
+ */
+export interface NormalizedPromptRecord {
+  userPrompt: string;
+  cleanedPrompt: string;
+  aspectRatio: string;
+  outputCount: number;
+  extracted: {
+    subject: string | null;
+    setting: string | null;
+    lighting: string | null;
+    mood: string | null;
+    styleHints: string[];
+  };
+  warnings: string[];
+  rulesApplied: string[];
+  /** ISO timestamp captured when normalization ran. */
+  normalizedAt: string;
+}
+
+// ── Prompt 27: locked generation input snapshot ───────────────────────────
+
+/** One locked input line in the snapshot: a pinned version or sheet. */
+export interface LockedInputLine {
+  kind: 'model_version' | 'environment_version' | 'library_asset' | 'look' | 'character_sheet';
+  id: string;
+  label: string;
+  versionNumber: number | null;
+  /** What the line was resolved through (e.g. 'model.activeVersionId'). */
+  resolvedVia: string;
+  /** Protected trait keys carried by this line (Character Sheet lines). */
+  protectedTraitKeys?: string[];
+}
+
+/** Minimal version shape the snapshot needs (model & environment versions both satisfy it). */
+export interface SnapshotVersionRef {
+  id: string;
+  versionNumber: number;
+  status: string;
+}
+
+/**
+ * The deterministic, inspectable baseline a generation ran under: pinned
+ * versions, protected Character Sheet constraints, settings and counts.
+ * Contains identifiers and display labels only — never secrets, never
+ * signed URLs. Stored on the run and reassembled identically for variants.
+ */
+export interface LockedGenerationInputSnapshot {
+  prompt: {
+    userPrompt: string;
+    cleanedPrompt: string;
+  };
+  aspectRatio: string;
+  outputCount: number;
+  /** Ordered pinned inputs (model → environment → assets/looks). */
+  lockedInputs: LockedInputLine[];
+  /** Protected identity constraints per model (prompt 26 projection). */
+  characterSheetConstraints: Array<{
+    modelId: string;
+    modelVersionId: string;
+    characterSheetId: string;
+    protectedTraitKeys: string[];
+    protectedTraitCount: number;
+  }>;
+  /** Reference roles requested for continuity (counts + roles only). */
+  referencePlan: Array<{ role: string; count: number }>;
+  /** ISO timestamp captured when the snapshot was assembled. */
+  assembledAt: string;
+}
+
 export interface ImageGenerationProvider {
   readonly providerName: string;
   isConfigured(): Promise<boolean>;

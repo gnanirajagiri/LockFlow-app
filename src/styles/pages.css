@@ -679,8 +679,8 @@
   text-align: center;
 }
 .lf-uploaddrop--active {
-  border-color: var(--lf-color-accent, var(--lf-color-border-strong));
-  background: color-mix(in srgb, var(--lf-color-surface-muted) 80%, transparent);
+  border-color: var(--lf-color-primary-500);
+  background: color-mix(in srgb, var(--lf-color-primary-soft) 55%, transparent);
 }
 .lf-uploadfile {
   display: flex;
@@ -706,10 +706,11 @@
   color: var(--lf-color-ink);
 }
 .lf-uploadchip--failed {
-  background: var(--lf-color-danger-bg, var(--lf-color-surface-muted));
-  color: var(--lf-color-danger-text, var(--lf-color-ink));
-  border-color: var(--lf-color-danger-border, var(--lf-color-border));
+  background: var(--lf-color-danger-bg);
+  color: var(--lf-color-danger-text);
+  border-color: var(--lf-color-danger-border);
 }
+
 .lf-uploadchip--deleted {
   background: var(--lf-color-surface-muted);
   color: var(--lf-color-ink-faint);

@@ -230,6 +230,11 @@ export function CharacterSheetTab({
     };
   }, [service, selectedVersion, retryTick]);
 
+  // Protected identity rows, derived from the same classification the
+  // generation-time hooks read (prompt 26). Computed BEFORE any early return
+  // so hook order stays stable across loading → ready transitions.
+  const protectedRows = useMemo(() => (sheet ? getProtectedIdentityTraits(sheet) : []), [sheet]);
+
   if (data.state === 'ready' && versions.length === 0) {
     return (
       <EmptyState
@@ -265,10 +270,6 @@ export function CharacterSheetTab({
 
   const isLocked = selectedVersion.status === 'locked';
   const isDraft = selectedVersion.status === 'draft';
-
-  /** Prompt 26 — protected identity rows, derived from the same classification
-   *  the generation-time hooks read. Shown for drafts and locked versions. */
-  const protectedRows = useMemo(() => (sheet ? getProtectedIdentityTraits(sheet) : []), [sheet]);
 
   function updateField(key: keyof SheetFormState, value: string) {
     setForm((current) => (current ? { ...current, [key]: value } : current));

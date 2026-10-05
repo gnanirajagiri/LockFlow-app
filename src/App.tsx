@@ -25,6 +25,7 @@ import { ContentProjectDetailPage } from './pages/ContentProjectDetailPage';
 import { ContentProjectLayout } from './features/content/ContentProjectLayout';
 import {
   ContentBriefRoute,
+  ContentComposeRoute,
   ContentInputsRoute,
   ContentJobRoute,
   ContentReviewRoute,
@@ -141,6 +142,7 @@ export default function App() {
               <Route path="content-studio/:projectId" element={<ContentProjectLayout />}>
                 <Route index element={<ContentProjectDetailPage />} />
                 <Route path="brief" element={<ContentBriefRoute />} />
+                <Route path="compose" element={<ContentComposeRoute />} />
                 <Route path="inputs" element={<ContentInputsRoute />} />
                 <Route path="storyboard" element={<ContentStoryboardRoute />} />
                 <Route path="review" element={<ContentReviewRoute />} />

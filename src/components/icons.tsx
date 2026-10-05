@@ -265,3 +265,31 @@ export const ScanIcon = (p: IconProps) => (
     <path d="M4 12h16" />
   </Icon>
 );
+
+export const PlayIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.6-6.2c.6-.4.6-1.4 0-1.8L9.6 4.9c-.7-.4-1.6.1-1.6.9Z" />
+  </Icon>
+);
+
+export const ImageIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3.5" y="5" width="17" height="14" rx="3" />
+    <circle cx="9" cy="10" r="1.6" />
+    <path d="m6 18 4.5-4.5L14 17l2.5-2.5L20 18" />
+  </Icon>
+);
+
+export const MicIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="9.2" y="3.5" width="5.6" height="10.3" rx="2.8" />
+    <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0" />
+    <path d="M12 18v2.5" />
+  </Icon>
+);
+
+export const TextIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M5 6.5h14M5 12h14M5 17.5h9" />
+  </Icon>
+);

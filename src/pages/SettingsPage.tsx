@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
@@ -9,8 +9,45 @@ import { useToast } from '../components/ui/Toast';
 import { Badge } from '../components/ui/Badge';
 import { getGenerationRepository, DEMO_GENERATION_CONFIG } from '../generation/factory';
 import { getOpenAiApiKey, setOpenAiApiKey } from '../generation/openAiImageProvider';
+import {
+  setUploadedAvatar,
+  clearUploadedAvatar,
+  clearGeneratedAvatar,
+  generateAvatar,
+} from '../generation/avatar';
+import { useAvatar } from '../generation/useAvatar';
 
 type AiProviderChoice = 'development-fake' | 'openai';
+
+/** Reads a picked image file and downscales it to a square 256×256 data-URI. */
+function readImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error('That file is not a readable image.'));
+      image.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const context = canvas.getContext('2d');
+        if (!context) {
+          reject(new Error('Your browser blocked image processing.'));
+          return;
+        }
+        // Cover-crop the source to a square, then draw at 256×256.
+        const side = Math.min(image.naturalWidth, image.naturalHeight);
+        const offsetX = (image.naturalWidth - side) / 2;
+        const offsetY = (image.naturalHeight - side) / 2;
+        context.drawImage(image, offsetX, offsetY, side, side, 0, 0, 256, 256);
+        resolve(canvas.toDataURL('image/jpeg', 0.9));
+      };
+      image.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 export function SettingsPage() {
   const { toast } = useToast();
@@ -19,6 +56,10 @@ export function SettingsPage() {
   const [aiProvider, setAiProvider] = useState<AiProviderChoice>('development-fake');
   const [apiKey, setApiKey] = useState('');
   const [hasKey, setHasKey] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const userAvatar = useAvatar('user');
+  const workspaceAvatar = useAvatar('workspace');
+  const [generatingAvatar, setGeneratingAvatar] = useState(false);
 
   // Current generation config (drives which provider image jobs actually use).
   useEffect(() => {
@@ -67,12 +108,140 @@ export function SettingsPage() {
     }
   }
 
+  async function handleAvatarFile(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Not an image', description: 'Choose a PNG or JPG photo.', tone: 'error' });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'Image too large', description: 'Pick a photo under 10 MB.', tone: 'error' });
+      return;
+    }
+    try {
+      const dataUri = await readImageFile(file);
+      clearGeneratedAvatar('user'); // uploads replace generated portraits
+      clearUploadedAvatar('user');
+      setUploadedAvatar('user', dataUri);
+      toast({
+        title: 'Profile photo updated',
+        description: 'Your photo appears in the topbar across Maya. It stays in this browser only.',
+        tone: 'success',
+      });
+    } catch (err) {
+      toast({
+        title: 'Upload failed',
+        description: err instanceof Error ? err.message : 'Could not process that image.',
+        tone: 'error',
+      });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleGenerateAvatar() {
+    setGeneratingAvatar(true);
+    try {
+      await generateAvatar('user');
+      toast({
+        title: 'AI portrait generated',
+        description: 'Your generated avatar now appears in the topbar. Generate again for a different take.',
+        tone: 'success',
+      });
+    } catch (err) {
+      toast({
+        title: 'Generation failed',
+        description: err instanceof Error ? err.message : 'Could not generate an avatar right now.',
+        tone: 'error',
+      });
+    } finally {
+      setGeneratingAvatar(false);
+    }
+  }
+
+  const avatarDescription = userAvatar.origin === 'upload'
+    ? 'Your uploaded photo is used everywhere the account avatar appears.'
+    : userAvatar.origin === 'generated'
+      ? 'AI-generated portrait (gpt-image-1). Upload a photo to replace it, or generate again for a new take.'
+      : 'Upload a photo, or generate an AI portrait. Until then the topbar shows your initial.';
+
   return (
     <div className="lf-page">
       <PageHeader
         title="Settings"
         description="Account and workspace preferences. Settings become persistent once the database is connected."
       />
+
+      <Card style={{ marginBottom: 'var(--lf-space-4)' }}>
+        <CardHeader
+          title="Profile photo"
+          description={avatarDescription}
+        />
+        <CardBody>
+          <div className="lf-avatarsettings">
+            <div className="lf-avatarsettings__previewwrap">
+              {userAvatar.src ? (
+                <img className="lf-avatarsettings__preview" src={userAvatar.src} alt="Current profile photo" />
+              ) : (
+                <span className="lf-avatar lf-avatar--photo lf-avatarsettings__preview lf-avatarsettings__preview--letter" aria-hidden="true">
+                  {(displayName.trim() || 'Demo User').slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              {userAvatar.generating || generatingAvatar ? (
+                <span className="lf-avatarsettings__spinner" role="status" aria-label="Generating avatar" />
+              ) : null}
+            </div>
+            <div className="lf-avatarsettings__origin">
+              {userAvatar.origin ? (
+                <Badge tone={userAvatar.origin === 'upload' ? 'success' : 'info'}>
+                  {userAvatar.origin === 'upload' ? 'uploaded photo' : 'AI-generated'}
+                </Badge>
+              ) : (
+                <Badge tone="neutral">no photo yet</Badge>
+              )}
+            </div>
+            <div className="lf-avatarsettings__actions">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="lf-visually-hidden"
+                aria-hidden="true"
+                tabIndex={-1}
+                onChange={(event) => void handleAvatarFile(event.target.files?.[0])}
+              />
+              <Button variant="primary" onClick={() => fileInputRef.current?.click()}>
+                Upload photo
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => void handleGenerateAvatar()}
+                disabled={generatingAvatar || !hasKey}
+                title={hasKey ? 'Generate a portrait with gpt-image-1' : 'Save an OpenAI API key below first'}
+              >
+                {generatingAvatar || userAvatar.generating ? 'Generating…' : 'Generate with AI'}
+              </Button>
+              {userAvatar.src ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    clearUploadedAvatar('user');
+                    toast({ title: 'Photo removed', description: 'The topbar is back to your generated portrait or initial.', tone: 'info' });
+                  }}
+                >
+                  Remove photo
+                </Button>
+              ) : null}
+            </div>
+            <p className="lf-field__hint">
+              Photos are resized to 256×256 and stored in this browser only (localStorage). The
+              workspace avatar uses the same flow; the workspace portrait currently comes from
+              {' '}{workspaceAvatar.origin === 'upload' ? 'an uploaded photo' : workspaceAvatar.origin === 'generated' ? 'AI generation' : 'the default'}.
+            </p>
+          </div>
+        </CardBody>
+      </Card>
+
       <Card style={{ marginBottom: 'var(--lf-space-4)' }}>
         <CardHeader
           title="AI image generation"

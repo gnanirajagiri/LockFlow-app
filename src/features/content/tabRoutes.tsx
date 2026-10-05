@@ -3,6 +3,7 @@
  */
 import { useOutletContext } from 'react-router-dom';
 import { BriefTab } from './BriefTab';
+import { ComposeTab } from './ComposeTab';
 import { InputsTab } from './InputsTab';
 import { StoryboardTab } from './StoryboardTab';
 import { ReviewTab } from './ReviewTab';
@@ -15,6 +16,10 @@ export function useContentProjectOutletContext(): ContentProjectOutletContext {
 
 export function ContentBriefRoute() {
   return <BriefTab />;
+}
+
+export function ContentComposeRoute() {
+  return <ComposeTab />;
 }
 
 export function ContentInputsRoute() {

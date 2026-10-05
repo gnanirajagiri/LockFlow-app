@@ -19,10 +19,11 @@ import { getEnvironmentsRepository } from '../../data/environmentsFactory';
 import { SEED_CONTENT_WORKSPACE_ID } from '../../mock/contentSeed';
 import { useContentProjectData, type ContentProjectState } from './useContentProjectData';
 
-type TabKey = 'brief' | 'inputs' | 'storyboard' | 'review' | 'job';
+type TabKey = 'brief' | 'compose' | 'inputs' | 'storyboard' | 'review' | 'job';
 
 const TABS: Array<{ key: TabKey; label: string; to: string }> = [
   { key: 'brief', label: 'Brief', to: 'brief' },
+  { key: 'compose', label: 'Compose', to: 'compose' },
   { key: 'inputs', label: 'Inputs', to: 'inputs' },
   { key: 'storyboard', label: 'Storyboard', to: 'storyboard' },
   { key: 'review', label: 'Review', to: 'review' },

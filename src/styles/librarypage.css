@@ -133,7 +133,7 @@
 }
 
 .lf-library__menuitem--danger {
-  color: var(--lf-color-danger, #b42318);
+  color: var(--lf-color-danger-text);
 }
 
 .lf-library__menuhint {
@@ -296,7 +296,7 @@
   margin: var(--lf-space-3) 0 0;
   padding: var(--lf-space-2) var(--lf-space-3);
   border-radius: var(--lf-radius-md);
-  border: 1px solid var(--lf-color-warning, #b54708);
-  background: color-mix(in srgb, var(--lf-color-warning, #b54708) 8%, transparent);
+  border: 1px solid var(--lf-color-warning-border);
+  background: var(--lf-color-warning-bg);
   font-size: var(--lf-text-sm);
 }

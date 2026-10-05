@@ -272,10 +272,21 @@
   font-size: var(--lf-text-xs);
   font-weight: var(--lf-font-weight-semibold);
 }
+/* Empty-state letter avatar — warm portrait gradient until a real image
+   (Settings upload or AI-generated portrait) is available. */
 .lf-avatar--photo {
   background:
     radial-gradient(120% 120% at 30% 25%, #f7d9b8 0%, #e2a977 45%, #a56a3f 100%);
   color: #4a2e14;
+}
+/* Real avatar image (photo upload or generated portrait). */
+.lf-avatar--img {
+  display: block;
+  padding: 0;
+  object-fit: cover;
+  object-position: center;
+  background: var(--lf-color-surface-muted);
+  box-shadow: inset 0 0 0 1px rgba(25, 31, 46, 0.08);
 }
 
 /* ── Content canvas ──────────────────────────────────────────────────── */

@@ -84,8 +84,29 @@ export const NAV_SECTIONS: NavSection[] = [
 
 export const NAV_FLAT: NavItem[] = NAV_SECTIONS.flatMap((section) => section.items);
 
+/**
+ * Maya draft rail — flat, curated, deduplicated by destination. The draft
+ * sidebar has no section headers; items render in this order with the
+ * product's canonical labels ("Models", not "Model Builder").
+ */
+export const NAV_PRIMARY: NavItem[] = [
+  { label: 'Home', to: '/', icon: <HomeIcon />, end: true },
+  { label: 'Create', to: '/create', icon: <SparkIcon /> },
+  { label: 'Models', to: '/models', icon: <ModelIcon /> },
+  { label: 'Environments', to: '/environments', icon: <EnvironmentIcon /> },
+  { label: 'Content Studio', to: '/content-studio', icon: <StudioIcon /> },
+  { label: 'Templates', to: '/templates', icon: <TemplateIcon /> },
+  { label: 'Gallery', to: '/gallery', icon: <GalleryIcon /> },
+  { label: 'Library', to: '/library', icon: <LibraryIcon /> },
+  { label: 'Campaigns', to: '/campaigns', icon: <CampaignIcon /> },
+  { label: 'Publishing', to: '/publishing', icon: <GalleryIcon /> },
+  { label: 'Workspace', to: '/workspace', icon: <WorkspaceIcon /> },
+  { label: 'Settings', to: '/settings', icon: <SettingsIcon /> },
+  { label: 'Help', to: '/help', icon: <HelpIcon /> },
+];
+
 export function findNavByPath(pathname: string): NavItem | undefined {
-  return NAV_FLAT.find((item) =>
+  return NAV_PRIMARY.find((item) =>
     item.end ? pathname === item.to : pathname.startsWith(item.to),
   );
 }

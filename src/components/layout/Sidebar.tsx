@@ -1,7 +1,8 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { NAV_SECTIONS, type NavItem } from '../../navigation/nav';
+import { NAV_PRIMARY } from '../../navigation/nav';
+import type { NavItem } from '../../navigation/nav';
 import { useAuth } from '../../auth/AuthProvider';
-import { ChevronLeftIcon, LogoutIcon } from '../icons';
+import { ChevronLeftIcon, LogoutIcon, SparkIcon } from '../icons';
 
 export interface SidebarProps {
   collapsed: boolean;
@@ -9,8 +10,9 @@ export interface SidebarProps {
 }
 
 /**
- * Desktop navigation rail (dark navy). Collapses to an icon-only rail; the
- * choice is persisted by the parent shell so it survives reloads.
+ * Maya's desktop navigation rail (draft: deep navy, flat curated nav,
+ * violet active pill, sparkle brand, tagline footer). Collapses to an
+ * icon-only rail; the choice is persisted by the parent shell.
  * Styling: `.lf-sidebar*` in src/styles/layout.css.
  */
 export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
@@ -29,36 +31,26 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
     <aside className={`lf-sidebar${collapsed ? ' lf-sidebar--collapsed' : ''}`} aria-label="Primary">
       <div className="lf-sidebar__top">
         <a href="/" className="lf-sidebar__brand" aria-label="Maya AI home">
-          <span className="lf-brandmark" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
-              <path d="M18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
-            </svg>
-          </span>
           <span className={`lf-sidebar__brandname${collapsed ? ' lf-sidebar__brandname--hidden' : ''}`}>
             Maya
+            <SparkIcon className="lf-sidebar__brandspark" size={16} aria-hidden="true" />
             <span className="lf-sidebar__brandsub">AI Content Studio</span>
           </span>
         </a>
       </div>
 
-      <nav className="lf-sidebar__nav">
-        {NAV_SECTIONS.map((section) => (
-          <div key={section.id} className="lf-navsection">
-            <div
-              className={`lf-navsection__label${collapsed ? ' lf-navsection__label--hidden' : ''}`}
-              id={`nav-section-${section.id}`}
-            >
-              {section.label}
-            </div>
-            {section.items.map((item) => (
-              <NavLinkRow key={item.to} item={item} collapsed={collapsed} />
-            ))}
-          </div>
+      <nav className="lf-sidebar__nav" aria-label="Maya sections">
+        {NAV_PRIMARY.map((item) => (
+          <NavLinkRow key={`${item.to}::${item.label}`} item={item} collapsed={collapsed} />
         ))}
       </nav>
 
       <div className="lf-sidebar__bottom">
+        <p className={`lf-sidebar__tagline${collapsed ? ' lf-sidebar__tagline--hidden' : ''}`} aria-hidden="true">
+          Better content.
+          <br />
+          Less effort.
+        </p>
         <button
           type="button"
           className="lf-sidebar__collapse"
@@ -93,7 +85,6 @@ function NavLinkRow({ item, collapsed }: { item: NavItem; collapsed: boolean }) 
       to={item.to}
       end={item.end}
       className={({ isActive }) => `lf-navlink${isActive ? ' lf-navlink--active' : ''}`}
-      aria-labelledby={`nav-section-${item.to}`}
       title={collapsed ? item.label : undefined}
     >
       <span className="lf-navlink__icon" aria-hidden="true">

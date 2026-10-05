@@ -1,76 +1,9 @@
-/* ── LockFlow design tokens ──────────────────────────────────────────────── */
+/* ── Maya design tokens ──────────────────────────────────────────────────
+   All custom properties are declared once, in tokens.css. Component styles
+   here consume them (including the legacy aliases kept for the rule blocks
+   written before the unified scale). No :root declarations in this file. */
 
-:root {
-  /* Colours */
-  --lf-color-bg: #f6f5f2;
-  --lf-color-surface: #ffffff;
-  --lf-color-surface-elevated: #ffffff;
-  --lf-color-border: #e3e1da;
-  --lf-color-border-strong: #d4d2c9;
-  --lf-color-foreground: #1c1b19;
-  --lf-color-foreground-subtle: #5c5954;
-  --lf-color-foreground-weak: #9b978e;
-
-  --lf-color-primary: #2f55d4;
-  --lf-color-primary-hover: #2444a8;
-  --lf-color-primary-on: #ffffff;
-
-  --lf-color-success: #1c7c43;
-  --lf-color-success-bg: #e7f4ec;
-  --lf-color-warning: #9a5b00;
-  --lf-color-warning-bg: #fdf1dc;
-  --lf-color-danger: #b42318;
-  --lf-color-danger-bg: #fbeae7;
-
-  --lf-color-locked-bg: #e9edf4;
-  --lf-color-locked-foreground: #3b4a63;
-  --lf-color-locked-border: #c3cbe0;
-
-  /* Status tones (mirrors BadgeTone) */
-  --lf-tone-neutral: #5c5954;
-  --lf-tone-primary: #2f55d4;
-  --lf-tone-success: #1c7c43;
-  --lf-tone-warning: #9a5b00;
-  --lf-tone-danger: #b42318;
-  --lf-tone-info: #2f55d4;
-  --lf-tone-locked: #3b4a63;
-
-  /* Spacing */
-  --lf-space-1: 4px;
-  --lf-space-2: 8px;
-  --lf-space-3: 12px;
-  --lf-space-4: 16px;
-  --lf-space-5: 20px;
-  --lf-space-6: 24px;
-  --lf-space-8: 32px;
-  --lf-space-12: 48px;
-
-  /* Typography */
-  --lf-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --lf-font-mono: 'SF Mono', 'Consolas', 'Menlo', monospace;
-  --lf-text-size-sm: 13px;
-  --lf-text-size-base: 15px;
-  --lf-text-size-lg: 17px;
-  --lf-text-size-xl: 20px;
-  --lf-text-size-2xl: 24px;
-  --lf-text-size-3xl: 32px;
-
-  /* Radius */
-  --lf-radius-sm: 4px;
-  --lf-radius-md: 8px;
-  --lf-radius-lg: 12px;
-
-  /* Shadows */
-  --lf-shadow-sm: 0 1px 2px rgba(28, 27, 25, 0.06);
-  --lf-shadow-md: 0 4px 12px rgba(28, 27, 25, 0.08);
-  --lf-shadow-lg: 0 12px 32px rgba(28, 27, 25, 0.12);
-
-  /* Layout */
-  --lf-max-width: 1200px;
-  --lf-corner-padding: var(--lf-space-4);
-}
-
-/* ── Reset + base ────────────────────────────────────────────────────────── */
+/* ── Reset + base ────────────────────────────────────────────────────── */
 
 *,
 *::before,
@@ -144,18 +77,18 @@ button {
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--lf-space-4);
-  padding: var(--lf-space-4);
+  padding: var(--lf-space-5);
   background: var(--lf-color-surface);
   border: 1px solid var(--lf-color-border);
   border-radius: var(--lf-radius-lg);
-  box-shadow: var(--lf-shadow-sm);
+  box-shadow: var(--lf-shadow-xs);
 }
 
 .lf-sheet__header__title h1 {
   margin: 0 0 var(--lf-space-1) 0;
-  font-size: var(--lf-text-size-xl);
+  font-size: var(--lf-text-2xl);
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--lf-tracking-tight);
 }
 
 .lf-sheet__header__subtitle {
@@ -184,31 +117,31 @@ button {
 
 .lf-sheet__tab {
   appearance: none;
-  border: 1px solid var(--lf-color-border);
-  background: var(--lf-color-surface);
-  color: var(--lf-color-foreground-subtle);
-  padding: var(--lf-space-2) var(--lf-space-3);
-  border-radius: var(--lf-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--lf-color-ink-secondary);
+  padding: var(--lf-space-2) var(--lf-space-4);
+  border-radius: var(--lf-radius-full);
   cursor: pointer;
   font-size: var(--lf-text-size-sm);
-  transition: color var(--lf-duration-fast) ease, border-color var(--lf-duration-fast) ease, background var(--lf-duration-fast) ease;
+  font-weight: var(--lf-font-weight-medium);
+  transition: color var(--lf-duration-fast) ease, background var(--lf-duration-fast) ease;
 }
 
 .lf-sheet__tab:hover {
-  color: var(--lf-color-foreground);
-  border-color: var(--lf-color-border-strong);
+  color: var(--lf-color-ink);
+  background: var(--lf-color-surface-muted);
 }
 
 .lf-sheet__tab.is-active {
-  color: var(--lf-color-primary);
-  border-color: var(--lf-color-primary);
-  background: var(--lf-color-primary);
-  font-weight: 600;
+  color: #ffffff;
+  background: var(--lf-color-primary-500);
+  font-weight: var(--lf-font-weight-semibold);
 }
 
 .lf-sheet__tab.is-active:hover {
-  color: var(--lf-color-primary-on);
-  border-color: var(--lf-color-primary);
+  color: #ffffff;
+  background: var(--lf-color-primary-600);
 }
 
 /* ── Panels / sections ───────────────────────────────────────────────────── */
@@ -398,22 +331,26 @@ button {
   appearance: none;
   border: 1px solid var(--lf-color-border-strong);
   background: var(--lf-color-surface);
-  color: var(--lf-color-foreground);
-  padding: var(--lf-space-2) var(--lf-space-3);
-  border-radius: var(--lf-radius-sm);
+  color: var(--lf-color-ink);
+  padding: var(--lf-space-2) var(--lf-space-4);
+  border-radius: var(--lf-radius-full);
   font-size: var(--lf-text-size-sm);
+  font-weight: var(--lf-font-weight-medium);
   cursor: pointer;
-  transition: background var(--lf-duration-fast) ease, border-color var(--lf-duration-fast) ease, color var(--lf-duration-fast) ease;
+  transition: background var(--lf-duration-fast) ease, border-color var(--lf-duration-fast) ease, color var(--lf-duration-fast) ease, box-shadow var(--lf-duration-fast) ease;
 }
 
 .lf-btn--primary {
-  background: var(--lf-color-primary);
-  border-color: var(--lf-color-primary);
+  background: var(--lf-color-primary-500);
+  border-color: var(--lf-color-primary-500);
   color: var(--lf-color-primary-on);
+  box-shadow: var(--lf-shadow-xs);
 }
 
 .lf-btn--primary:hover {
-  background: var(--lf-color-primary-hover);
+  background: var(--lf-color-primary-600);
+  border-color: var(--lf-color-primary-600);
+  box-shadow: var(--lf-shadow-sm);
 }
 
 .lf-btn--secondary {
@@ -425,20 +362,20 @@ button {
 }
 
 .lf-btn--sm {
-  padding: var(--lf-space-1) var(--lf-space-2);
+  padding: var(--lf-space-1) var(--lf-space-3);
   font-size: var(--lf-text-size-sm);
 }
 
 .lf-btn--ghost {
   background: transparent;
   border-color: transparent;
-  color: var(--lf-color-foreground-subtle);
+  color: var(--lf-color-ink-secondary);
 }
 
 .lf-btn--ghost:hover {
-  background: var(--lf-color-surface);
-  border-color: var(--lf-color-border);
-  color: var(--lf-color-foreground);
+  background: var(--lf-color-surface-muted);
+  border-color: transparent;
+  color: var(--lf-color-ink);
 }
 
 /* ── Locked tone (mirrors Badge tone) ────────────────────────────────────── */
@@ -447,17 +384,17 @@ button {
   display: flex;
   align-items: center;
   gap: var(--lf-space-3);
-  padding: var(--lf-space-4);
-  background: var(--lf-color-locked-bg);
-  border: 1px solid var(--lf-color-locked-border);
-  border-radius: var(--lf-radius-lg);
-  color: var(--lf-color-locked-foreground);
+  padding: var(--lf-space-4) var(--lf-space-5);
+  background: var(--lf-color-primary-50);
+  border: 1px solid var(--lf-color-primary-100);
+  border-radius: var(--lf-radius-md);
+  color: var(--lf-color-primary-700);
 }
 
 .lf-lockedbanner__copy {
   flex: 1;
   font-size: var(--lf-text-size-sm);
-  color: var(--lf-color-locked-foreground);
+  color: var(--lf-color-primary-700);
 }
 
 .lf-sheet__panes {
@@ -815,4 +752,547 @@ button {
   .lf-createquick {
     grid-template-columns: 1fr;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Maya UI kit — Card, Badge, Button sizes, Input/Field, Modal, Drawer,
+   Toast, Tabs, Skeleton, EmptyState.
+   These classes are emitted by src/components/ui/* which documented
+   "styling in components.css" — the rules below are that missing layer,
+   drawn to the Maya draft (white 16px cards, pill controls, violet
+   primary, soft warm shadows).
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Card ──────────────────────────────────────────────────────── */
+
+.lf-card {
+  background: var(--lf-color-surface);
+  border: 1px solid var(--lf-color-border);
+  border-radius: var(--lf-radius-lg);
+  box-shadow: var(--lf-shadow-xs);
+}
+
+.lf-card--interactive {
+  cursor: pointer;
+  transition: box-shadow var(--lf-duration-fast) var(--lf-ease-out),
+    border-color var(--lf-duration-fast) var(--lf-ease-out),
+    transform var(--lf-duration-fast) var(--lf-ease-out);
+}
+.lf-card--interactive:hover {
+  border-color: var(--lf-color-border-strong);
+  box-shadow: var(--lf-shadow-sm);
+}
+.lf-card--interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--lf-focus-ring);
+}
+
+.lf-card__body {
+  padding: var(--lf-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-2);
+}
+.lf-card__body--flush {
+  padding: 0;
+  gap: 0;
+}
+.lf-card__header {
+  padding: var(--lf-space-4) var(--lf-space-4) 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lf-space-3);
+}
+.lf-card__title {
+  margin: 0;
+  font-size: var(--lf-text-md);
+  font-weight: var(--lf-font-weight-semibold);
+  color: var(--lf-color-ink);
+}
+.lf-card__description {
+  margin: 0;
+  font-size: var(--lf-text-sm);
+  color: var(--lf-color-ink-secondary);
+}
+.lf-card__footer {
+  padding: var(--lf-space-3) var(--lf-space-4) var(--lf-space-4);
+  border-top: 1px solid var(--lf-color-border);
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-ink-muted);
+}
+
+/* ── Badge — status chips (draft lock pills) ─────────────────────── */
+
+.lf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--lf-radius-full);
+  font-size: var(--lf-text-xs);
+  font-weight: var(--lf-font-weight-medium);
+  line-height: 1.5;
+  white-space: nowrap;
+  background: var(--lf-color-surface-muted);
+  color: var(--lf-tone-neutral);
+  border: 1px solid transparent;
+}
+.lf-badge--primary {
+  background: var(--lf-color-primary-soft);
+  color: var(--lf-color-primary-700);
+}
+.lf-badge--success {
+  background: var(--lf-color-success-bg);
+  color: var(--lf-color-success-text);
+}
+.lf-badge--warning {
+  background: var(--lf-color-warning-bg);
+  color: var(--lf-color-warning-text);
+}
+.lf-badge--danger {
+  background: var(--lf-color-danger-bg);
+  color: var(--lf-color-danger-text);
+}
+.lf-badge--info {
+  background: var(--lf-color-info-bg);
+  color: var(--lf-color-info-text);
+}
+.lf-badge--locked {
+  background: var(--lf-color-locked-bg);
+  color: var(--lf-color-locked-foreground);
+  border-color: var(--lf-color-locked-border);
+}
+.lf-badge__dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: var(--lf-radius-full);
+  background: currentColor;
+}
+
+/* ── Icon button (modal/drawer close, row menus) ───────────────── */
+
+.lf-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: none;
+  border-radius: var(--lf-radius-full);
+  background: transparent;
+  color: var(--lf-color-ink-secondary);
+  cursor: pointer;
+  transition: background var(--lf-duration-fast) ease, color var(--lf-duration-fast) ease;
+}
+.lf-iconbtn:hover {
+  background: var(--lf-color-surface-muted);
+  color: var(--lf-color-ink);
+}
+.lf-iconbtn:focus-visible {
+  outline: none;
+  box-shadow: var(--lf-focus-ring);
+}
+
+/* ── Button — sizes, block, icon slot, danger ────────────────────── */
+
+.lf-btn--md {
+  padding: var(--lf-space-2) var(--lf-space-4);
+}
+.lf-btn--lg {
+  padding: var(--lf-space-3) var(--lf-space-5);
+  font-size: var(--lf-text-size-base);
+}
+.lf-btn--block {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+}
+.lf-btn__icon {
+  display: inline-flex;
+  flex: none;
+}
+.lf-btn--danger {
+  background: var(--lf-color-danger-text);
+  border-color: var(--lf-color-danger-text);
+  color: #ffffff;
+}
+.lf-btn--danger:hover {
+  background: #97282f;
+  border-color: #97282f;
+}
+.lf-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.lf-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--lf-focus-ring);
+}
+
+/* ── Input + field ──────────────────────────────────────────────── */
+
+.lf-input {
+  width: 100%;
+  padding: var(--lf-space-2) var(--lf-space-3);
+  border: 1px solid var(--lf-color-border-strong);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-color-surface);
+  color: var(--lf-color-ink);
+  font-family: inherit;
+  font-size: var(--lf-text-size-base);
+  transition: border-color var(--lf-duration-fast) ease, box-shadow var(--lf-duration-fast) ease;
+}
+.lf-input::placeholder {
+  color: var(--lf-color-ink-faint);
+}
+.lf-input:focus-visible {
+  outline: none;
+  border-color: var(--lf-color-border-focus);
+  box-shadow: var(--lf-focus-ring);
+}
+.lf-input--invalid {
+  border-color: var(--lf-color-danger-text);
+}
+.lf-input--invalid:focus-visible {
+  box-shadow: 0 0 0 2px var(--lf-color-bg), 0 0 0 4px var(--lf-color-danger-border);
+}
+select.lf-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%237c8598' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+.lf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lf-field__label {
+  font-size: var(--lf-text-sm);
+  font-weight: var(--lf-font-weight-medium);
+  color: var(--lf-color-ink);
+}
+.lf-field__label--optional {
+  font-weight: var(--lf-font-weight-normal);
+  color: var(--lf-color-ink-muted);
+}
+.lf-field__hint {
+  margin: 0;
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-ink-muted);
+}
+
+/* ── Modal ──────────────────────────────────────────────────────── */
+
+.lf-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--lf-z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--lf-space-4);
+  background: rgba(13, 21, 38, 0.45);
+  backdrop-filter: blur(2px);
+}
+.lf-modal {
+  width: 100%;
+  max-height: min(86dvh, 820px);
+  display: flex;
+  flex-direction: column;
+  background: var(--lf-color-surface);
+  border-radius: var(--lf-radius-lg);
+  box-shadow: var(--lf-shadow-lg);
+}
+.lf-modal--sm {
+  max-width: 440px;
+}
+.lf-modal--md {
+  max-width: 620px;
+}
+.lf-modal--lg {
+  max-width: 860px;
+}
+.lf-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--lf-space-3);
+  padding: var(--lf-space-5) var(--lf-space-5) 0;
+}
+.lf-modal__title {
+  margin: 0;
+  font-size: var(--lf-text-lg);
+  font-weight: var(--lf-font-weight-semibold);
+  letter-spacing: var(--lf-tracking-tight);
+  color: var(--lf-color-ink);
+}
+.lf-modal__body {
+  padding: var(--lf-space-4) var(--lf-space-5);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-3);
+}
+.lf-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--lf-space-2);
+  padding: var(--lf-space-3) var(--lf-space-5) var(--lf-space-5);
+}
+
+/* ── Drawer ─────────────────────────────────────────────────────── */
+
+.lf-drawer__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--lf-z-drawer);
+  background: rgba(13, 21, 38, 0.4);
+}
+.lf-drawer__panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: calc(var(--lf-z-drawer) + 1);
+  width: min(420px, 92vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--lf-color-surface);
+  box-shadow: var(--lf-shadow-lg);
+}
+.lf-drawer__panel--right {
+  left: auto;
+  right: 0;
+}
+.lf-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lf-space-3);
+  padding: var(--lf-space-4) var(--lf-space-5);
+  border-bottom: 1px solid var(--lf-color-border);
+}
+.lf-drawer__title {
+  margin: 0;
+  font-size: var(--lf-text-lg);
+  font-weight: var(--lf-font-weight-semibold);
+  letter-spacing: var(--lf-tracking-tight);
+  color: var(--lf-color-ink);
+}
+.lf-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--lf-space-4) var(--lf-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-3);
+}
+.lf-drawer__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--lf-space-2);
+  padding: var(--lf-space-3) var(--lf-space-5);
+  border-top: 1px solid var(--lf-color-border);
+}
+
+/* ── Tabs — pill segments (draft) ────────────────────────────── */
+
+.lf-tabs__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--lf-space-1);
+  padding: 3px;
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-surface-muted);
+}
+.lf-tabs__tab {
+  appearance: none;
+  border: none;
+  padding: 7px var(--lf-space-4);
+  border-radius: var(--lf-radius-full);
+  background: transparent;
+  color: var(--lf-color-ink-secondary);
+  font-size: var(--lf-text-sm);
+  font-weight: var(--lf-font-weight-medium);
+  cursor: pointer;
+  transition: background var(--lf-duration-fast) ease, color var(--lf-duration-fast) ease;
+}
+.lf-tabs__tab:hover {
+  color: var(--lf-color-ink);
+}
+.lf-tabs__tab:focus-visible {
+  outline: none;
+  box-shadow: var(--lf-focus-ring);
+}
+.lf-tabs__tab[aria-selected='true'] {
+  background: var(--lf-color-surface);
+  color: var(--lf-color-ink);
+  font-weight: var(--lf-font-weight-semibold);
+  box-shadow: var(--lf-shadow-xs);
+}
+.lf-tabs__panel {
+  animation: lf-fade-in var(--lf-duration-fast) ease;
+}
+
+/* ── Skeleton — soft warm shimmer ────────────────────────────────── */
+
+.lf-skeleton {
+  border-radius: var(--lf-radius-sm);
+  background: linear-gradient(
+    100deg,
+    #efece4 0%,
+    #f7f5ef 45%,
+    #efece4 90%
+  );
+  background-size: 200% 100%;
+  animation: lf-shimmer 1.6s ease-in-out infinite;
+  min-height: 0.875rem;
+}
+.lf-skeleton--text {
+  height: 0.875rem;
+  margin-bottom: 6px;
+}
+.lf-skeleton--title {
+  height: 1.25rem;
+  width: 55%;
+  margin-bottom: 8px;
+}
+.lf-skeleton--rect {
+  width: 100%;
+}
+.lf-skeleton--circle {
+  border-radius: var(--lf-radius-full);
+}
+@keyframes lf-shimmer {
+  from { background-position: 180% 0; }
+  to { background-position: -20% 0; }
+}
+
+/* ── Empty state ────────────────────────────────────────────────── */
+
+.lf-emptystate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lf-space-2);
+  padding: var(--lf-space-7) var(--lf-space-5);
+  text-align: center;
+  background: var(--lf-color-surface);
+  border: 1px dashed var(--lf-color-border-strong);
+  border-radius: var(--lf-radius-lg);
+}
+.lf-emptystate--borderless {
+  border: none;
+  background: transparent;
+}
+.lf-emptystate__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-primary-soft);
+  color: var(--lf-color-primary-600);
+  margin-bottom: var(--lf-space-1);
+}
+.lf-emptystate__title {
+  margin: 0;
+  font-size: var(--lf-text-md);
+  font-weight: var(--lf-font-weight-semibold);
+  color: var(--lf-color-ink);
+}
+.lf-emptystate__description {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--lf-text-sm);
+  color: var(--lf-color-ink-secondary);
+}
+.lf-emptystate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--lf-space-2);
+  margin-top: var(--lf-space-2);
+}
+
+/* ── Toasts ──────────────────────────────────────────────────────── */
+
+.lf-toaster {
+  position: fixed;
+  bottom: var(--lf-space-5);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--lf-z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--lf-space-2);
+  width: min(440px, calc(100vw - 32px));
+}
+.lf-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--lf-space-3);
+  width: 100%;
+  padding: var(--lf-space-3) var(--lf-space-4);
+  background: var(--lf-color-navy-900);
+  color: var(--lf-color-navy-text);
+  border-radius: var(--lf-radius-md);
+  box-shadow: var(--lf-shadow-lg);
+  animation: lf-fade-in var(--lf-duration-fast) ease;
+}
+.lf-toast--leaving {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity var(--lf-duration-normal) ease, transform var(--lf-duration-normal) ease;
+}
+.lf-toast__icon {
+  display: inline-flex;
+  flex: none;
+  margin-top: 1px;
+  color: #a99bf8;
+}
+.lf-toast--success .lf-toast__icon { color: #6fd694; }
+.lf-toast--error .lf-toast__icon { color: #f2938f; }
+.lf-toast--warning .lf-toast__icon { color: #eec27f; }
+.lf-toast__content {
+  flex: 1;
+  min-width: 0;
+}
+.lf-toast__title {
+  display: block;
+  font-size: var(--lf-text-sm);
+  font-weight: var(--lf-font-weight-semibold);
+}
+.lf-toast__description {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-navy-text-muted);
+}
+.lf-toast__close {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--lf-color-navy-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--lf-radius-sm);
+}
+.lf-toast__close:hover {
+  color: var(--lf-color-navy-text);
+}
+.lf-toast__close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--lf-color-navy-900), 0 0 0 4px var(--lf-color-primary-500);
 }

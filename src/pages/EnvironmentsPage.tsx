@@ -24,6 +24,8 @@ import {
 import { EnvironmentsService } from '../services/environmentsService';
 import { getEnvironmentsRepository } from '../data/environmentsFactory';
 import { validateCreateEnvironment } from '../domain/environments';
+import { ENVIRONMENT_PRESETS } from '../environments/environmentPresets';
+import type { EnvironmentPreset } from '../environments/environmentPresets';
 import { useAuth } from '../auth/AuthProvider';
 import { SEED_ENVIRONMENT_WORKSPACE_ID } from '../mock/environmentsSeed';
 import type { EnvironmentStatus, EnvironmentWithVersion } from '../domain/environments';
@@ -86,6 +88,8 @@ export function EnvironmentsPage() {
   const [createName, setCreateName] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  /** Maya stepper: "Choose a base environment" — null = create from scratch. */
+  const [selectedPreset, setSelectedPreset] = useState<EnvironmentPreset | null>(null);
   const [archiving, setArchiving] = useState<EnvironmentWithVersion | null>(null);
 
   const load = useCallback(async () => {
@@ -141,13 +145,32 @@ export function EnvironmentsPage() {
         result.value,
         user?.id ?? 'demo-user',
       );
+
+      // Maya "choose a base": seed the fresh v1 draft's spec anchors and lock
+      // level from the chosen preset so the creator edits rather than invents.
+      let presetNote: string | null = null;
+      if (selectedPreset) {
+        try {
+          const versions = await service.getVersions(environment.id, SEED_ENVIRONMENT_WORKSPACE_ID);
+          const draft = versions.find((version) => version.status === 'draft') ?? versions[0];
+          if (draft) {
+            await service.updateSpec(draft.id, selectedPreset.spec, SEED_ENVIRONMENT_WORKSPACE_ID);
+            await service.updateVersionDraft(draft.id, { lockLevel: selectedPreset.lockLevel }, SEED_ENVIRONMENT_WORKSPACE_ID);
+            presetNote = ` Seeded from the “${selectedPreset.name}” base.`;
+          }
+        } catch {
+          presetNote = ' Base preset could not be applied — starting blank.';
+        }
+      }
+
       toast({
         title: 'Environment created',
-        description: `${environment.name} starts with a draft version — define its anchors, then lock.`,
+        description: `${environment.name} starts with a draft version — define its anchors, then lock.${presetNote ?? ''}`,
         tone: 'success',
       });
       setCreateOpen(false);
       setCreateName('');
+      setSelectedPreset(null);
       navigate(`/environments/${environment.id}/edit`);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Could not create the environment.');
@@ -402,8 +425,8 @@ export function EnvironmentsPage() {
       <Modal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="Create an environment"
-        size="sm"
+        title="New environment — choose a base"
+        size="lg"
         footer={
           <div className="lf-dialogactions">
             <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
@@ -413,21 +436,41 @@ export function EnvironmentsPage() {
           </div>
         }
       >
-        <p>
-          Start a reusable setting. You can define, review and lock its continuity anchors before
-          using it in content.
+        <p className="lf-tile__description" style={{ marginTop: 0 }}>
+          <strong>1 · Choose a base</strong> — presets seed the draft's anchors and default lock
+          level. Everything stays editable before you lock. Or skip a base and create from scratch.
         </p>
-        <Input
-          label="Environment name"
-          value={createName}
-          onChange={(event) => setCreateName(event.target.value)}
-          error={createError ?? undefined}
-          required
-          hint="e.g. Warm Bedroom Studio, Glass Loft Kitchen"
-        />
+        <div className="lf-epresetgrid" role="radiogroup" aria-label="Base environment">
+          {ENVIRONMENT_PRESETS.map((preset) => (
+            <button
+              key={preset.key}
+              type="button"
+              role="radio"
+              aria-checked={selectedPreset?.key === preset.key}
+              className={`lf-epreset${selectedPreset?.key === preset.key ? ' lf-epreset--selected' : ''}`}
+              onClick={() => setSelectedPreset(selectedPreset?.key === preset.key ? null : preset)}
+            >
+              <span className={`lf-epreset__media ${preset.mediaClass}`} aria-hidden="true" />
+              <span className="lf-epreset__name">{preset.name}</span>
+              <span className="lf-epreset__desc">{preset.description}</span>
+              <span className="lf-epreset__meta">{preset.roomType} · {preset.lockLevel} lock</span>
+            </button>
+          ))}
+        </div>
+        <div className="lf-field" style={{ marginTop: 'var(--lf-space-4)' }}>
+          <label className="lf-field__label" htmlFor="env-create-name">Environment name</label>
+          <input
+            id="env-create-name"
+            className="lf-input"
+            value={createName}
+            onChange={(event) => setCreateName(event.target.value)}
+            placeholder="e.g. Warm Bedroom Studio, Glass Loft Kitchen"
+          />
+          {createError ? <p className="lf-field__error" role="alert">{createError}</p> : null}
+        </div>
         <p className="lf-tile__description">
-          The environment starts with a first draft version of its spec. Definition, review and
-          locking happen next — no generation or image analysis happens here.
+          Next: edit the environment's anchors, then lock-and-save when it's ready — no generation
+          or image analysis happens here.
         </p>
       </Modal>
 

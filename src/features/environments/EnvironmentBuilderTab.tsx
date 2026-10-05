@@ -44,6 +44,8 @@ import { getEnvironmentsRepository } from '../../data/environmentsFactory';
 import { LibraryService } from '../../services/libraryService';
 import { getLibraryRepository } from '../../data/libraryFactory';
 import { SEED_ENVIRONMENT_WORKSPACE_ID } from '../../mock/environmentsSeed';
+import { LOCK_LEVEL_CHOICES } from '../../environments/environmentPresets';
+import type { EnvironmentLockLevel } from '../../domain/environments';
 import { useEnvironmentOutletContext } from './tabRoutes';
 
 const ACTOR = 'demo-user';
@@ -141,6 +143,8 @@ export function EnvironmentBuilderTab() {
   const [lockOpen, setLockOpen] = useState(false);
   const [lockConfirmed, setLockConfirmed] = useState(false);
   const [snapshot, setSnapshot] = useState<EnvironmentVersionSnapshot | null>(null);
+  /** Maya mockup 8: lock-level choice, pre-filled from the draft's current level. */
+  const [lockLevelChoice, setLockLevelChoice] = useState<EnvironmentLockLevel | null>(null);
 
   const loadView = useCallback(async (versionId: string) => {
     setView(await builder.getEnvironmentBuilderView(SEED_ENVIRONMENT_WORKSPACE_ID, versionId));
@@ -164,6 +168,15 @@ export function EnvironmentBuilderTab() {
 
   if (!environment) return null;
   const locked = view?.version.status === 'locked';
+  // Maya stepper (mockups 6–8): Choose base → Edit environment → Lock & save.
+  const specSeeded = !!(view?.spec && (view.spec.roomType || view.spec.lightingStyle));
+  const readyToLock = view?.readiness.readiness === 'ready_to_lock';
+  const stepperStates: Array<'done' | 'current' | 'todo'> =
+    locked
+      ? ['done', 'done', 'done']
+      : specSeeded
+        ? ['done', readyToLock ? 'done' : 'current', readyToLock ? 'current' : 'todo']
+        : ['current', 'todo', 'todo'];
 
   function openAssetDialog() {
     setAssetOpen(true);
@@ -270,6 +283,7 @@ export function EnvironmentBuilderTab() {
         return;
       }
       setSnapshot(await builder.getEnvironmentVersionSnapshot(SEED_ENVIRONMENT_WORKSPACE_ID, view.version.id));
+      setLockLevelChoice(view.version.lockLevel);
       setLockConfirmed(false);
       setLockOpen(true);
     } catch (err) {
@@ -283,9 +297,14 @@ export function EnvironmentBuilderTab() {
     if (!view || !lockConfirmed || busy) return;
     setBusy(true);
     try {
+      // Persist a changed lock level before the lock seals the version.
+      if (lockLevelChoice && lockLevelChoice !== view.version.lockLevel) {
+        await service.updateVersionDraft(view.version.id, { lockLevel: lockLevelChoice }, SEED_ENVIRONMENT_WORKSPACE_ID);
+      }
       const { version } = await builder.lockAndSaveEnvironmentVersion(SEED_ENVIRONMENT_WORKSPACE_ID, view.version.id, ACTOR);
       toast({ title: `v${version.versionNumber} locked — this environment stays stable for every generation set using it.`, tone: 'success' });
       setLockOpen(false);
+      await data.reload();
       await refresh();
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : 'Could not lock the version.', tone: 'error' });
@@ -301,6 +320,7 @@ export function EnvironmentBuilderTab() {
       const draftVersion = await builder.createEnvironmentDraftFromLockedVersion(SEED_ENVIRONMENT_WORKSPACE_ID, view.version.id, ACTOR);
       toast({ title: `Draft v${draftVersion.versionNumber} created — repaint, rearrange or relight there.`, tone: 'success' });
       setSelectedVersionId(draftVersion.id);
+      await data.reload();
       await loadView(draftVersion.id);
     } catch (err) {
       toast({ title: err instanceof Error ? err.message : 'Could not create the draft.', tone: 'error' });
@@ -336,6 +356,17 @@ export function EnvironmentBuilderTab() {
             Environments are independently reusable locations — never tied to a model. Locked
             versions stay visually stable across every generation set that uses them.
           </p>
+          <ol className="lf-envsteps" aria-label="Environment steps">
+            {['Choose base', 'Edit environment', 'Lock & save'].map((label, index) => (
+              <li key={label} className={`lf-envsteps__step lf-envsteps__step--${stepperStates[index]}`}>
+                <span className="lf-envsteps__num" aria-hidden="true">
+                  {stepperStates[index] === 'done' ? '✓' : index + 1}
+                </span>
+                {label}
+                {stepperStates[index] === 'current' ? <span className="lf-visually-hidden"> (current step)</span> : null}
+              </li>
+            ))}
+          </ol>
         </CardBody>
       </Card>
 
@@ -637,7 +668,7 @@ export function EnvironmentBuilderTab() {
           <div className="lf-dialogactions">
             <Button onClick={() => setLockOpen(false)}>Cancel</Button>
             <Button variant="primary" disabled={!lockConfirmed || busy} onClick={() => void handleLock()}>
-              {busy ? 'Locking…' : 'Lock version'}
+              {busy ? 'Locking…' : `Lock environment v${view?.version.versionNumber ?? ''}`}
             </Button>
           </div>
         }
@@ -650,12 +681,38 @@ export function EnvironmentBuilderTab() {
               changes.
             </p>
             <ul className="lf-sheet__trait-list" style={{ margin: 'var(--lf-space-2) 0' }}>
-              <li className="lf-sheet__trait-row"><span className="lf-sheet__trait-key">Version</span><span className="lf-sheet__trait-value">v{snapshot.versionNumber} · {snapshot.lockLevel} lock</span></li>
+              <li className="lf-sheet__trait-row"><span className="lf-sheet__trait-key">Version</span><span className="lf-sheet__trait-value">v{snapshot.versionNumber}</span></li>
               <li className="lf-sheet__trait-row"><span className="lf-sheet__trait-key">Room</span><span className="lf-sheet__trait-value">{snapshot.spec?.roomType || '—'} · {snapshot.spec?.lightingStyle || '—'}</span></li>
               <li className="lf-sheet__trait-row"><span className="lf-sheet__trait-key">Coverage</span><span className="lf-sheet__trait-value">{snapshot.coverageSummary.requiredFilled}/{snapshot.coverageSummary.requiredTotal} required</span></li>
               <li className="lf-sheet__trait-row"><span className="lf-sheet__trait-key">References</span><span className="lf-sheet__trait-value">{snapshot.references.length} labeled</span></li>
               <li className="lf-sheet__trait-row"><span className="lf-sheet__trait-key">Assets / views</span><span className="lf-sheet__trait-value">{snapshot.assets.length} attached · {snapshot.cameraViews.length} saved views</span></li>
             </ul>
+
+            <fieldset className="lf-locklevels">
+              <legend className="lf-field__label">Lock level</legend>
+              {LOCK_LEVEL_CHOICES.map((choice) => (
+                <label key={choice.value} className="lf-locklevels__row">
+                  <input
+                    type="radio"
+                    name="envlock-level"
+                    value={choice.value}
+                    checked={lockLevelChoice === choice.value}
+                    onChange={() => setLockLevelChoice(choice.value)}
+                  />
+                  <span>
+                    <strong>{choice.label}</strong>
+                    <span className="lf-locklevels__hint">{choice.hint}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+
+            <ul className="lf-lockrules">
+              <li>✓ This locked environment stays visually stable in every generation using it.</li>
+              <li>✓ Changes later create a new draft version — the locked version never changes.</li>
+              <li>✓ Locked versions count as generation-ready assets in Content Studio.</li>
+            </ul>
+
             <label className="lf-envlock__rights" htmlFor="envlock-confirm">
               <input
                 id="envlock-confirm"
@@ -663,7 +720,7 @@ export function EnvironmentBuilderTab() {
                 checked={lockConfirmed}
                 onChange={(event) => setLockConfirmed(event.target.checked)}
               />
-              <span>I understand this locked environment version cannot be destructively edited.</span>
+              <span>I have the rights to this environment's references and understand this locked version cannot be destructively edited.</span>
             </label>
           </>
         ) : null}

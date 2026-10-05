@@ -235,6 +235,20 @@ export const EnvironmentIcon = (p: IconProps) => (
   </Icon>
 );
 
+export const BellIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M18 15.5v-5a6 6 0 1 0-12 0v5l-1.6 2.3a.6.6 0 0 0 .5.95h14.2a.6.6 0 0 0 .5-.95L18 15.5Z" />
+    <path d="M10 19.5a2 2 0 0 0 4 0" />
+  </Icon>
+);
+
+export const VideoIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="3.5" y="6" width="12.5" height="12" rx="2" />
+    <path d="m16 11 4.5-2.8v7.6L16 13" />
+  </Icon>
+);
+
 export const CameraIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.2-1.8h5.4L15.9 6h1.6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" />

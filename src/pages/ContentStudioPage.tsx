@@ -4,7 +4,7 @@
  * appears in Gallery.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -14,7 +14,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
-import { GridViewIcon, ListViewIcon, SearchIcon, StudioIcon } from '../components/icons';
+import { GridViewIcon, ListViewIcon, SearchIcon, StudioIcon, CameraIcon, VideoIcon, CampaignIcon } from '../components/icons';
 import { ContentStudioService } from '../services/contentService';
 import { LibraryService } from '../services/libraryService';
 import { ModelsService } from '../services/modelsService';
@@ -23,7 +23,10 @@ import { getContentRepository } from '../data/contentFactory';
 import { getLibraryRepository } from '../data/libraryFactory';
 import { getModelsRepository } from '../data';
 import { getEnvironmentsRepository } from '../data/environmentsFactory';
+import { getGalleryRepository } from '../data/galleryFactory';
 import { SEED_CONTENT_WORKSPACE_ID } from '../mock/contentSeed';
+import { SEED_GALLERY_WORKSPACE_ID } from '../mock/gallerySeed';
+import type { GalleryOutputRecord } from '../domain/gallery/types';
 import { STUDIO_HELPER_COPY } from '../features/content/contentUi';
 import type { ContentProjectStatus } from '../domain/content';
 import type { ContentProjectSummary } from '../data/contentRepository';
@@ -46,6 +49,17 @@ const STATUS_TONE = {
   archived: 'warning',
 } as const;
 
+/** Gallery output status → badge tone. */
+const OUTPUT_TONE: Record<GalleryOutputRecord['status'], 'neutral' | 'info' | 'warning' | 'success' | 'danger'> = {
+  draft: 'neutral',
+  processing: 'info',
+  ready_for_review: 'warning',
+  approved: 'success',
+  rejected: 'danger',
+  archived: 'neutral',
+  failed: 'danger',
+};
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -56,6 +70,7 @@ function formatDate(iso: string): string {
 
 export function ContentStudioPage() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const service = useMemo(
     () =>
       new ContentStudioService(getContentRepository(), {
@@ -69,6 +84,7 @@ export function ContentStudioPage() {
   const [state, setState] = useState<LoadState>('loading');
   const [error, setError] = useState<string | null>(null);
   const [summaries, setSummaries] = useState<ContentProjectSummary[]>([]);
+  const [outputs, setOutputs] = useState<GalleryOutputRecord[]>([]);
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -80,7 +96,16 @@ export function ContentStudioPage() {
     setState('loading');
     setError(null);
     try {
-      setSummaries(await service.listProjectSummaries(SEED_CONTENT_WORKSPACE_ID));
+      const [rows, galleryOutputs] = await Promise.all([
+        service.listProjectSummaries(SEED_CONTENT_WORKSPACE_ID),
+        getGalleryRepository().listOutputs(SEED_GALLERY_WORKSPACE_ID),
+      ]);
+      setSummaries(rows);
+      setOutputs(
+        [...galleryOutputs]
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+          .slice(0, 5),
+      );
       setState('ready');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load Content Studio.');
@@ -133,6 +158,77 @@ export function ContentStudioPage() {
       />
 
       <p className="lf-library__note" role="note">{STUDIO_HELPER_COPY}</p>
+
+      <section className="lf-studiohub" aria-label="Start something new">
+        <div className="lf-createquick">
+          <div className="lf-createquick__item">
+            <span className="lf-createquick__icon" aria-hidden="true"><CameraIcon size={18} /></span>
+            <div>
+              <strong>Create Image</strong>
+              <span className="lf-tile__description">High-quality images from your locked model and assets.</span>
+            </div>
+            <Link className="lf-btn lf-btn--primary lf-btn--sm" to="/content-studio/new">Start</Link>
+          </div>
+          <div className="lf-createquick__item">
+            <span className="lf-createquick__icon" aria-hidden="true"><VideoIcon size={18} /></span>
+            <div>
+              <strong>Create Video</strong>
+              <span className="lf-tile__description">Short-form and long-form video with consistent continuity.</span>
+            </div>
+            <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/content-studio/new">Start</Link>
+          </div>
+          <div className="lf-createquick__item">
+            <span className="lf-createquick__icon" aria-hidden="true"><CampaignIcon size={18} /></span>
+            <div>
+              <strong>Create Content Set</strong>
+              <span className="lf-tile__description">Plan a campaign with multiple deliverables at once.</span>
+            </div>
+            <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/campaigns/new">Plan</Link>
+          </div>
+        </div>
+      </section>
+
+      {state !== 'error' ? (
+      <Card style={{ marginTop: 'var(--lf-space-4)' }}>
+        <CardBody>
+          <div className="lf-envcard__badges">
+            <h3 className="lf-envpanel__heading" style={{ margin: 0 }}>Recent drafts</h3>
+            <Link className="lf-btn lf-btn--ghost lf-btn--sm" to="/gallery">View all →</Link>
+          </div>
+          {state === 'loading' ? (
+            <Skeleton lines={2} />
+          ) : outputs.length === 0 ? (
+            <p className="lf-tile__description">
+              Nothing generated yet — set up a plan above and your generated drafts will land here and in Gallery.
+            </p>
+          ) : (
+            <div className="lf-tilegrid">
+              {outputs.map((output) => (
+                <Card
+                  key={output.id}
+                  interactive
+                  onClick={() => navigate(`/gallery/${output.id}`)}
+                >
+                  <CardBody>
+                    <span className="lf-quicklink__title">{output.title}</span>
+                    <span className="lf-tile__meta">
+                      <Badge tone={OUTPUT_TONE[output.status]} dot>{output.status.replace('_', ' ')}</Badge>
+                      <Badge tone="neutral">{output.outputType}</Badge>
+                    </span>
+                  </CardBody>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardBody>
+      </Card>
+      ) : null}
+
+      {state === 'ready' ? (
+        <h2 className="lf-envpanel__heading" style={{ marginTop: 'var(--lf-space-6)' }}>
+          Your content plans
+        </h2>
+      ) : null}
 
       {state === 'loading' ? (
         <div className="lf-envgrid" aria-busy="true">

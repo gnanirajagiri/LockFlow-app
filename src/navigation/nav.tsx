@@ -91,5 +91,5 @@ export function findNavByPath(pathname: string): NavItem | undefined {
 }
 
 export function routeTitle(pathname: string): string {
-  return findNavByPath(pathname)?.label ?? 'LockFlow';
+  return findNavByPath(pathname)?.label ?? 'Maya';
 }

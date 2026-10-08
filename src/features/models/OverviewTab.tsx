@@ -1,164 +1,243 @@
 /**
- * Overview tab — the model's high-level panel.
- *
- * Shows active version + lock status, the identity-protection summary and
- * stat placeholders. Environments, props and wardrobe are separate reusable
- * assets (attached at job time); generated work lives in Gallery, never here.
+ * Overview tab — Stage-5 S30: three-column body under the profile hero —
+ * Locked traits (from the active version's Character Sheet), Fine details
+ * chips + Style signature, and "Environments used with X" (derived from job
+ * provenance, never a default) — followed by the Recent outputs strip.
  */
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardBody } from '../../components/ui/Card';
-import { LockIcon, ModelIcon } from '../../components/icons';
+import { LockIcon } from '../../components/icons';
+import { ModelsService } from '../../services/modelsService';
 import { useUsageSummary } from '../usage/useUsageSummary';
-import type { ModelVersionRecord } from '../../domain/models';
+import type { CharacterSheetRecord, ModelVersionRecord } from '../../domain/models';
 
 interface OverviewTabProps {
   modelId: string;
   modelName: string;
   activeVersion: ModelVersionRecord | null;
   basePath: string;
+  service: ModelsService;
 }
 
-export function OverviewTab({ modelId, modelName, activeVersion, basePath }: OverviewTabProps) {
+const TRAIT_ROWS: Array<{ group: 'faceFeatures' | 'complexion' | 'hairIdentity' | 'bodyProportions'; key: string; label: string }> = [
+  { group: 'faceFeatures', key: 'faceShape', label: 'Face' },
+  { group: 'complexion', key: 'skinTone', label: 'Skin tone' },
+  { group: 'faceFeatures', key: 'eyes', label: 'Eyes' },
+  { group: 'hairIdentity', key: 'hair', label: 'Hair' },
+  { group: 'bodyProportions', key: 'body', label: 'Body' },
+];
+
+function traitText(sheet: CharacterSheetRecord, group: string, key: string): string | null {
+  const source = sheet[group as keyof CharacterSheetRecord] as Record<string, unknown> | undefined;
+  if (!source || typeof source !== 'object') return null;
+  const raw = source[key];
+  return typeof raw === 'string' && raw.trim() !== '' ? raw : null;
+}
+
+export function OverviewTab({ modelId, modelName, activeVersion, basePath, service }: OverviewTabProps) {
   const locked = activeVersion?.status === 'locked';
   const usage = useUsageSummary('model', modelId);
+  const [sheet, setSheet] = useState<CharacterSheetRecord | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeVersion) {
+      setSheet(null);
+      return;
+    }
+    void service
+      .getCharacterSheet(activeVersion.id, SEED_WORKSPACE_ID_FALLBACK)
+      .then((record) => {
+        if (!cancelled) setSheet(record);
+      })
+      .catch(() => {
+        if (!cancelled) setSheet(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeVersion, service]);
+
+  const traitRows = sheet
+    ? TRAIT_ROWS.map((row) => ({ label: row.label, value: traitText(sheet, row.group, row.key) })).filter(
+        (row): row is { label: string; value: string } => row.value !== null,
+      )
+    : [];
+
+  const detailChips = sheet
+    ? Object.values(sheet.distinctiveDetails ?? {}).filter(
+        (value): value is string => typeof value === 'string' && value.trim() !== '',
+      )
+    : [];
+
+  const styleChips = sheet
+    ? Object.values(sheet.lockRules ?? {}).filter(
+        (value): value is string => typeof value === 'string' && value.trim() !== '' && value.toLowerCase() !== 'none',
+      )
+    : [];
 
   return (
     <div className="lf-section" style={{ gap: 'var(--lf-space-4)' }}>
-      <Card>
-        <CardBody>
-          <div className="lf-modelprofile__hero">
-            <div
-              className="lf-modelcard__cover"
-              style={{ height: 140, flex: '0 1 260px' }}
-              aria-hidden="true"
-            >
-              <span className="lf-quicklink__icon">
-                <ModelIcon size={26} />
-              </span>
+      <div className="lf-mprofile__columns">
+        <Card>
+          <CardBody>
+            <div className="lf-mprofile__panelhead">
+              <h3 className="lf-envpanel__heading" style={{ margin: 0 }}>
+                Locked traits
+              </h3>
+              {locked && traitRows.length > 0 ? (
+                <Badge tone="locked">
+                  <LockIcon size={11} /> {traitRows.length} locked
+                </Badge>
+              ) : null}
             </div>
-            <div className="lf-sheet__section" style={{ flex: 1, minWidth: 240 }}>
-              <h2 style={{ fontSize: 'var(--lf-text-lg)' }}>Active version</h2>
-              {activeVersion ? (
-                <>
-                  <div className="lf-modelprofile__badges">
-                    <Badge tone={locked ? 'locked' : 'primary'}>
-                      {locked ? <LockIcon size={12} /> : null}
-                      v{activeVersion.versionNumber} {locked ? 'Locked' : 'Draft'}
-                    </Badge>
-                    <Badge tone={locked ? 'locked' : 'primary'}>{locked ? 'Identity protected' : 'Draft — editable'}</Badge>
-                  </div>
-                  <p className="lf-tile__description">
-                    v{activeVersion.versionNumber} — {activeVersion.changeSummary || 'No change summary yet.'}
-                    {activeVersion.lockedAt
-                      ? ` Locked ${new Date(activeVersion.lockedAt).toLocaleDateString()}.`
-                      : ' Not locked yet.'}
-                  </p>
-                  <div className="lf-modelprofile__actions-row" style={{ justifyContent: 'flex-start' }}>
-                    <Link className="lf-btn lf-btn--secondary lf-btn--sm" to={`${basePath}/character-sheet`}>
-                      View Character Sheet
-                    </Link>
-                    <Link className="lf-btn lf-btn--ghost lf-btn--sm" to={`${basePath}/versions`}>
-                      View version history
-                    </Link>
-                  </div>
-                </>
-              ) : (
-                <p className="lf-tile__description">
-                  This model has no active version yet. Create and lock a Character Sheet to make
-                  it ready for content jobs.
-                </p>
-              )}
-            </div>
-          </div>
-        </CardBody>
-      </Card>
-
-      <div className="lf-statgrid">
-        <StatCard label="Saved looks" value="—" note="Looks arrive with the shared Library" />
-        <StatCard label="Shortcut assets" value="—" note="Managed in the shared Library" />
-        <StatCard label="Linked environments" value="—" note="Environments are separate reusable assets" />
-        <StatCard
-          label="Generated outputs"
-          value={usage === null ? '…' : String(usage.outputs.length)}
-          note="Pinned via job provenance in Gallery"
-        />
-      </div>
-
-      <Card>
-        <CardBody>
-          <div className="lf-sheet__section">
-            <h3>Identity protection</h3>
-            <p className="lf-tile__description">
-              {locked
-                ? `The active Character Sheet of ${modelName} is locked — its face, hair, complexion, body and distinctive details are permanently read-only. Any change starts a new draft version.`
-                : `The active Character Sheet of ${modelName} is a draft. Edit it freely, then lock it to protect the identity before content jobs reference it.`}
-            </p>
-            <p className="lf-tile__description">
-              Environments, props and wardrobe are <strong>separate reusable assets</strong> —
-              they attach from the one shared Library at job time and are never part of a
-              model's identity.
-            </p>
-          </div>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardBody>
-          <div className="lf-sheet__section">
-            <h3>Recent generated output</h3>
-            {usage === null ? null : usage.outputs.length === 0 ? (
-              <p className="lf-tile__description" data-testid="gallery-placeholder">
-                Generated work appears in Gallery.
+            {traitRows.length === 0 ? (
+              <p className="lf-tile__description">
+                {locked
+                  ? 'Traits arrive once the Character Sheet has identity sections filled.'
+                  : 'Fill the Character Sheet and lock the version to protect these traits.'}
               </p>
             ) : (
-              <>
-                <p className="lf-tile__description">
-                  Pinned by {usage.outputs.length} generated output
-                  {usage.outputs.length === 1 ? '' : 's'} (via job provenance, stored in Gallery):
-                </p>
-                <ul className="lf-envref__list">
-                  {usage.outputs.map((output) => (
-                    <li key={output.id} className="lf-envref__item">
-                      <Link to={output.path}>
-                        <strong>{output.title}</strong>
-                      </Link>
-                      <span className="lf-tile__description">Gallery · {output.status.replace(/_/g, ' ')}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {usage && usage.plans.length > 0 ? (
-              <p className="lf-tile__description">
-                Selected by:{' '}
-                {usage.plans.map((plan, index) => (
-                  <span key={plan.path}>
-                    {index > 0 ? ', ' : ''}
-                    <Link to={plan.path}>
-                      <strong>{plan.name}</strong>
-                    </Link>
-                  </span>
+              <ul className="lf-mprofile__traits">
+                {traitRows.map((row) => (
+                  <li key={row.label} className="lf-mprofile__traitrow">
+                    <span className="lf-mprofile__traitlabel">{row.label}</span>
+                    <span className="lf-mprofile__traitvalue">{row.value}</span>
+                  </li>
                 ))}
+              </ul>
+            )}
+            <Link className="lf-mprofile__panellink" to={`${basePath}/character-sheet`}>
+              View Character Sheet
+            </Link>
+          </CardBody>
+        </Card>
+
+        <div className="lf-mprofile__midcol">
+          <Card>
+            <CardBody>
+              <div className="lf-mprofile__panelhead">
+                <h3 className="lf-envpanel__heading" style={{ margin: 0 }}>
+                  Fine details
+                </h3>
+              </div>
+              {detailChips.length === 0 ? (
+                <p className="lf-tile__description">
+                  Distinctive details from the Character Sheet appear here.
+                </p>
+              ) : (
+                <div className="lf-mprofile__chips">
+                  {detailChips.slice(0, 4).map((chip) => (
+                    <span key={chip} className="lf-mprofile__chip">
+                      <LockIcon size={10} /> {chip}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </CardBody>
+          </Card>
+          <Card>
+            <CardBody>
+              <div className="lf-mprofile__panelhead">
+                <h3 className="lf-envpanel__heading" style={{ margin: 0 }}>
+                  Style signature
+                </h3>
+              </div>
+              <p className="lf-tile__description">Suggests only — never locks Library items.</p>
+              <div className="lf-mprofile__chips">
+                {styleChips.length === 0 ? (
+                  <span className="lf-mprofile__chip">Natural</span>
+                ) : (
+                  styleChips.slice(0, 4).map((chip) => (
+                    <span key={chip} className="lf-mprofile__chip">
+                      {chip}
+                    </span>
+                  ))
+                )}
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+
+        <Card>
+          <CardBody>
+            <div className="lf-mprofile__panelhead">
+              <h3 className="lf-envpanel__heading" style={{ margin: 0 }}>
+                Environments used with {modelName}
+              </h3>
+            </div>
+            <p className="lf-tile__description">
+              From usage history. {modelName} has no default environment.
+            </p>
+            {usage === null ? null : usage.outputs.length === 0 ? (
+              <p className="lf-tile__description">No jobs have used {modelName} yet.</p>
+            ) : (
+              <ul className="lf-envref__list">
+                {usage.outputs.slice(0, 3).map((output) => (
+                  <li key={output.id} className="lf-envref__item">
+                    <Link to={output.path}>
+                      <strong>{output.title}</strong>
+                    </Link>
+                    <span className="lf-tile__description">
+                      Gallery · {output.status.replace(/_/g, ' ')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
+      </div>
+
+      <section className="lf-section" aria-label="Recent outputs">
+        <div className="lf-section__header">
+          <h2 className="lf-section__title">Recent outputs</h2>
+          <Link className="lf-section__link" to="/gallery">
+            Open Gallery →
+          </Link>
+        </div>
+        {usage === null ? null : usage.outputs.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="lf-tile__description" data-testid="gallery-placeholder">
+                Generated work appears in Gallery once jobs run.
               </p>
-            ) : null}
-            <span className="lf-versionrow__dates">
-              This area shows a lightweight historical summary only — no outputs are created or
-              stored here.
-            </span>
+            </CardBody>
+          </Card>
+        ) : (
+          <div className="lf-mprofile__outputs">
+            {usage.outputs.slice(0, 6).map((output) => {
+              const pill =
+                output.status === 'ready_for_review'
+                  ? 'In review'
+                  : output.status === 'failed'
+                    ? 'Failed'
+                    : output.status === 'draft'
+                      ? 'Draft'
+                      : 'Export';
+              return (
+                <Link key={output.id} to={output.path} className="lf-mprofile__outputcard">
+                  <span
+                    className={`lf-mprofile__outputpill${output.status === 'failed' ? ' lf-mprofile__outputpill--failed' : ''}`}
+                  >
+                    {pill}
+                  </span>
+                  <span className="lf-mprofile__outputname">{output.title}</span>
+                  <span className="lf-mprofile__outputmeta">{pill}</span>
+                </Link>
+              );
+            })}
           </div>
-        </CardBody>
-      </Card>
+        )}
+        <span className="lf-versionrow__dates">
+          This area shows a lightweight historical summary only — no outputs are created or
+          stored here.
+        </span>
+      </section>
     </div>
   );
 }
 
-function StatCard({ label, value, note }: { label: string; value: string; note: string }) {
-  return (
-    <Card className="lf-statcard">
-      <span className="lf-statcard__label">{label}</span>
-      <span className="lf-statcard__value">{value}</span>
-      <span className="lf-statcard__note">{note}</span>
-    </Card>
-  );
-}
+const SEED_WORKSPACE_ID_FALLBACK = 'ws_demo';

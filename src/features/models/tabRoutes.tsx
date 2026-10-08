@@ -28,7 +28,7 @@ export function useModelOutletContext(): ModelOutletContext {
 /** /models/:modelId (index) — Overview tab. */
 export function ModelOverviewRoute() {
   const { modelId } = useParams();
-  const { data, basePath } = useModelOutletContext();
+  const { service, data, basePath } = useModelOutletContext();
   if (!data.model || !modelId) return null;
   return (
     <OverviewTab
@@ -36,6 +36,7 @@ export function ModelOverviewRoute() {
       modelName={data.model.name}
       activeVersion={data.activeVersion}
       basePath={basePath}
+      service={service}
     />
   );
 }

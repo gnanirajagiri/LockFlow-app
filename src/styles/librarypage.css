@@ -249,6 +249,19 @@
   gap: var(--lf-space-1);
 }
 
+/* Beat/look rows wrap their actions on narrow screens instead of
+   forcing a wide min-content row (storyboard beat editor on phones). */
+@media (max-width: 720px) {
+  .lf-library__lookitem {
+    flex-wrap: wrap;
+  }
+  .lf-library__lookitemactions {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
 .lf-library__assetpick {
   max-height: 320px;
   overflow-y: auto;

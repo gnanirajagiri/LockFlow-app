@@ -641,6 +641,18 @@
   .lf-pageheader__title {
     font-size: 1.5rem; /* M-screen titles are 16–24px, not the desktop 28px */
   }
+
+  /* Never let page content push the document wider than the screen —
+     inner blocks scroll horizontally inside their own containers. */
+  .lf-content > .lf-page > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .lf-page .lf-table,
+  .lf-page table {
+    display: block;
+    overflow-x: auto;
+  }
 }
 
 /* ── Sidebar plan/credits meter (Stage-5 S06 sidebar bottom) ─────────── */

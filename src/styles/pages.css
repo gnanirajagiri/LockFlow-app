@@ -635,6 +635,7 @@
 }
 .lf-dialogactions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--lf-space-2);
 }
@@ -649,7 +650,32 @@
   font-size: var(--lf-text-sm);
 }
 
-/* ── Demo mode banner ────────────────────────────────────────────────── */
+/* Review tab lock-status table — unstyled <table> had a large min-content
+   width; on mobile it scrolls inside its card instead of pushing the page. */
+.lf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--lf-text-sm);
+}
+.lf-table th,
+.lf-table td {
+  padding: var(--lf-space-2) var(--lf-space-3);
+  border: 1px solid var(--lf-color-border);
+  text-align: left;
+  vertical-align: top;
+}
+.lf-table th {
+  background: var(--lf-color-surface-muted);
+  font-weight: var(--lf-font-weight-medium);
+  color: var(--lf-color-ink);
+  white-space: nowrap;
+}
+.lf-table td {
+  color: var(--lf-color-ink-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* ── Demo mode banner ──────────────────────────────────────────────── */
 .lf-demobanner {
   display: flex;
   align-items: center;

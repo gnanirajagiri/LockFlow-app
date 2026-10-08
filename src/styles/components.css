@@ -1116,6 +1116,17 @@ select.lf-input {
 
 /* ── Tabs — Stage-5 underline style ──────────────────────────── */
 
+/* Route-level tablist container (CampaignLayout, model/env profiles use
+   their own rails). Flex so the underline tabs wrap on narrow screens
+   instead of forcing a ~580px unwrappable line. */
+.lf-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid var(--lf-color-border);
+}
+
 .lf-tabs__list {
   display: flex;
   flex-wrap: wrap;
@@ -1754,6 +1765,15 @@ select.lf-input {
 @media (max-width: 1180px) {
   .lf-topbar__search {
     display: none;
+  }
+
+  /* Phones: let any button/action row wrap instead of pushing the page
+     horizontally (builder toolbars, job actions, page-header actions). */
+  .lf-dialogactions,
+  .lf-envprofile__actions-row,
+  .lf-library__lookitemactions,
+  .lf-section__header {
+    flex-wrap: wrap;
   }
 }
 @media (max-width: 900px) {

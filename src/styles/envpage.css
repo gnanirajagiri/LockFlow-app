@@ -400,13 +400,27 @@
     display: block;
   }
 
-  .lf-envlock__layout {
+  .lf-envlock__layout,
+  .lf-envlock__layout .lf-section,
+  .lf-envlock__layout .lf-card {
     grid-template-columns: 1fr;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .lf-envprofile__actions {
     margin-left: 0;
     justify-items: start;
+  }
+
+  /* Action rows wrap instead of pushing the page wide on phones */
+  .lf-envprofile__actions-row,
+  .lf-enveditor__actions,
+  .lf-envpanel__heading {
+    flex-wrap: wrap;
+  }
+  .lf-envprofile__preview--lg {
+    min-width: 0;
   }
 }
 

@@ -1,111 +1,17 @@
+import { Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthProvider';
 import { ToastProvider } from './components/ui/Toast';
-import { ProtectedRoute } from './auth/ProtectedRoute';
 import { AppShell } from './components/layout/AppShell';
-import { LoginPage } from './auth/LoginPage';
-import { HomePage } from './pages/HomePage';
-import { CreatePage } from './pages/CreatePage';
-import { ModelsPage } from './pages/ModelsPage';
-import { EnvironmentsPage } from './pages/EnvironmentsPage';
-import { EnvironmentProfileLayout } from './features/environments/EnvironmentProfileLayout';
-import {
-  EnvironmentBuilderRoute,
-  EnvironmentEditRoute,
-  EnvironmentOverviewRoute,
-  EnvironmentReferencesRoute,
-  EnvironmentSpecsRoute,
-  EnvironmentVersionsRoute,
-} from './features/environments/tabRoutes';
-import { EnvironmentLockPage } from './features/environments/EnvironmentLockPage';
-import { StudioPage } from './pages/StudioPage';
-import { ContentStudioPage } from './pages/ContentStudioPage';
-import { ContentStudioNewPlanPage } from './pages/ContentStudioNewPlanPage';
-import { ContentProjectDetailPage } from './pages/ContentProjectDetailPage';
-import { ContentProjectLayout } from './features/content/ContentProjectLayout';
-import {
-  ContentBriefRoute,
-  ContentComposeRoute,
-  ContentInputsRoute,
-  ContentJobRoute,
-  ContentReviewRoute,
-  ContentStoryboardRoute,
-} from './features/content/tabRoutes';
-import { TemplatesHomePage } from './features/templates/TemplatesHomePage';
-import { TemplateCreatePage } from './features/templates/TemplateCreatePage';
-import { TemplateEditPage } from './features/templates/TemplateEditPage';
-import { TemplateDetailPage } from './features/templates/TemplateDetailPage';
-import { TemplateApplyPage } from './features/templates/TemplateApplyPage';
-import { GalleryPage } from './pages/GalleryPage';
-import { GalleryOutputDetailPage } from './pages/GalleryOutputDetailPage';
-import { GalleryCollectionsPage } from './pages/GalleryCollectionsPage';
-import { GalleryCollectionDetailPage } from './pages/GalleryCollectionDetailPage';
-import { ConnectionsPage } from './features/social/ConnectionsPage';
-import {
-  ConnectionCallbackPage,
-  ConnectionStartPage,
-} from './features/social/ConnectionCallbackPage';
-import { CampaignPublishingPage } from './features/publishing/PublishingHomePage';
-import { PublishingCreatePage } from './features/publishing/PublishingCreatePage';
-import { PublishingDetailPage } from './features/publishing/PublishingDetailPage';
-import { PublishingGlobalListPage } from './features/publishing/PublishingGlobalListPage';
-import { PublishingReviewPage } from './features/publishing/PublishingReviewPage';
-import { PublishingRunDetailPage } from './features/publishing/PublishingRunDetailPage';
-import { CampaignPublishingCalendarPage } from './features/publishing/CampaignPublishingCalendarPage';
-import { PublishingHistoryPage } from './features/publishing/PublishingHistoryPage';
-import { PublishRunDetailOpsPage } from './features/publishing/PublishRunDetailOpsPage';
-import { CampaignStatusOverviewPage } from './features/publishing/CampaignStatusOverviewPage';
-import { GalleryQualityReviewPage } from './features/quality/GalleryQualityReviewPage';
-import { CorrectionCreatePage } from './features/quality/CorrectionCreatePage';
-import { CorrectionsPage } from './features/quality/CorrectionsPage';
-import { CorrectionDetailPage } from './features/quality/CorrectionDetailPage';
-import { LibraryNewAssetPage } from './pages/LibraryNewAssetPage';
-import { LibraryLooksPage } from './pages/LibraryLooksPage';
-import { LibraryNewLookPage } from './pages/LibraryNewLookPage';
-import { LibraryLookProfilePage } from './pages/LibraryLookProfilePage';
-import { LibraryAssetProfileLayout } from './features/library/LibraryAssetProfileLayout';
-import { LibraryOpsHomePage } from './features/library/LibraryOpsHomePage';
-import { LibraryAssetsPage } from './features/library/LibraryAssetsPage';
-import { LibraryAssetOpsDetailPage } from './features/library/LibraryAssetOpsDetailPage';
-import { LibraryPickerPage } from './features/library/LibraryPickerPage';
-import { LibraryArchivedPage } from './features/library/LibraryArchivedPage';
-import { LibraryAddAssetPage } from './features/library/LibraryAddAssetPage';
-import { LibraryAssetEditPage } from './features/library/LibraryAssetEditPage';
-import {
-  LibraryDetailsRoute,
-  LibraryOverviewRoute,
-  LibraryReferencesRoute,
-  LibraryVersionsRoute,
-} from './features/library/tabRoutes';
-import { CampaignsHomePage } from './features/campaigns/CampaignsHomePage';
-import { CampaignCreatePage } from './features/campaigns/CampaignCreatePage';
-import { CampaignLayout } from './features/campaigns/CampaignLayout';
-import { CampaignOverviewTab } from './features/campaigns/CampaignOverviewTab';
-import { CampaignContentTab } from './features/campaigns/CampaignContentTab';
-import { CampaignCalendarTab } from './features/campaigns/CampaignCalendarTab';
-import { CampaignChannelsTab } from './features/campaigns/CampaignChannelsTab';
-import { CampaignActivityTab } from './features/campaigns/CampaignActivityTab';
-import { WorkspacePage } from './pages/WorkspacePage';
-import { SettingsPage } from './pages/SettingsPage';
-import { HelpPage } from './pages/HelpPage';
-import { NotFoundPage } from './pages/NotFoundPage';
-import { ModelProfileLayout } from './features/models/ModelProfileLayout';
-import {
-  ModelBuilderRoute,
-  ModelCharacterSheetRoute,
-  ModelClosetPropsRoute,
-  ModelLooksRoute,
-  ModelOverviewRoute,
-  ModelUsageHistoryRoute,
-  ModelVersionsRoute,
-} from './features/models/tabRoutes';
+import { CampaignActivityTab, CampaignCalendarTab, CampaignChannelsTab, CampaignContentTab, CampaignCreatePage, CampaignLayout, CampaignOverviewTab, CampaignPublishingCalendarPage, CampaignPublishingPage, CampaignStatusOverviewPage, CampaignsHomePage, ConnectionCallbackPage, ConnectionStartPage, ConnectionsPage, ContentBriefRoute, ContentComposeRoute, ContentInputsRoute, ContentJobRoute, ContentProjectDetailPage, ContentProjectLayout, ContentReviewRoute, ContentStoryboardRoute, ContentStudioNewPlanPage, ContentStudioPage, CorrectionCreatePage, CorrectionDetailPage, CorrectionsPage, CreatePage, EnvironmentBuilderRoute, EnvironmentEditRoute, EnvironmentLockPage, EnvironmentOverviewRoute, EnvironmentProfileLayout, EnvironmentReferencesRoute, EnvironmentSpecsRoute, EnvironmentVersionsRoute, EnvironmentsPage, GalleryCollectionDetailPage, GalleryCollectionsPage, GalleryOutputDetailPage, GalleryPage, GalleryQualityReviewPage, HelpPage, HomePage, LibraryAddAssetPage, LibraryArchivedPage, LibraryAssetEditPage, LibraryAssetOpsDetailPage, LibraryAssetProfileLayout, LibraryAssetsPage, LibraryDetailsRoute, LibraryLookProfilePage, LibraryLooksPage, LibraryNewAssetPage, LibraryNewLookPage, LibraryOpsHomePage, LibraryOverviewRoute, LibraryPickerPage, LibraryReferencesRoute, LibraryVersionsRoute, LoginPage, ModelBuilderRoute, ModelCharacterSheetRoute, ModelClosetPropsRoute, ModelLooksRoute, ModelOverviewRoute, ModelProfileLayout, ModelUsageHistoryRoute, ModelVersionsRoute, ModelsPage, NotFoundPage, ProtectedRoute, PublishRunDetailOpsPage, PublishingCreatePage, PublishingDetailPage, PublishingGlobalListPage, PublishingHistoryPage, PublishingReviewPage, PublishingRunDetailPage, SettingsPage, StudioPage, TemplateApplyPage, TemplateCreatePage, TemplateDetailPage, TemplateEditPage, TemplatesHomePage, WorkspacePage } from './routes';
 
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <Routes>
+          <Suspense fallback={<div className="lf-content" aria-busy="true" />}>
+            <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route
               element={
@@ -212,7 +118,8 @@ export default function App() {
               <Route path="help" element={<HelpPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Route>
-          </Routes>
+            </Routes>
+          </Suspense>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

@@ -40,6 +40,7 @@ export function HomePage() {
       <PageHeader
         eyebrow={MOCK_WORKSPACE.name}
         title="Home"
+        display
         description="Continuity first: reusable models, environments and assets are versioned and independently locked before use in content jobs."
         actions={
           <>

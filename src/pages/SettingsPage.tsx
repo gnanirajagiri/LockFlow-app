@@ -14,8 +14,13 @@ import {
   clearUploadedAvatar,
   clearGeneratedAvatar,
   generateAvatar,
+  getCloudSyncInfo,
+  setCloudSyncEnabled,
+  subscribeToAvatars,
+  type CloudSyncInfo,
 } from '../generation/avatar';
 import { useAvatar } from '../generation/useAvatar';
+import { isDemoMode } from '../lib/env';
 
 type AiProviderChoice = 'development-fake' | 'openai';
 
@@ -49,6 +54,24 @@ function readImageFile(file: File): Promise<string> {
   });
 }
 
+/** Human-readable state for the avatar cloud-sync toggle. */
+function cloudStatusLabel(info: CloudSyncInfo): string {
+  if (!info.enabled) return 'Off — stored in this browser only';
+  if (isDemoMode) return 'On — connect the database to sync across devices';
+  switch (info.status) {
+    case 'anonymous':
+      return 'On — sign in to sync across devices';
+    case 'syncing':
+      return 'Syncing…';
+    case 'available':
+      return info.hasCloudAvatar ? 'Synced across your devices' : 'On — no cloud avatar yet';
+    case 'unavailable':
+      return 'Cloud unavailable — using this browser';
+    default:
+      return 'Connecting…';
+  }
+}
+
 export function SettingsPage() {
   const { toast } = useToast();
   const [displayName, setDisplayName] = useState('');
@@ -60,6 +83,12 @@ export function SettingsPage() {
   const userAvatar = useAvatar('user');
   const workspaceAvatar = useAvatar('workspace');
   const [generatingAvatar, setGeneratingAvatar] = useState(false);
+  const [cloudSync, setCloudSync] = useState<CloudSyncInfo>(() => getCloudSyncInfo());
+
+  // Keep the preview, badge and sync status in step with every avatar change.
+  useEffect(() => subscribeToAvatars(() => {
+    setCloudSync(getCloudSyncInfo());
+  }), []);
 
   // Current generation config (drives which provider image jobs actually use).
   useEffect(() => {
@@ -233,9 +262,26 @@ export function SettingsPage() {
                 </Button>
               ) : null}
             </div>
+            <div className="lf-avatarsettings__sync">
+              <label className="lf-avatarsettings__synctoggle" htmlFor="avatar-cloud-sync">
+                <input
+                  id="avatar-cloud-sync"
+                  type="checkbox"
+                  checked={cloudSync.enabled}
+                  onChange={(event) => setCloudSyncEnabled(event.target.checked)}
+                  disabled={generatingAvatar || userAvatar.generating}
+                />
+                <span>
+                  <strong>Sync across devices</strong>
+                  <span className="lf-avatarsettings__syncstatus">{cloudStatusLabel(cloudSync)}</span>
+                </span>
+              </label>
+            </div>
             <p className="lf-field__hint">
-              Photos are resized to 256×256 and stored in this browser only (localStorage). The
-              workspace avatar uses the same flow; the workspace portrait currently comes from
+              Photos are resized to 256×256. With sync off they stay in this browser only
+              (localStorage); with sync on the account avatar mirrors to your private
+              storage and follows you across devices. The workspace avatar uses the same
+              flow locally; the workspace portrait currently comes from
               {' '}{workspaceAvatar.origin === 'upload' ? 'an uploaded photo' : workspaceAvatar.origin === 'generated' ? 'AI generation' : 'the default'}.
             </p>
           </div>

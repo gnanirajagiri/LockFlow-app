@@ -11,9 +11,10 @@ export interface TopbarProps {
 }
 
 /**
- * Maya draft topbar: a quiet transparent strip — the page's big title lives
- * in the content column, so the bar carries only the identity cluster
- * (workspace chip + user chip with avatar and name) on the right.
+ * Stage-5 topbar: a 64px canvas strip with a hairline bottom border.
+ * Left: breadcrumb trail (LockFlow / current section). Right: ⌘K search
+ * chip, credits pill, notification bell with unread dot, and the identity
+ * cluster (workspace chip + user chip with avatar and name).
  *
  * Both chips render real images when one exists: a Settings photo upload
  * first, then an AI-generated portrait; the letter avatar stays as the
@@ -38,10 +39,82 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
       >
         <MenuIcon />
       </button>
-      <span className="lf-visually-hidden">{title}</span>
+
+      <nav className="lf-topbar__crumbs" aria-label="Breadcrumb">
+        <span aria-hidden="true">LockFlow</span>
+        <svg
+          className="lf-topbar__crumbsep"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+        <span className="lf-topbar__crumbs-current" aria-current="page">
+          {title}
+        </span>
+      </nav>
+
       <div className="lf-topbar__spacer" />
 
       <div className="lf-topbar__right">
+        <div className="lf-topbar__search" aria-hidden="true">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <span>Search</span>
+          <span className="lf-topbar__kbd">⌘K</span>
+        </div>
+
+        <div className="lf-topbar__credits" title={`${MOCK_WORKSPACE.credits.toLocaleString()} generation credits`}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
+          {MOCK_WORKSPACE.credits.toLocaleString()}
+        </div>
+
+        <button type="button" className="lf-topbar__bell" aria-label="Notifications (1 unread)">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+          </svg>
+          <span className="lf-topbar__belldot" aria-hidden="true" />
+        </button>
+
         <div className="lf-topbar__workspace" title={`${MOCK_WORKSPACE.name} · ${MOCK_WORKSPACE.plan} plan`}>
           {workspaceAvatar.src ? (
             <img
@@ -55,9 +128,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
               {MOCK_WORKSPACE.initials}
             </span>
           )}
-          <span className="lf-topbar__title" style={{ fontSize: 'var(--lf-text-sm)' }}>
-            {MOCK_WORKSPACE.name}
-          </span>
+          <span className="lf-topbar__title">{MOCK_WORKSPACE.name}</span>
         </div>
 
         <button type="button" className="lf-topbar__user" title={user?.email ?? ''}>

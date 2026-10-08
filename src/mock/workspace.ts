@@ -10,11 +10,14 @@ export interface MockWorkspace {
   name: string;
   plan: string;
   initials: string;
+  /** Generation credits remaining (Stage-5 topbar credits pill). */
+  credits: number;
 }
 
 export const MOCK_WORKSPACE: MockWorkspace = {
   id: 'ws_demo',
-  name: 'Aurora Studio',
+  name: 'Glow Studio',
   plan: 'Studio',
-  initials: 'AS',
+  initials: 'GS',
+  credits: 1240,
 };

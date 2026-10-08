@@ -1,62 +1,114 @@
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/Fraunces-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/Fraunces-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/Inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fonts/Inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../assets/fonts/Inter-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/Inter-400.woff2') format('woff2');
+}
+
 /**
- * Maya design tokens — single source of truth.
- * Draft reference: Maya Content Studio desktop UI (navy rail, warm cream
- * canvas, white 16px cards, violet primary, pill controls).
+ * LockFlow design tokens — single source of truth.
+ * Stage-5 UI design system + Stage-4 design-tokens/tokens.json (build pack):
+ * navy rail, warm canvas #FAF8F5, white 16px cards, indigo primary #4F46E5,
+ * AI gradient #4F46E5→#7C3AED, Fraunces display, Inter UI.
  *
  * Consume via CSS custom properties only; component styles must not hard-code
  * raw values. (TypeScript mirror: src/styles/tokens.ts)
  */
 :root {
+  /* ── Display type (Stage-5) ─────────────────────────────────────────── */
+  --lf-font-display: 'Fraunces', Georgia, serif;
+  --lf-text-display: 2.25rem; /* 36 */
+  --lf-leading-display: 44px;
+  --lf-weight-display: 500;
   /* ── Colour · canvas & surfaces ─────────────────────────────────────── */
-  --lf-color-bg: #faf9f5; /* warm cream page background (draft canvas) */
+  --lf-color-bg: #faf8f5; /* warm cream page background (Stage-5 canvas) */
   --lf-color-surface: #ffffff; /* cards, sheets, modals */
   --lf-color-surface-muted: #f4f1ea; /* inset wells, table headers */
   --lf-color-surface-raised: #ffffff; /* hover-elevated surfaces */
 
   /* ── Colour · navy chrome (sidebar rail) ────────────────────────────── */
-  --lf-color-navy-900: #0d1526; /* rail background (draft) */
-  --lf-color-navy-800: #101b31;
-  --lf-color-navy-700: #1a2946; /* hover wash on rail */
-  --lf-color-navy-600: #24365c;
+  --lf-color-navy-900: #0f172a; /* rail background (Stage-5 navy) */
+  --lf-color-navy-800: #1e293b;
+  --lf-color-navy-700: #334155; /* hover wash on rail */
+  --lf-color-navy-600: #334155;
+  --lf-color-navy-accent: #a5b4fc; /* active icon on rail (indigo-300) */
+  --lf-color-navy-active: rgba(99, 102, 241, 0.18); /* active nav wash */
   --lf-color-navy-text: #eef1f8;
   --lf-color-navy-text-muted: #a7b1c7;
   --lf-color-navy-border: rgba(238, 241, 248, 0.08);
 
   /* ── Colour · ink (text on light surfaces) ──────────────────────────── */
-  --lf-color-ink: #191f2e; /* near-black navy, draft headings */
-  --lf-color-ink-secondary: #4c5568;
-  --lf-color-ink-muted: #7c8598;
-  --lf-color-ink-faint: #a6adbd;
+  --lf-color-ink: #111827; /* ink-900 — Stage-5 headings/body */
+  --lf-color-ink-secondary: #374151; /* ink-700 */
+  --lf-color-ink-muted: #6b7280; /* ink-500 */
+  --lf-color-ink-faint: #9ca3af; /* ink-400 */
   --lf-color-ink-inverse: #ffffff;
 
-  /* ── Colour · primary (Maya violet) ─────────────────────────────────── */
-  --lf-color-primary-50: #efedfe;
-  --lf-color-primary-100: #e3e0fd;
-  --lf-color-primary-200: #ccc6fb;
-  --lf-color-primary-500: #5b4ee6; /* draft active pill / primary buttons */
-  --lf-color-primary-600: #4a3ed6;
-  --lf-color-primary-700: #3d33bd;
-  --lf-color-primary-soft: #efedfe; /* tinted chips, focus washes */
-  --lf-gradient-primary: linear-gradient(135deg, #5b4ee6 0%, #8a6ef7 100%);
+  /* ── Colour · primary (Stage-5 indigo) ──────────────────────────────── */
+  --lf-color-primary-50: #f5f3ff; /* lavender-50 */
+  --lf-color-primary-100: #ede9fe; /* lavender-100 */
+  --lf-color-primary-200: #ddd6fe; /* lavender-200 */
+  --lf-color-primary-500: #4f46e5; /* indigo-600 — primary buttons */
+  --lf-color-primary-600: #4f46e5; /* indigo-600 */
+  --lf-color-primary-700: #4338ca; /* indigo-700 */
+  --lf-color-primary-800: #3730a3; /* indigo-800 */
+  --lf-color-primary-soft: #f5f3ff; /* tinted chips, focus washes */
+  --lf-gradient-primary: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); /* AI */
 
-  /* ── Colour · feedback ──────────────────────────────────────────────── */
-  --lf-color-success-bg: #e5f4ea;
-  --lf-color-success-text: #1d7a3d;
-  --lf-color-success-border: #bfe3cb;
-  --lf-color-warning-bg: #fdf3e2;
-  --lf-color-warning-text: #96620d;
-  --lf-color-warning-border: #f3ddb2;
-  --lf-color-danger-bg: #fdecea;
-  --lf-color-danger-text: #b3363e;
-  --lf-color-danger-border: #f2c4c7;
-  --lf-color-info-bg: #edf1fe;
-  --lf-color-info-text: #3d55c9;
-  --lf-color-info-border: #ccd7f6;
+  /* ── Colour · feedback (Stage-5) ────────────────────────────────────── */
+  --lf-color-success-bg: #dcfce7;
+  --lf-color-success-text: #16a34a;
+  --lf-color-success-border: #bbf7d0;
+  --lf-color-warning-bg: #fef3c7;
+  --lf-color-warning-text: #d97706;
+  --lf-color-warning-border: #fde68a;
+  --lf-color-danger-bg: #fee2e2;
+  --lf-color-danger-text: #dc2626;
+  --lf-color-danger-border: #fecaca;
+  --lf-color-info-bg: #dbeafe;
+  --lf-color-info-text: #2563eb;
+  --lf-color-info-border: #bfdbfe;
 
   /* ── Colour · lines ─────────────────────────────────────────────────── */
-  --lf-color-border: #eae5da; /* warm hairline on light surfaces */
-  --lf-color-border-strong: #d9d2c4;
-  --lf-color-border-focus: #5b4ee6;
+  --lf-color-border: #e7e2da; /* warm hairline on light surfaces */
+  --lf-color-border-strong: #d6d0c6;
+  --lf-color-border-focus: #4f46e5;
 
   /* ── Legacy aliases (components.css predates the unified scale; keep the
        names defined so those rules render on the draft system) ────────── */
@@ -67,9 +119,9 @@
   --lf-color-foreground-subtle: var(--lf-color-ink-secondary);
   --lf-color-foreground-weak: var(--lf-color-ink-muted);
   --lf-color-surface-elevated: var(--lf-color-surface-raised);
-  --lf-color-locked-bg: #edeff7;
-  --lf-color-locked-foreground: #3b4a63;
-  --lf-color-locked-border: #ccd3e6;
+  --lf-color-locked-bg: #f4f1ec;
+  --lf-color-locked-foreground: #374151;
+  --lf-color-locked-border: #d6d0c6;
   --lf-tone-neutral: var(--lf-color-ink-secondary);
   --lf-tone-primary: var(--lf-color-primary-600);
   --lf-tone-success: var(--lf-color-success-text);
@@ -85,8 +137,8 @@
   --lf-text-size-xl: var(--lf-text-xl);
   --lf-text-size-2xl: var(--lf-text-2xl);
   --lf-text-size-3xl: var(--lf-text-3xl);
-  --lf-radius-sm: 10px;
-  --lf-radius-md: 14px;
+  --lf-radius-sm: 8px;
+  --lf-radius-md: 12px;
   --lf-radius-lg: 16px;
   --lf-shadow-sm: var(--lf-shadow-xs);
   --lf-shadow-md: var(--lf-shadow-sm);
@@ -107,14 +159,14 @@
   --lf-space-9: 96px;
 
   /* ── Radii ──────────────────────────────────────────────────────────── */
-  --lf-radius-xl: 24px;
+  --lf-radius-xl: 20px;
   --lf-radius-full: 999px; /* pills — buttons, chips, search (draft) */
 
   /* ── Shadows — soft, warm, low-contrast (draft cards) ───────────────── */
-  --lf-shadow-xs: 0 1px 2px rgba(25, 31, 46, 0.04), 0 1px 6px rgba(25, 31, 46, 0.04);
-  --lf-shadow-sm: 0 2px 6px rgba(25, 31, 46, 0.05), 0 1px 2px rgba(25, 31, 46, 0.04);
-  --lf-shadow-md: 0 6px 20px rgba(25, 31, 46, 0.08), 0 2px 6px rgba(25, 31, 46, 0.04);
-  --lf-shadow-lg: 0 18px 48px rgba(18, 24, 40, 0.16), 0 4px 12px rgba(18, 24, 40, 0.06);
+  --lf-shadow-xs: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --lf-shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --lf-shadow-md: 0 4px 12px rgba(17, 24, 39, 0.08);
+  --lf-shadow-lg: 0 12px 32px rgba(17, 24, 39, 0.14);
 
   /* ── Typography ─────────────────────────────────────────────────────── */
   --lf-font-sans:
@@ -131,9 +183,9 @@
   --lf-leading-tight: 1.25;
   --lf-leading-normal: 1.55;
   --lf-tracking-tight: -0.02em;
-  --lf-font-weight-normal: 450;
-  --lf-font-weight-medium: 550;
-  --lf-font-weight-semibold: 650;
+  --lf-font-weight-normal: 400;
+  --lf-font-weight-medium: 500;
+  --lf-font-weight-semibold: 600;
 
   /* ── Motion ─────────────────────────────────────────────────────────── */
   --lf-duration-fast: 120ms;
@@ -146,10 +198,10 @@
   --lf-z-toast: 800;
 
   /* ── Layout metrics ─────────────────────────────────────────────────── */
-  --lf-sidebar-width: 232px;
-  --lf-sidebar-width-collapsed: 76px;
-  --lf-topbar-height: 60px;
-  --lf-content-max: 1240px;
+  --lf-sidebar-width: 248px;
+  --lf-sidebar-width-collapsed: 64px;
+  --lf-topbar-height: 64px;
+  --lf-content-max: 1280px;
 
   /* ── Focus ──────────────────────────────────────────────────────────── */
   --lf-focus-ring: 0 0 0 2px var(--lf-color-bg), 0 0 0 4px var(--lf-color-border-focus);

@@ -10,6 +10,7 @@ import {
 import type { Session, User } from '@supabase/supabase-js';
 import { getSupabase } from '../lib/supabase';
 import { isDemoMode } from '../lib/env';
+import { pullCloudAvatar, setAvatarUserProvider } from '../generation/avatar';
 
 export interface AuthUser {
   /** Supabase user id (or `demo-user` in demo mode). */
@@ -84,6 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.subscription.unsubscribe();
     };
   }, [supabase]);
+
+  // Register the account id with the avatar store and pull the cloud avatar
+  // once per session (no-op unless cloud sync is enabled in Settings).
+  useEffect(() => {
+    setAvatarUserProvider(() => user?.id ?? null);
+    if (user && !isDemoMode) void pullCloudAvatar();
+  }, [user]);
 
   const signInWithPassword = useCallback(async (email: string, password: string) => {
     const client = getSupabase();

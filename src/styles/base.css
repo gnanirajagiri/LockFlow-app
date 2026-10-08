@@ -15,9 +15,9 @@ html {
 
 body {
   font-family: var(--lf-font-sans);
-  font-size: var(--lf-text-base);
+  font-size: var(--lf-text-sm);
   font-weight: var(--lf-font-weight-normal);
-  line-height: var(--lf-leading-normal);
+  line-height: 1.5715; /* 22/14 — Stage-5 body */
   color: var(--lf-color-ink);
   background: var(--lf-color-bg);
   -webkit-font-smoothing: antialiased;
@@ -39,16 +39,29 @@ h4 {
 }
 
 h1 {
-  font-size: var(--lf-text-2xl);
+  font-size: 1.75rem; /* 28/36 — Stage-5 h1 */
+  line-height: 1.2857;
 }
 h2 {
-  font-size: var(--lf-text-xl);
+  font-size: 1.375rem; /* 22/30 */
+  line-height: 1.3636;
 }
 h3 {
-  font-size: var(--lf-text-lg);
+  font-size: 1.125rem; /* 18/26 */
+  line-height: 1.4444;
 }
 h4 {
-  font-size: var(--lf-text-md);
+  font-size: 0.9375rem; /* 15/22 */
+}
+
+/* Stage-5 display style — Fraunces 36/44 for hero moments */
+.lf-display {
+  font-family: var(--lf-font-display);
+  font-weight: var(--lf-weight-display);
+  font-size: var(--lf-text-display);
+  line-height: 1.2222;
+  letter-spacing: -0.01em;
+  color: var(--lf-color-ink);
 }
 
 p {

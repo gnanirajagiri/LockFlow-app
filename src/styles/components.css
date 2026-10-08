@@ -329,13 +329,19 @@ button {
 
 .lf-btn {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--lf-space-2);
+  height: 40px;
   border: 1px solid var(--lf-color-border-strong);
   background: var(--lf-color-surface);
   color: var(--lf-color-ink);
-  padding: var(--lf-space-2) var(--lf-space-4);
-  border-radius: var(--lf-radius-full);
-  font-size: var(--lf-text-size-sm);
-  font-weight: var(--lf-font-weight-medium);
+  padding: 0 var(--lf-space-4);
+  border-radius: 10px;
+  font-size: var(--lf-text-sm);
+  font-weight: var(--lf-font-weight-semibold);
+  white-space: nowrap;
   cursor: pointer;
   transition: background var(--lf-duration-fast) ease, border-color var(--lf-duration-fast) ease, color var(--lf-duration-fast) ease, box-shadow var(--lf-duration-fast) ease;
 }
@@ -344,12 +350,12 @@ button {
   background: var(--lf-color-primary-500);
   border-color: var(--lf-color-primary-500);
   color: var(--lf-color-primary-on);
-  box-shadow: var(--lf-shadow-xs);
+  box-shadow: 0 1px 2px rgba(79, 70, 229, 0.3);
 }
 
 .lf-btn--primary:hover {
-  background: var(--lf-color-primary-600);
-  border-color: var(--lf-color-primary-600);
+  background: var(--lf-color-primary-700);
+  border-color: var(--lf-color-primary-700);
   box-shadow: var(--lf-shadow-sm);
 }
 
@@ -362,8 +368,10 @@ button {
 }
 
 .lf-btn--sm {
-  padding: var(--lf-space-1) var(--lf-space-3);
-  font-size: var(--lf-text-size-sm);
+  height: 32px;
+  padding: 0 var(--lf-space-3);
+  font-size: 13px;
+  border-radius: var(--lf-radius-sm);
 }
 
 .lf-btn--ghost {
@@ -827,11 +835,12 @@ button {
 .lf-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: var(--lf-radius-full);
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
   font-size: var(--lf-text-xs);
-  font-weight: var(--lf-font-weight-medium);
+  font-weight: var(--lf-font-weight-semibold);
   line-height: 1.5;
   white-space: nowrap;
   background: var(--lf-color-surface-muted);
@@ -899,11 +908,14 @@ button {
 /* ── Button — sizes, block, icon slot, danger ────────────────────── */
 
 .lf-btn--md {
-  padding: var(--lf-space-2) var(--lf-space-4);
+  height: 40px;
+  padding: 0 var(--lf-space-4);
 }
 .lf-btn--lg {
-  padding: var(--lf-space-3) var(--lf-space-5);
-  font-size: var(--lf-text-size-base);
+  height: 48px;
+  padding: 0 22px;
+  font-size: var(--lf-text-base);
+  border-radius: var(--lf-radius-md);
 }
 .lf-btn--block {
   display: flex;
@@ -1102,28 +1114,29 @@ select.lf-input {
   border-top: 1px solid var(--lf-color-border);
 }
 
-/* ── Tabs — pill segments (draft) ────────────────────────────── */
+/* ── Tabs — Stage-5 underline style ──────────────────────────── */
 
 .lf-tabs__list {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--lf-space-1);
-  padding: 3px;
-  border-radius: var(--lf-radius-full);
-  background: var(--lf-color-surface-muted);
+  padding: 0;
+  border-bottom: 1px solid var(--lf-color-border);
 }
 .lf-tabs__tab {
   appearance: none;
   border: none;
-  padding: 7px var(--lf-space-4);
-  border-radius: var(--lf-radius-full);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 10px var(--lf-space-4);
+  border-radius: 0;
   background: transparent;
-  color: var(--lf-color-ink-secondary);
+  color: var(--lf-color-ink-muted);
   font-size: var(--lf-text-sm);
-  font-weight: var(--lf-font-weight-medium);
+  font-weight: var(--lf-font-weight-semibold);
   cursor: pointer;
-  transition: background var(--lf-duration-fast) ease, color var(--lf-duration-fast) ease;
+  transition: color var(--lf-duration-fast) ease, border-color var(--lf-duration-fast) ease;
 }
 .lf-tabs__tab:hover {
   color: var(--lf-color-ink);
@@ -1133,10 +1146,11 @@ select.lf-input {
   box-shadow: var(--lf-focus-ring);
 }
 .lf-tabs__tab[aria-selected='true'] {
-  background: var(--lf-color-surface);
+  background: transparent;
   color: var(--lf-color-ink);
   font-weight: var(--lf-font-weight-semibold);
-  box-shadow: var(--lf-shadow-xs);
+  border-bottom-color: var(--lf-color-primary-500);
+  box-shadow: none;
 }
 .lf-tabs__panel {
   animation: lf-fade-in var(--lf-duration-fast) ease;
@@ -1348,6 +1362,42 @@ select.lf-input {
     flex-basis: auto;
     order: 0;
   }
+}
+
+/* Cloud-sync toggle (account avatar) */
+.lf-avatarsettings__sync {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  padding: var(--lf-space-2) var(--lf-space-3);
+  background: var(--lf-color-bg);
+  border: 1px solid var(--lf-color-border);
+  border-radius: var(--lf-radius-md);
+}
+
+.lf-avatarsettings__synctoggle {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-3);
+  cursor: pointer;
+}
+
+.lf-avatarsettings__synctoggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--lf-color-primary-500);
+}
+
+.lf-avatarsettings__synctoggle strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lf-avatarsettings__syncstatus {
+  display: block;
+  font-size: 12px;
+  color: var(--lf-color-text-secondary);
 }
 
 /* ── Maya · Content Studio · compose (two-column draft layout) ───────────── */
@@ -1666,5 +1716,48 @@ select.lf-input {
   }
   .lf-compose__grid3 {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Stage-5 additions — prompt bar lavender ring, AI gradient button,
+   topbar responsive behavior.
+   ═════════════════════════════════════════════════════════════════════════ */
+
+/* AI gradient primary action (Generate / etc.) */
+.lf-btn--ai {
+  background: var(--lf-gradient-primary);
+  border-color: transparent;
+  color: #ffffff;
+}
+.lf-btn--ai:hover {
+  background: var(--lf-gradient-primary);
+  filter: brightness(1.06);
+  border-color: transparent;
+}
+
+/* Prompt bar — lavender ring per Stage-5 builder spec */
+.lf-compose__promptfield .lf-input,
+.lf-promptbar {
+  border: 1.5px solid var(--lf-color-primary-200);
+  box-shadow: 0 0 0 4px rgba(237, 233, 254, 0.6);
+  border-radius: var(--lf-radius-md);
+}
+.lf-compose__promptfield .lf-input:focus-visible,
+.lf-promptbar:focus-within {
+  border-color: var(--lf-color-primary-500);
+  box-shadow: 0 0 0 4px rgba(237, 233, 254, 0.9);
+  outline: none;
+}
+
+/* Topbar responsiveness — hide search on narrow viewports */
+@media (max-width: 1180px) {
+  .lf-topbar__search {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .lf-topbar__credits {
+    display: none;
   }
 }

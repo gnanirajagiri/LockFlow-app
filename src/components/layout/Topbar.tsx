@@ -8,6 +8,8 @@ import { MOCK_WORKSPACE } from '../../mock/workspace';
 export interface TopbarProps {
   /** Opens the mobile nav drawer (the trigger is hidden on desktop). */
   onOpenMobileNav: () => void;
+  /** Opens the ⌘K command palette from the search chip. */
+  onOpenSearch: () => void;
 }
 
 /**
@@ -20,7 +22,7 @@ export interface TopbarProps {
  * first, then an AI-generated portrait; the letter avatar stays as the
  * empty-state fallback.
  */
-export function Topbar({ onOpenMobileNav }: TopbarProps) {
+export function Topbar({ onOpenMobileNav, onOpenSearch }: TopbarProps) {
   const { pathname } = useLocation();
   const { user } = useAuth();
   const title = routeTitle(pathname);
@@ -64,7 +66,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
       <div className="lf-topbar__spacer" />
 
       <div className="lf-topbar__right">
-        <div className="lf-topbar__search" aria-hidden="true">
+        <button type="button" className="lf-topbar__search" onClick={onOpenSearch} aria-label="Search (Command K)">
           <svg
             width="16"
             height="16"
@@ -74,13 +76,14 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            aria-hidden="true"
           >
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
           </svg>
           <span>Search</span>
           <span className="lf-topbar__kbd">⌘K</span>
-        </div>
+        </button>
 
         <div className="lf-topbar__credits" title={`${MOCK_WORKSPACE.credits.toLocaleString()} generation credits`}>
           <svg

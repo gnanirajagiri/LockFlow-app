@@ -8,7 +8,7 @@ import { Tabs } from '../components/ui/Tabs';
 import { Skeleton } from '../components/ui/Skeleton';
 import { useToast } from '../components/ui/Toast';
 import { LibraryIcon, ModelIcon, SparkIcon, StudioIcon } from '../components/icons';
-import { MOCK_WORKSPACE } from '../mock/workspace';
+import { useAuth } from '../auth/AuthProvider';
 
 const CONTINUITY = [
   {
@@ -31,15 +31,22 @@ const CONTINUITY = [
   },
 ] as const;
 
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export function HomePage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [demoModalOpen, setDemoModalOpen] = useState(false);
 
   return (
     <div className="lf-page">
       <PageHeader
-        eyebrow={MOCK_WORKSPACE.name}
-        title="Home"
+        title={`${greeting()}, ${user?.name?.split(' ')[0] ?? 'there'}`}
         display
         description="Continuity first: reusable models, environments and assets are versioned and independently locked before use in content jobs."
         actions={

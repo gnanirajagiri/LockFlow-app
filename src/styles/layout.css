@@ -547,3 +547,140 @@
     font-size: var(--lf-text-2xl);
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   Stage-5 mobile (M01–M18) — bottom tab bar, mobile topbar, drawer nav.
+   Tab bar: 72px white bar, 5 equal columns, 11px labels, indigo active.
+   Mobile topbar: 56px canvas strip, 16px title, compact credits, small bell.
+   ═════════════════════════════════════════════════════════════════════════ */
+.lf-mobiletabs {
+  display: none;
+}
+
+@media (max-width: 960px) {
+  .lf-mobiletabs {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 420;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    height: 72px;
+    padding-bottom: 10px;
+    background: var(--lf-color-surface);
+    border-top: 1px solid var(--lf-color-border);
+  }
+  .lf-mobiletabs__tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 11px;
+    font-weight: var(--lf-font-weight-semibold);
+    color: var(--lf-color-ink-muted);
+    text-decoration: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .lf-mobiletabs__tab--active {
+    color: var(--lf-color-primary-500);
+  }
+  .lf-mobiletabs__tab:focus-visible {
+    outline: none;
+    box-shadow: var(--lf-focus-ring);
+    border-radius: var(--lf-radius-sm);
+  }
+
+  /* Mobile topbar — Stage-5 m-top: 56px canvas strip, compact clusters */
+  .lf-topbar {
+    min-height: 56px;
+    padding: 0 var(--lf-space-4);
+    gap: var(--lf-space-2);
+  }
+  .lf-topbar__crumbs span[aria-hidden] {
+    display: none; /* drop "LockFlow" root crumb on mobile */
+  }
+  .lf-topbar__title {
+    display: none; /* sidebar-style workspace label duplicates the crumb */
+  }
+  .lf-topbar__workspace {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: var(--lf-space-1);
+  }
+  .lf-topbar__user span:not(.lf-avatar) {
+    display: none;
+  }
+  .lf-topbar__user .lf-topbar__caret {
+    display: none;
+  }
+  .lf-topbar__credits {
+    height: 30px;
+    padding: 0 10px;
+    font-size: var(--lf-text-xs);
+  }
+  .lf-topbar__bell {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--lf-radius-sm);
+  }
+  .lf-topbar__search {
+    display: none;
+  }
+
+  /* Room for the fixed tab bar above the page bottom */
+  .lf-content {
+    padding: var(--lf-space-4) var(--lf-space-4) 96px;
+  }
+  .lf-pageheader__title {
+    font-size: 1.5rem; /* M-screen titles are 16–24px, not the desktop 28px */
+  }
+}
+
+/* ── Sidebar plan/credits meter (Stage-5 S06 sidebar bottom) ─────────── */
+.lf-sidebar__plan {
+  margin: var(--lf-space-2) var(--lf-space-2) var(--lf-space-3);
+  padding: var(--lf-space-3);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-color-navy-800);
+}
+.lf-sidebar__planrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lf-space-2);
+  font-size: var(--lf-text-sm);
+  font-weight: var(--lf-font-weight-semibold);
+  color: var(--lf-color-navy-text);
+  white-space: nowrap;
+}
+.lf-sidebar__planmeter {
+  margin-top: var(--lf-space-2);
+  height: 6px;
+  border-radius: var(--lf-radius-full);
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.lf-sidebar__planmeter::before {
+  content: '';
+  display: block;
+  height: 100%;
+  width: 38%;
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-gradient-primary);
+}
+.lf-sidebar__planhint {
+  margin-top: var(--lf-space-2);
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-navy-text-muted);
+  white-space: nowrap;
+}
+.lf-sidebar__plan--hidden {
+  display: none;
+}

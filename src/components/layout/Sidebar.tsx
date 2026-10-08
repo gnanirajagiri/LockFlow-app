@@ -3,6 +3,7 @@ import { NAV_PRIMARY } from '../../navigation/nav';
 import type { NavItem } from '../../navigation/nav';
 import { useAuth } from '../../auth/AuthProvider';
 import { ChevronLeftIcon, LogoutIcon, SparkIcon } from '../icons';
+import { MOCK_WORKSPACE } from '../../mock/workspace';
 
 export interface SidebarProps {
   collapsed: boolean;
@@ -46,6 +47,22 @@ export function Sidebar({ collapsed, onToggleCollapsed }: SidebarProps) {
       </nav>
 
       <div className="lf-sidebar__bottom">
+        {/* Stage-5: plan + credits meter card (S06) above the identity block */}
+        <div className={`lf-sidebar__plan${collapsed ? ' lf-sidebar__plan--hidden' : ''}`}>
+          <div className="lf-sidebar__planrow">
+            <span>Creator plan</span>
+            <span>{MOCK_WORKSPACE.credits.toLocaleString()} cr</span>
+          </div>
+          <div
+            className="lf-sidebar__planmeter"
+            role="progressbar"
+            aria-label="Monthly credits used"
+            aria-valuenow={38}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          />
+          <div className="lf-sidebar__planhint">62% of monthly credits left</div>
+        </div>
         <p className={`lf-sidebar__tagline${collapsed ? ' lf-sidebar__tagline--hidden' : ''}`} aria-hidden="true">
           Better content.
           <br />

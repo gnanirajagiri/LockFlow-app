@@ -3,6 +3,8 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { MobileNavDrawer } from './MobileNavDrawer';
+import { MobileTabBar } from './MobileTabBar';
+import { CommandPalette } from './CommandPalette';
 import { readStoredString, writeStoredString } from '../../lib/storage';
 import { isDemoMode } from '../../lib/env';
 
@@ -18,10 +20,23 @@ export function AppShell() {
     () => readStoredString(SIDEBAR_COLLAPSED_KEY) === '1',
   );
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     writeStoredString(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0');
   }, [collapsed]);
+
+  // Global ⌘K / Ctrl+K opens the command palette.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen((value) => !value);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Close the mobile drawer whenever the viewport crosses to desktop.
   useEffect(() => {
@@ -49,12 +64,14 @@ export function AppShell() {
             <span>— Supabase is not configured; authentication and data are mocked.</span>
           </div>
         ) : null}
-        <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} />
+        <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} onOpenSearch={() => setPaletteOpen(true)} />
         <main className="lf-content" id="lf-main-content">
           <Outlet />
         </main>
       </div>
+      <MobileTabBar onOpenMore={() => setMobileNavOpen(true)} />
       <MobileNavDrawer open={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </div>
   );
 }

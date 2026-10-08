@@ -1761,3 +1761,111 @@ select.lf-input {
     display: none;
   }
 }
+
+/* ── ⌘K command palette (Stage-5 topbar search) ─────────────────────── */
+.search.is-button {
+  cursor: pointer;
+}
+button.lf-topbar__search {
+  cursor: pointer;
+  font: inherit;
+}
+button.lf-topbar__search:hover {
+  border-color: var(--lf-color-border-strong);
+  color: var(--lf-color-ink-secondary);
+}
+button.lf-topbar__search span {
+  flex: none;
+}
+
+.lf-cmdk {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh var(--lf-space-4) var(--lf-space-4);
+  background: rgba(15, 23, 42, 0.35);
+}
+.lf-cmdk__panel {
+  width: min(560px, 100%);
+  background: var(--lf-color-surface);
+  border: 1px solid var(--lf-color-border);
+  border-radius: var(--lf-radius-lg);
+  box-shadow: var(--lf-shadow-lg);
+  overflow: hidden;
+}
+.lf-cmdk__field {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  padding: 14px var(--lf-space-4);
+  border-bottom: 1px solid var(--lf-color-border);
+  color: var(--lf-color-ink-faint);
+}
+.lf-cmdk__input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--lf-text-md);
+  color: var(--lf-color-ink);
+}
+.lf-cmdk__input::placeholder {
+  color: var(--lf-color-ink-faint);
+}
+.lf-cmdk__esc {
+  font-size: 11px;
+  padding: 3px 6px;
+  border: 1px solid var(--lf-color-border);
+  border-radius: 6px;
+  color: var(--lf-color-ink-muted);
+}
+.lf-cmdk__list {
+  max-height: 380px;
+  overflow-y: auto;
+  padding: var(--lf-space-2);
+}
+.lf-cmdk__item {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-3);
+  width: 100%;
+  padding: 10px var(--lf-space-3);
+  border: none;
+  border-radius: var(--lf-radius-sm);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lf-cmdk__item--selected {
+  background: var(--lf-color-primary-soft);
+}
+.lf-cmdk__itemicon {
+  display: inline-flex;
+  flex: none;
+  color: var(--lf-color-ink-secondary);
+}
+.lf-cmdk__item--selected .lf-cmdk__itemicon {
+  color: var(--lf-color-primary-700);
+}
+.lf-cmdk__itemlabel {
+  font-size: var(--lf-text-sm);
+  font-weight: var(--lf-font-weight-medium);
+  color: var(--lf-color-ink);
+}
+.lf-cmdk__itemto {
+  margin-left: auto;
+  font-family: var(--lf-font-mono);
+  font-size: 11px;
+  color: var(--lf-color-ink-faint);
+}
+.lf-cmdk__empty {
+  padding: var(--lf-space-6) var(--lf-space-4);
+  text-align: center;
+  font-size: var(--lf-text-sm);
+  color: var(--lf-color-ink-muted);
+}

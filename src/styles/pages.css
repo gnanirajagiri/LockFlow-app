@@ -314,7 +314,96 @@
   text-align: center;
 }
 
-/* ── S30 model profile overview ──────────────────────────────────────── */
+/* ── S31 Character Sheet view cards ──────────────────────────────────── */
+.lf-sheet__viewshead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--lf-space-3);
+}
+.lf-sheet__views {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--lf-space-4);
+}
+.lf-sheet__views--optional {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+.lf-sheet__viewcard {
+  border: 1px solid var(--lf-color-border);
+  border-radius: var(--lf-radius-lg);
+  background: var(--lf-color-surface);
+  box-shadow: var(--lf-shadow-xs);
+  overflow: hidden;
+}
+.lf-sheet__viewmedia {
+  position: relative;
+}
+.lf-sheet__viewmedia .lf-refcard__image {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  display: block;
+}
+.lf-sheet__viewmedia > div {
+  aspect-ratio: 4 / 5;
+  display: grid;
+  place-items: center;
+  background: var(--lf-color-surface-muted);
+  color: var(--lf-color-ink-faint);
+}
+.lf-sheet__viewbadge {
+  position: absolute;
+  top: var(--lf-space-2);
+  left: var(--lf-space-2);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-primary-soft);
+  color: var(--lf-color-primary-700);
+  font-size: 11px;
+  font-weight: var(--lf-font-weight-semibold);
+}
+.lf-sheet__viewscore {
+  position: absolute;
+  top: var(--lf-space-2);
+  right: var(--lf-space-2);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--lf-radius-full);
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 11px;
+  font-weight: var(--lf-font-weight-semibold);
+}
+.lf-sheet__viewfoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--lf-space-2);
+  padding: var(--lf-space-3) var(--lf-space-4);
+  border-top: 1px solid var(--lf-color-border);
+}
+.lf-sheet__viewname {
+  font-size: var(--lf-text-base);
+  font-weight: var(--lf-font-weight-semibold);
+  color: var(--lf-color-ink);
+}
+.lf-sheet__optionalhead {
+  font-size: var(--lf-text-xs);
+  font-weight: var(--lf-font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lf-color-ink-muted);
+}
+
+/* ── S30 model profile overview
 .lf-mprofile__columns {
   display: grid;
   grid-template-columns: minmax(0, 4fr) minmax(0, 4fr) minmax(0, 4fr);

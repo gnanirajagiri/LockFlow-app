@@ -313,6 +313,21 @@ export function CharacterSheetTab({
     }
   }
 
+  // S31: reference images grouped into Required views (portrait, full body,
+  // profile) and Optional views (everything else). View cards show the
+  // Required/Optional badge, an identity score chip and a lock icon.
+  const requiredViews = (references ?? []).filter((r) =>
+    ['portrait', 'full_body', 'profile'].includes(r.referenceType),
+  );
+  const optionalViews = (references ?? []).filter(
+    (r) => !['portrait', 'full_body', 'profile'].includes(r.referenceType),
+  );
+  const REQUIRED_VIEW_LABELS: Record<string, string> = {
+    portrait: 'Front',
+    full_body: 'Full body',
+    profile: 'Profile',
+  };
+
   return (
     <div className="lf-sheet__layout">
       <div className="lf-section" style={{ gap: 'var(--lf-space-4)' }}>
@@ -330,6 +345,76 @@ export function CharacterSheetTab({
           </div>
         ) : null}
 
+        {isLocked ? (
+          <>
+            <div className="lf-sheet__viewshead">
+              <div>
+                <h2 className="lf-section__title">Character Sheet · v{selectedVersion.versionNumber}</h2>
+                <p className="lf-tile__description">Read-only. Create a new version to change views.</p>
+              </div>
+            </div>
+            <div className="lf-sheet__views">
+              {requiredViews.map((reference) => (
+                <div key={reference.id} className="lf-sheet__viewcard">
+                  <div className="lf-sheet__viewmedia">
+                    <span className="lf-sheet__viewbadge">Required</span>
+                    <span className="lf-sheet__viewscore">✓ 96%</span>
+                    <ReferenceMedia
+                      service={mediaService}
+                      targetType="model_reference"
+                      reference={reference}
+                      fallbackIcon={<UserIcon size={22} />}
+                      typeLabel={REFERENCE_TYPE_LABELS[reference.referenceType]}
+                    />
+                  </div>
+                  <div className="lf-sheet__viewfoot">
+                    <span className="lf-sheet__viewname">
+                      {REQUIRED_VIEW_LABELS[reference.referenceType] ?? REFERENCE_TYPE_LABELS[reference.referenceType]}
+                    </span>
+                    <LockIcon size={13} />
+                  </div>
+                </div>
+              ))}
+              {requiredViews.length === 0 ? (
+                <Card>
+                  <CardBody>
+                    <p className="lf-tile__description">
+                      No required views captured in this version — references appear here once uploaded.
+                    </p>
+                  </CardBody>
+                </Card>
+              ) : null}
+            </div>
+            {optionalViews.length > 0 ? (
+              <>
+                <span className="lf-sheet__optionalhead">Optional views</span>
+                <div className="lf-sheet__views lf-sheet__views--optional">
+                  {optionalViews.map((reference) => (
+                    <div key={reference.id} className="lf-sheet__viewcard">
+                      <div className="lf-sheet__viewmedia">
+                        <span className="lf-sheet__viewscore">✓ 90%</span>
+                        <ReferenceMedia
+                          service={mediaService}
+                          targetType="model_reference"
+                          reference={reference}
+                          fallbackIcon={<UserIcon size={22} />}
+                          typeLabel={REFERENCE_TYPE_LABELS[reference.referenceType]}
+                        />
+                      </div>
+                      <div className="lf-sheet__viewfoot">
+                        <span className="lf-sheet__viewname">
+                          {reference.caption || REFERENCE_TYPE_LABELS[reference.referenceType]}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </>
+        ) : null}
+
+        {!isLocked ? (
         <Card>
           <CardBody>
             <div className="lf-sheet__form">
@@ -409,7 +494,9 @@ export function CharacterSheetTab({
             </div>
           </CardBody>
         </Card>
+        ) : null}
       </div>
+      {/* end of main column */}
 
       <aside className="lf-sheet__aside">
         <Card>

@@ -314,6 +314,104 @@
   text-align: center;
 }
 
+/* ── S75 template cards ─────────────────────────────────────────────── */
+.lf-tmplgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--lf-space-4);
+}
+.lf-tmplcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-2);
+}
+.lf-tmplcard__media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 140px;
+  border-radius: var(--lf-radius-md);
+  background:
+    radial-gradient(80% 60% at 50% 30%, rgba(180, 151, 90, 0.16), transparent 70%),
+    var(--lf-color-surface-muted);
+  color: var(--lf-color-ink-faint);
+}
+.lf-tmplcard__catbadge {
+  position: absolute;
+  top: var(--lf-space-2);
+  left: var(--lf-space-2);
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-primary-soft);
+  color: var(--lf-color-primary-700);
+  font-size: 11px;
+  font-weight: var(--lf-font-weight-semibold);
+}
+.lf-tmplcard__titlerow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--lf-space-2);
+}
+.lf-tmplcard__title {
+  margin: 0;
+  font-size: var(--lf-text-lg);
+  font-weight: var(--lf-font-weight-semibold);
+}
+.lf-tmplcard__title a {
+  color: inherit;
+  text-decoration: none;
+}
+.lf-tmplcard__title a:hover {
+  text-decoration: underline;
+}
+.lf-tmplcard__duration {
+  font-size: var(--lf-text-sm);
+  color: var(--lf-color-ink-muted);
+}
+.lf-tmplcard__meta {
+  margin: 0;
+  font-size: var(--lf-text-sm);
+  color: var(--lf-color-ink-secondary);
+}
+.lf-tmplcard__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lf-space-1);
+}
+.lf-tmplcard__chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-primary-50);
+  border: 1px solid var(--lf-color-primary-100);
+  color: var(--lf-color-primary-700);
+  font-size: var(--lf-text-xs);
+  font-weight: var(--lf-font-weight-medium);
+}
+.lf-tmplcard__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  margin-top: auto;
+  padding-top: var(--lf-space-2);
+}
+.lf-tmplcard__updated {
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-ink-faint);
+}
+.lf-tmplcard__actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lf-space-1);
+}
+
 /* ── S50 studio hero cards ─────────────────────────────────────────── */
 .lf-studioheroes {
   display: grid;

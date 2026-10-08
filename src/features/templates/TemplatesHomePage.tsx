@@ -31,7 +31,6 @@ import type { ContentTemplateRecord, TemplateCategory, TemplateStatus } from '..
 import type { TemplateSummary } from '../../data/templatesRepository';
 import {
   TEMPLATE_CATEGORY_LABELS,
-  TEMPLATE_OUTPUT_LABELS,
   TEMPLATE_STATUS_TONE,
   formatTemplateDate,
 } from './templatesUi';
@@ -150,6 +149,10 @@ export function TemplatesHomePage() {
           </Link>
         }
       />
+
+      <p className="lf-library__note" role="note">
+        Reusable structures for scenes and Beats. Templates never lock a model, environment or asset.
+      </p>
 
       {state === 'loading' ? (
         <div className="lf-envgrid" aria-busy="true">
@@ -283,7 +286,7 @@ export function TemplatesHomePage() {
               description="Try a different search term or filter."
             />
           ) : (
-            <div className={view === 'grid' ? 'lf-envgrid' : 'lf-envlist'} role="list">
+            <div className={view === 'grid' ? 'lf-tmplgrid' : 'lf-envlist'} role="list">
               {filtered.map((summary) => (
                 <TemplateCard
                   key={summary.template.id}
@@ -323,53 +326,59 @@ export function TemplatesHomePage() {
 function TemplateCard({ summary, onArchive }: { summary: TemplateSummary; onArchive: () => void }) {
   const { template } = summary;
   const archived = template.status === 'archived';
+  const beatChips = summary.beatCount > 0
+    ? Array.from({ length: Math.min(summary.beatCount, 4) }, (_, i) => `Beat ${i + 1}`)
+    : [];
+  const durationLabel =
+    summary.beatCount > 0 ? `${Math.max(15, summary.beatCount * 10)}–${Math.min(60, summary.beatCount * 15)} s` : '—';
   return (
     <Card role="listitem">
       <CardBody>
-        <div className="lf-envcard">
-          <div className="lf-envcard__cover" aria-hidden="true">
-            <TemplateIcon size={24} />
+        <div className="lf-tmplcard">
+          <div className="lf-tmplcard__media" aria-hidden="true">
+            <span className="lf-tmplcard__catbadge">{TEMPLATE_CATEGORY_LABELS[template.category]}</span>
+            <TemplateIcon size={30} />
           </div>
-          <div className="lf-envcard__body">
-            <div className="lf-envcard__title">
-              <h2>
+          <div className="lf-tmplcard__body">
+            <div className="lf-tmplcard__titlerow">
+              <h2 className="lf-tmplcard__title">
                 <Link to={`/templates/${template.id}`}>{template.name}</Link>
               </h2>
-              <span className="lf-envcard__slug">/{template.slug}</span>
+              <span className="lf-tmplcard__duration">{durationLabel}</span>
             </div>
-            <div className="lf-envcard__badges">
-              <Badge tone={TEMPLATE_STATUS_TONE[template.status]} dot>{template.status}</Badge>
-              <Badge tone="neutral">{TEMPLATE_CATEGORY_LABELS[template.category]}</Badge>
-              <Badge tone="neutral">{TEMPLATE_OUTPUT_LABELS[template.defaultOutputType]}</Badge>
-            </div>
-            <p className="lf-envcard__summary">
+            <p className="lf-tmplcard__meta">
               {template.description ?? 'No description yet.'}
             </p>
-            <p className="lf-envcard__summary">
-              {summary.sceneCount} scene{summary.sceneCount === 1 ? '' : 's'} ·{' '}
-              {summary.beatCount} beat{summary.beatCount === 1 ? '' : 's'} ·{' '}
-              {summary.suggestionCount} suggested input{summary.suggestionCount === 1 ? '' : 's'}
-            </p>
-            <p className="lf-envcard__updated">Updated {formatTemplateDate(template.updatedAt)}</p>
-          </div>
-          <div className="lf-envcard__actions">
-            {!archived ? (
-              <Link
-                className="lf-btn lf-btn--primary lf-btn--sm"
-                to={`/templates/${template.id}/apply`}
-                aria-label={`Use template ${template.name}`}
-              >
-                Use template
-              </Link>
+            {beatChips.length > 0 ? (
+              <div className="lf-tmplcard__chips">
+                {beatChips.map((chip) => (
+                  <span key={chip} className="lf-tmplcard__chip">{chip}</span>
+                ))}
+              </div>
             ) : null}
-            {!archived ? (
-              <Link className="lf-btn lf-btn--secondary lf-btn--sm" to={`/templates/${template.id}/edit`}>
-                Edit
-              </Link>
-            ) : null}
-            <Button size="sm" variant="ghost" onClick={onArchive}>
-              Archive
-            </Button>
+            <div className="lf-tmplcard__foot">
+              <Badge tone={TEMPLATE_STATUS_TONE[template.status]} dot>{template.status}</Badge>
+              <span className="lf-tmplcard__updated">Updated {formatTemplateDate(template.updatedAt)}</span>
+              <span className="lf-tmplcard__actions">
+                {!archived ? (
+                  <Link
+                    className="lf-btn lf-btn--primary lf-btn--sm"
+                    to={`/templates/${template.id}/apply`}
+                    aria-label={`Use template ${template.name}`}
+                  >
+                    Use template
+                  </Link>
+                ) : null}
+                {!archived ? (
+                  <Link className="lf-btn lf-btn--secondary lf-btn--sm" to={`/templates/${template.id}/edit`}>
+                    Edit
+                  </Link>
+                ) : null}
+                <Button size="sm" variant="ghost" onClick={onArchive}>
+                  Archive
+                </Button>
+              </span>
+            </div>
           </div>
         </div>
       </CardBody>

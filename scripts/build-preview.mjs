@@ -62,11 +62,31 @@ if (!cssAsset) {
   console.error('Expected a stylesheet link in dist/index.html.');
   process.exit(1);
 }
-const css = await readFile(join(distDir, cssAsset), 'utf8');
+let css = await readFile(join(distDir, cssAsset), 'utf8');
+
+// The single-file preview ships no asset files, so any url(./xxx.woff2)
+// reference in the CSS would 404 and silently drop the self-hosted fonts.
+// Inline every emitted font as a base64 data: URI.
+const fontRefs = [...css.matchAll(/url\(\.\/([^)]+\.woff2)\)/g)];
+for (const [, fontFile] of fontRefs) {
+  const fontData = await readFile(join(distDir, 'assets', fontFile));
+  css = css.replaceAll(
+    `url(./${fontFile})`,
+    `url(data:font/woff2;base64,${fontData.toString('base64')})`,
+  );
+}
+if (fontRefs.length) {
+  console.log(`Inlined ${fontRefs.length} font file(s) as data: URIs.`);
+}
+
+// When the single file is served from a sub-path (…/dist-preview/index.html)
+// the router would match that URL against no route and render 404. Normalize
+// to '/' before the app boots. try/catch keeps file:// booting intact.
+const bootGuard = `<script>try{if(/\\/index\\.html$/.test(location.pathname)){history.replaceState(null,'','/');}}catch(e){}</script>`;
 
 const inlined = html
   .replace(/<link rel="stylesheet"[^>]*>/, () => `<style>\n${css}\n</style>`)
-  .replace(/<script type="module"[^>]*><\/script>/, () => `<script type="module">\n${js}\n</script>`)
+  .replace(/<script type="module"[^>]*><\/script>/, () => `${bootGuard}\n<script type="module">\n${js}\n</script>`)
   // Module-preload links point at files that no longer exist once inlined.
   .replace(/<link rel="modulepreload"[^>]*>\n?/g, '');
 

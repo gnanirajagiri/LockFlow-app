@@ -6,7 +6,6 @@ import { MobileNavDrawer } from './MobileNavDrawer';
 import { MobileTabBar } from './MobileTabBar';
 import { CommandPalette } from './CommandPalette';
 import { readStoredString, writeStoredString } from '../../lib/storage';
-import { isDemoMode } from '../../lib/env';
 
 const SIDEBAR_COLLAPSED_KEY = 'lockflow.sidebar.collapsed';
 
@@ -58,12 +57,6 @@ export function AppShell() {
         onToggleCollapsed={() => setCollapsed((value) => !value)}
       />
       <div className="lf-main">
-        {isDemoMode ? (
-          <div className="lf-demobanner" role="status">
-            <strong>Demo mode</strong>
-            <span>— Supabase is not configured; authentication and data are mocked.</span>
-          </div>
-        ) : null}
         <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} onOpenSearch={() => setPaletteOpen(true)} />
         <main className="lf-content" id="lf-main-content">
           <Outlet />

@@ -14,7 +14,7 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { useToast } from '../components/ui/Toast';
-import { GridViewIcon, ListViewIcon, SearchIcon, StudioIcon, CameraIcon, VideoIcon, CampaignIcon } from '../components/icons';
+import { GridViewIcon, ListViewIcon, SearchIcon, StudioIcon, CameraIcon, VideoIcon, TemplateIcon, SparkIcon } from '../components/icons';
 import { ContentStudioService } from '../services/contentService';
 import { LibraryService } from '../services/libraryService';
 import { ModelsService } from '../services/modelsService';
@@ -160,31 +160,46 @@ export function ContentStudioPage() {
       <p className="lf-library__note" role="note">{STUDIO_HELPER_COPY}</p>
 
       <section className="lf-studiohub" aria-label="Start something new">
-        <div className="lf-createquick">
-          <div className="lf-createquick__item">
-            <span className="lf-createquick__icon" aria-hidden="true"><CameraIcon size={18} /></span>
-            <div>
-              <strong>Create Image</strong>
-              <span className="lf-tile__description">High-quality images from your locked model and assets.</span>
-            </div>
-            <Link className="lf-btn lf-btn--primary lf-btn--sm" to="/content-studio/new">Start</Link>
-          </div>
-          <div className="lf-createquick__item">
-            <span className="lf-createquick__icon" aria-hidden="true"><VideoIcon size={18} /></span>
-            <div>
-              <strong>Create Video</strong>
-              <span className="lf-tile__description">Short-form and long-form video with consistent continuity.</span>
-            </div>
-            <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/content-studio/new">Start</Link>
-          </div>
-          <div className="lf-createquick__item">
-            <span className="lf-createquick__icon" aria-hidden="true"><CampaignIcon size={18} /></span>
-            <div>
-              <strong>Create Content Set</strong>
-              <span className="lf-tile__description">Plan a campaign with multiple deliverables at once.</span>
-            </div>
-            <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/campaigns/new">Plan</Link>
-          </div>
+        <div className="lf-studioheroes">
+          <Card className="lf-createhero lf-createhero--selected">
+            <CardBody>
+              <div className="lf-createhero__copy">
+                <span className="lf-createhero__icon" aria-hidden="true"><StudioIcon size={22} /></span>
+                <h2 className="lf-createhero__title">Create content</h2>
+                <p className="lf-createhero__body">
+                  One photo, video or story. Pick a model, environment and template.
+                </p>
+                <Link className="lf-btn lf-btn--primary" to="/content-studio/new">→ Start</Link>
+              </div>
+              <div className="lf-createhero__media lf-createhero__media--model" aria-hidden="true"><CameraIcon size={40} /></div>
+            </CardBody>
+          </Card>
+          <Card className="lf-createhero">
+            <CardBody>
+              <div className="lf-createhero__copy">
+                <span className="lf-createhero__icon lf-createhero__icon--soft" aria-hidden="true"><VideoIcon size={22} /></span>
+                <h2 className="lf-createhero__title">Content set from a brief</h2>
+                <p className="lf-createhero__body">
+                  Up to 12 items planned from one brief — great for campaigns.
+                </p>
+                <Link className="lf-btn lf-btn--secondary" to="/content-studio/new">→ Plan a set</Link>
+              </div>
+              <div className="lf-createhero__media lf-createhero__media--env" aria-hidden="true"><StudioIcon size={40} /></div>
+            </CardBody>
+          </Card>
+          <Card className="lf-createhero">
+            <CardBody>
+              <div className="lf-createhero__copy">
+                <span className="lf-createhero__icon lf-createhero__icon--soft" aria-hidden="true"><TemplateIcon size={22} /></span>
+                <h2 className="lf-createhero__title">Start from template</h2>
+                <p className="lf-createhero__body">
+                  Product review, testimonial, unboxing and your own templates.
+                </p>
+                <Link className="lf-btn lf-btn--secondary" to="/templates">→ Browse templates</Link>
+              </div>
+              <div className="lf-createhero__media lf-createhero__media--env" aria-hidden="true"><SparkIcon size={40} /></div>
+            </CardBody>
+          </Card>
         </div>
       </section>
 

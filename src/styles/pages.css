@@ -314,6 +314,35 @@
   text-align: center;
 }
 
+/* ── S50 studio hero cards ─────────────────────────────────────────── */
+.lf-studioheroes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--lf-space-4);
+}
+.lf-studioheroes .lf-card__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0;
+}
+.lf-studioheroes .lf-createhero__media {
+  order: -1;
+  border-radius: var(--lf-radius-lg) var(--lf-radius-lg) 0 0;
+  min-height: 200px;
+}
+.lf-createhero--selected {
+  border: 2px solid var(--lf-color-primary-500);
+}
+.lf-createhero__icon--soft {
+  background: var(--lf-color-primary-soft);
+  color: var(--lf-color-primary-700);
+}
+@media (max-width: 1100px) {
+  .lf-studioheroes {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── S31 Character Sheet view cards ──────────────────────────────────── */
 .lf-sheet__viewshead {
   display: flex;

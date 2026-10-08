@@ -655,6 +655,132 @@
   }
 }
 
+/* ── S08 create hero cards + drafts + locked rail ─────────────────── */
+.lf-createheroes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--lf-space-4);
+}
+.lf-createhero .lf-card__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--lf-space-4);
+  padding: 0;
+}
+.lf-createhero__copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--lf-space-2);
+  padding: var(--lf-space-5);
+}
+.lf-createhero__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--lf-space-2);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-color-navy-900);
+  color: #ffffff;
+}
+.lf-createhero__eyebrow {
+  font-size: var(--lf-text-xs);
+  font-weight: var(--lf-font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lf-color-ink-muted);
+}
+.lf-createhero__title {
+  margin: 0;
+  font-size: var(--lf-text-2xl);
+  font-weight: var(--lf-font-weight-semibold);
+  color: var(--lf-color-ink);
+}
+.lf-createhero__body {
+  margin: 0 0 var(--lf-space-2);
+  font-size: var(--lf-text-base);
+  color: var(--lf-color-ink-secondary);
+}
+.lf-createhero__media {
+  display: grid;
+  place-items: center;
+  min-height: 280px;
+  border-radius: 0 var(--lf-radius-lg) var(--lf-radius-lg) 0;
+  color: var(--lf-color-ink-muted);
+}
+.lf-createhero__media--model {
+  background:
+    radial-gradient(80% 60% at 50% 35%, rgba(79, 70, 229, 0.12), transparent 70%),
+    var(--lf-color-surface-muted);
+}
+.lf-createhero__media--env {
+  background:
+    radial-gradient(80% 60% at 50% 35%, rgba(180, 151, 90, 0.18), transparent 70%),
+    var(--lf-color-surface-muted);
+}
+.lf-createhero__draftpill {
+  margin-bottom: var(--lf-space-2);
+}
+.lf-createhero__pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--lf-radius-full);
+  border: 1px dashed var(--lf-color-border-strong);
+  background: var(--lf-color-surface);
+  font-size: 11px;
+  font-weight: var(--lf-font-weight-semibold);
+  color: var(--lf-color-ink-secondary);
+}
+.lf-createhero__lockedrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--lf-space-3);
+}
+.lf-createhero__lockedcard {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  padding: var(--lf-space-2) var(--lf-space-4) var(--lf-space-2) var(--lf-space-2);
+  border: 1px solid var(--lf-color-border);
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-surface);
+  box-shadow: var(--lf-shadow-xs);
+  text-decoration: none;
+  font-size: var(--lf-text-sm);
+  font-weight: var(--lf-font-weight-semibold);
+  color: var(--lf-color-ink);
+}
+.lf-createhero__lockedcard:hover {
+  box-shadow: var(--lf-shadow-sm);
+}
+.lf-createhero__lockedthumb {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--lf-radius-full);
+  background: var(--lf-color-surface-muted);
+  color: var(--lf-color-ink-secondary);
+}
+.lf-createhero__lockedname {
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .lf-createheroes {
+    grid-template-columns: 1fr;
+  }
+  .lf-createhero .lf-card__body {
+    grid-template-columns: 1fr;
+  }
+  .lf-createhero__media {
+    display: none;
+  }
+}
+
 /* ── S06 home — resume cards, attention list, campaign rings, assets ─── */
 .lf-section__link {
   display: inline-flex;

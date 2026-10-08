@@ -1,40 +1,61 @@
 /**
- * Maya Create overview — the hub above the builders. Mirrors the product
- * mockup: Model Builder and Environment Builder hero cards with live
- * locked-version state, quick create entry into Content Studio, and a
- * recent-drafts strip fed by real Gallery outputs.
+ * Maya Create overview — Stage-5 S08. Two builder hero cards (Model Builder
+ * "Create your presenter" / Environment Builder "Create your setting") with
+ * eyebrow labels and photo panels, the Saved drafts strip (unlocked model and
+ * environment drafts + content plans, S09), and the Recently locked rail.
+ * Data comes from the same mock-backed services as the feature pages.
  */
-import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '../components/layout/PageHeader';
 import { Card, CardBody } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
 import { Skeleton } from '../components/ui/Skeleton';
-import { EnvironmentIcon, LockIcon, ModelIcon, SparkIcon, StudioIcon } from '../components/icons';
+import { EnvironmentIcon, LockIcon, ModelIcon } from '../components/icons';
 import { ModelsService } from '../services/modelsService';
 import { EnvironmentsService } from '../services/environmentsService';
-import { getGalleryRepository } from '../data/galleryFactory';
+import { ContentStudioService } from '../services/contentService';
+import { LibraryService } from '../services/libraryService';
 import { getModelsRepository } from '../data';
 import { getEnvironmentsRepository } from '../data/environmentsFactory';
+import { getContentRepository } from '../data/contentFactory';
+import { getLibraryRepository } from '../data/libraryFactory';
 import { SEED_GALLERY_WORKSPACE_ID } from '../mock/gallerySeed';
-import type { GalleryOutputRecord } from '../domain/gallery/types';
+import { SEED_CONTENT_WORKSPACE_ID } from '../mock/contentSeed';
+import type { ModelRecord, ModelVersionRecord } from '../domain/models';
+import type { EnvironmentRecord, EnvironmentVersionRecord } from '../domain/environments';
+import type { ContentProjectSummary } from '../data/contentRepository';
 
-interface BuilderState {
-  total: number;
-  locked: number;
-  loading: boolean;
+interface DraftCard {
+  id: string;
+  to: string;
+  name: string;
+  meta: string;
 }
 
-interface DraftState {
-  outputs: GalleryOutputRecord[];
-  loading: boolean;
+interface LockedCard {
+  id: string;
+  to: string;
+  name: string;
+  versionLabel: string;
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const hours = Math.floor(diff / 3_600_000);
+  if (hours < 1) return 'just now';
+  if (hours < 24) return `${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'yesterday';
+  return `${days} days ago`;
 }
 
 export function CreatePage() {
-  const navigate = useNavigate();
-  const [models, setModels] = useState<BuilderState>({ total: 0, locked: 0, loading: true });
-  const [environments, setEnvironments] = useState<BuilderState>({ total: 0, locked: 0, loading: true });
-  const [drafts, setDrafts] = useState<DraftState>({ outputs: [], loading: true });
+  const [loading, setLoading] = useState(true);
+  const [models, setModels] = useState<ModelRecord[]>([]);
+  const [modelVersions, setModelVersions] = useState<Record<string, ModelVersionRecord[]>>({});
+  const [environments, setEnvironments] = useState<EnvironmentRecord[]>([]);
+  const [environmentVersions, setEnvironmentVersions] = useState<Record<string, EnvironmentVersionRecord[]>>({});
+  const [projects, setProjects] = useState<ContentProjectSummary[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,43 +63,36 @@ export function CreatePage() {
       try {
         const modelsService = new ModelsService(getModelsRepository());
         const environmentsService = new EnvironmentsService(getEnvironmentsRepository());
-        const [modelRows, environmentRows] = await Promise.all([
+        const content = new ContentStudioService(getContentRepository(), {
+          library: new LibraryService(getLibraryRepository()),
+          models: modelsService,
+          environments: environmentsService,
+        });
+        const [modelRows, environmentRows, projectRows] = await Promise.all([
           modelsService.listModels(SEED_GALLERY_WORKSPACE_ID),
           environmentsService.listEnvironments(SEED_GALLERY_WORKSPACE_ID),
+          content.listProjectSummaries(SEED_CONTENT_WORKSPACE_ID),
         ]);
-        if (cancelled) return;
-        const lockCount = (statuses: Array<string | null>) =>
-          statuses.filter((status) => status === 'locked').length;
-        setModels({
-          total: modelRows.length,
-          locked: lockCount(
-            (await Promise.all(modelRows.map((model) => modelsService.getVersions(model.id, SEED_GALLERY_WORKSPACE_ID))))
-              .flatMap((versions) => versions.map((version) => version.status)),
-          ),
-          loading: false,
-        });
-        setEnvironments({
-          total: environmentRows.length,
-          locked: lockCount(
-            (await Promise.all(
-              environmentRows.map((environment) => environmentsService.getVersions(environment.id, SEED_GALLERY_WORKSPACE_ID)),
-            )).flatMap((versions) => versions.map((version) => version.status)),
-          ),
-          loading: false,
-        });
-      } catch {
-        if (!cancelled) {
-          setModels((current) => ({ ...current, loading: false }));
-          setEnvironments((current) => ({ ...current, loading: false }));
+        const versionMap: Record<string, ModelVersionRecord[]> = {};
+        for (const model of modelRows) {
+          versionMap[model.id] = await modelsService.getVersions(model.id, SEED_GALLERY_WORKSPACE_ID);
         }
-      }
-    })();
-    void (async () => {
-      try {
-        const outputs = await getGalleryRepository().listOutputs(SEED_GALLERY_WORKSPACE_ID);
-        if (!cancelled) setDrafts({ outputs: outputs.slice(0, 4), loading: false });
+        const envVersionMap: Record<string, EnvironmentVersionRecord[]> = {};
+        for (const environment of environmentRows) {
+          envVersionMap[environment.id] = await environmentsService.getVersions(
+            environment.id,
+            SEED_GALLERY_WORKSPACE_ID,
+          );
+        }
+        if (cancelled) return;
+        setModels(modelRows);
+        setModelVersions(versionMap);
+        setEnvironments(environmentRows);
+        setEnvironmentVersions(envVersionMap);
+        setProjects(projectRows);
+        setLoading(false);
       } catch {
-        if (!cancelled) setDrafts({ outputs: [], loading: false });
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
@@ -86,155 +100,212 @@ export function CreatePage() {
     };
   }, []);
 
+  /** S09: only unlocked model and environment drafts, newest first. */
+  const savedDrafts = useMemo<DraftCard[]>(() => {
+    const cards: DraftCard[] = [];
+    for (const model of models) {
+      const drafts = (modelVersions[model.id] ?? []).filter((v) => v.status === 'draft');
+      for (const draft of drafts) {
+        cards.push({
+          id: `m-${draft.id}`,
+          to: `/models/${model.id}/versions`,
+          name: `${model.name} v${draft.versionNumber}`,
+          meta: `Model version · ${relativeTime(draft.updatedAt)}`,
+        });
+      }
+      if (model.status === 'draft') {
+        cards.push({
+          id: `m-${model.id}`,
+          to: `/models/${model.id}`,
+          name: model.name,
+          meta: `Model · ${relativeTime(model.updatedAt)}`,
+        });
+      }
+    }
+    for (const environment of environments) {
+      const drafts = (environmentVersions[environment.id] ?? []).filter((v) => v.status === 'draft');
+      for (const draft of drafts) {
+        cards.push({
+          id: `e-${draft.id}`,
+          to: `/environments/${environment.id}/versions`,
+          name: `${environment.name} v${draft.versionNumber}`,
+          meta: `Environment draft · ${relativeTime(draft.updatedAt)}`,
+        });
+      }
+    }
+    for (const project of projects) {
+      cards.push({
+        id: `p-${project.project.id}`,
+        to: `/content-studio/${project.project.id}`,
+        name: project.project.name,
+        meta: `Content set · Plan · ${relativeTime(project.project.updatedAt)}`,
+      });
+    }
+    return cards.slice(0, 4);
+  }, [models, modelVersions, environments, environmentVersions, projects]);
+
+  /** S08 "Recently locked": newest locked versions across both systems. */
+  const recentlyLocked = useMemo<LockedCard[]>(() => {
+    const locked: Array<LockedCard & { at: string }> = [];
+    for (const model of models) {
+      for (const version of modelVersions[model.id] ?? []) {
+        if (version.status === 'locked' && version.lockedAt) {
+          locked.push({
+            id: `m-${version.id}`,
+            to: `/models/${model.id}`,
+            name: `${model.name} v${version.versionNumber}`,
+            versionLabel: `v${version.versionNumber}`,
+            at: version.lockedAt,
+          });
+        }
+      }
+    }
+    for (const environment of environments) {
+      for (const version of environmentVersions[environment.id] ?? []) {
+        if (version.status === 'locked' && version.lockedAt) {
+          locked.push({
+            id: `e-${version.id}`,
+            to: `/environments/${environment.id}`,
+            name: `${environment.name} v${version.versionNumber}`,
+            versionLabel: `v${version.versionNumber}`,
+            at: version.lockedAt,
+          });
+        }
+      }
+    }
+    return locked.sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 3);
+  }, [models, modelVersions, environments, environmentVersions]);
+
   return (
     <div className="lf-page">
       <PageHeader
-        title="Create reusable assets"
-        description="Models and environments are built separately, locked independently, and combined later in Content Studio."
+        title="Create"
+        description="Build your model and your environment separately, then combine them in Content Studio."
       />
 
-      <div className="lf-creategrid">
-        <Card className="lf-createcard">
+      <div className="lf-createheroes">
+        <Card className="lf-createhero">
           <CardBody>
-            <div className="lf-createcard__head">
-              <span className="lf-createcard__icon lf-createcard__icon--model" aria-hidden="true">
+            <div className="lf-createhero__copy">
+              <span className="lf-createhero__icon" aria-hidden="true">
                 <ModelIcon size={22} />
               </span>
-              <div>
-                <h2 className="lf-createcard__title">Model Builder</h2>
-                <p className="lf-tile__description">Create or import your presenter.</p>
-              </div>
-              <span className="lf-createcard__lockchip">
-                <LockIcon size={12} /> {models.loading ? '…' : `${models.locked} locked`}
-              </span>
+              <span className="lf-createhero__eyebrow">Model Builder</span>
+              <h2 className="lf-createhero__title">Create your presenter</h2>
+              <p className="lf-createhero__body">
+                Face, skin, hair, body, fine details and a Character Sheet — then lock it.
+              </p>
+              <Link className="lf-btn lf-btn--primary" to="/models">
+                Start Model Builder
+              </Link>
             </div>
-            <div className="lf-createcard__media lf-createcard__media--model" aria-hidden="true">
-              <ModelIcon size={40} />
-            </div>
-            <p className="lf-createcard__body">
-              Build your reusable presenter with AI or import your own. Lock the model version when it&apos;s ready —
-              locked versions are generation-ready assets.
-            </p>
-            <div className="lf-createcard__actions">
-              <span className="lf-createcard__state">
-                {models.loading ? <Skeleton lines={1} /> : (
-                  <>
-                    <Badge tone={models.total > 0 ? 'success' : 'neutral'}>
-                      {models.total > 0 ? `${models.total} model${models.total === 1 ? '' : 's'}` : 'No models yet'}
-                    </Badge>
-                    <Badge tone="neutral">version-safe</Badge>
-                  </>
-                )}
-              </span>
-              <button type="button" className="lf-btn lf-btn--primary" onClick={() => navigate('/models')}>
-                Open Model Builder <span aria-hidden="true">→</span>
-              </button>
+            <div className="lf-createhero__media lf-createhero__media--model" aria-hidden="true">
+              <ModelIcon size={48} />
             </div>
           </CardBody>
         </Card>
 
-        <Card className="lf-createcard">
+        <Card className="lf-createhero">
           <CardBody>
-            <div className="lf-createcard__head">
-              <span className="lf-createcard__icon lf-createcard__icon--env" aria-hidden="true">
+            <div className="lf-createhero__copy">
+              <span className="lf-createhero__icon" aria-hidden="true">
                 <EnvironmentIcon size={22} />
               </span>
-              <div>
-                <h2 className="lf-createcard__title">Environment Builder</h2>
-                <p className="lf-tile__description">Create your reusable setting.</p>
-              </div>
-              <span className="lf-createcard__lockchip">
-                <LockIcon size={12} /> {environments.loading ? '…' : `${environments.locked} locked`}
-              </span>
+              <span className="lf-createhero__eyebrow">Environment Builder</span>
+              <h2 className="lf-createhero__title">Create your setting</h2>
+              <p className="lf-createhero__body">
+                Start from samples, shape rooms, anchors and a product zone — then lock it.
+              </p>
+              <Link className="lf-btn lf-btn--primary" to="/environments">
+                Start Environment Builder
+              </Link>
             </div>
-            <div className="lf-createcard__media lf-createcard__media--env" aria-hidden="true">
-              <EnvironmentIcon size={40} />
-            </div>
-            <p className="lf-createcard__body">
-              Build your reusable environment with consistent lighting, style and atmosphere — a separate system from
-              models, with its own locks and versions.
-            </p>
-            <div className="lf-createcard__actions">
-              <span className="lf-createcard__state">
-                {environments.loading ? <Skeleton lines={1} /> : (
-                  <>
-                    <Badge tone={environments.total > 0 ? 'success' : 'neutral'}>
-                      {environments.total > 0 ? `${environments.total} environment${environments.total === 1 ? '' : 's'}` : 'No environments yet'}
-                    </Badge>
-                    <Badge tone="neutral">independent</Badge>
-                  </>
-                )}
-              </span>
-              <button type="button" className="lf-btn lf-btn--primary" onClick={() => navigate('/environments')}>
-                Open Environment Builder <span aria-hidden="true">→</span>
-              </button>
+            <div className="lf-createhero__media lf-createhero__media--env" aria-hidden="true">
+              <EnvironmentIcon size={48} />
             </div>
           </CardBody>
         </Card>
       </div>
 
-      <Card style={{ marginTop: 'var(--lf-space-4)' }}>
-        <CardBody>
-          <div className="lf-createquick">
-            <div className="lf-createquick__item">
-              <span className="lf-createquick__icon" aria-hidden="true"><StudioIcon size={18} /></span>
-              <div>
-                <strong>Create Image</strong>
-                <span className="lf-tile__description">High-quality images from your locked model and assets.</span>
-              </div>
-              <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/content-studio">Start</Link>
-            </div>
-            <div className="lf-createquick__item">
-              <span className="lf-createquick__icon" aria-hidden="true"><SparkIcon size={18} /></span>
-              <div>
-                <strong>Create Video</strong>
-                <span className="lf-tile__description">Short-form and long-form video with consistent continuity.</span>
-              </div>
-              <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/content-studio">Start</Link>
-            </div>
-            <div className="lf-createquick__item">
-              <span className="lf-createquick__icon" aria-hidden="true"><StudioIcon size={18} /></span>
-              <div>
-                <strong>Create Content Set</strong>
-                <span className="lf-tile__description">Plan a campaign with multiple deliverables at once.</span>
-              </div>
-              <Link className="lf-btn lf-btn--secondary lf-btn--sm" to="/content-studio">Plan</Link>
-            </div>
+      <section className="lf-section" aria-labelledby="create-drafts">
+        <div className="lf-section__header">
+          <h2 className="lf-section__title" id="create-drafts">
+            Saved drafts
+          </h2>
+          <Link className="lf-section__link" to="/gallery">
+            See all
+          </Link>
+        </div>
+        {loading ? (
+          <Card>
+            <CardBody>
+              <Skeleton lines={2} />
+            </CardBody>
+          </Card>
+        ) : savedDrafts.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="lf-tile__description">
+                No drafts yet — everything you start will be saved here.
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          <div className="lf-home__resumegrid">
+            {savedDrafts.map((draft) => (
+              <Card key={draft.id}>
+                <CardBody>
+                  <div className="lf-createhero__draftpill" aria-hidden="true">
+                    <span className="lf-createhero__pill">Draft</span>
+                  </div>
+                  <div className="lf-home__resumebody">
+                    <span className="lf-home__resumetitle">{draft.name}</span>
+                    <span className="lf-home__resumesubtitle">{draft.meta}</span>
+                    <Link className="lf-btn lf-btn--secondary lf-btn--sm" to={draft.to}>
+                      Resume
+                    </Link>
+                  </div>
+                </CardBody>
+              </Card>
+            ))}
           </div>
-        </CardBody>
-      </Card>
+        )}
+      </section>
 
-      <Card style={{ marginTop: 'var(--lf-space-4)' }}>
-        <CardBody>
-          <div className="lf-envcard__badges">
-            <h3 className="lf-envpanel__heading" style={{ margin: 0 }}>Recent work</h3>
-            <Link className="lf-btn lf-btn--ghost lf-btn--sm" to="/gallery">View all →</Link>
+      <section className="lf-section" aria-labelledby="create-locked">
+        <div className="lf-section__header">
+          <h2 className="lf-section__title" id="create-locked">
+            Recently locked
+          </h2>
+        </div>
+        {loading ? (
+          <Card>
+            <CardBody>
+              <Skeleton lines={1} />
+            </CardBody>
+          </Card>
+        ) : recentlyLocked.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="lf-tile__description">
+                Nothing locked yet — locked versions appear here once you lock a model or environment.
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          <div className="lf-createhero__lockedrow">
+            {recentlyLocked.map((item) => (
+              <Link key={item.id} to={item.to} className="lf-createhero__lockedcard">
+                <span className="lf-createhero__lockedthumb" aria-hidden="true">
+                  {item.to.startsWith('/models') ? <ModelIcon size={18} /> : <EnvironmentIcon size={18} />}
+                </span>
+                <span className="lf-createhero__lockedname">{item.name}</span>
+                <LockIcon size={13} />
+              </Link>
+            ))}
           </div>
-          {drafts.loading ? (
-            <Skeleton lines={2} />
-          ) : drafts.outputs.length === 0 ? (
-            <p className="lf-tile__description">
-              Nothing generated yet — start in Content Studio and your outputs will appear here and in Gallery.
-            </p>
-          ) : (
-            <div className="lf-tilegrid">
-              {drafts.outputs.map((output) => (
-                <Card key={output.id} interactive onClick={() => navigate('/gallery')}>
-                  <CardBody>
-                    <span className="lf-quicklink__title">{output.title}</span>
-                    <span className="lf-tile__meta">
-                      <Badge tone={output.status === 'approved' ? 'success' : output.status === 'rejected' ? 'danger' : 'neutral'}>
-                        {output.status.replace('_', ' ')}
-                      </Badge>
-                      <Badge tone="neutral">{output.outputType}</Badge>
-                    </span>
-                  </CardBody>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardBody>
-      </Card>
+        )}
+      </section>
     </div>
   );
 }

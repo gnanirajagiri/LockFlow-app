@@ -21,6 +21,7 @@ import {
   ModelIcon,
   SearchIcon,
 } from '../components/icons';
+import { ModelsGridCard } from '../features/models/ModelsGridCard';
 import { ModelsService } from '../services/modelsService';
 import { getModelsRepository } from '../data';
 import { validateCreateModel } from '../domain/models';
@@ -270,16 +271,20 @@ export function ModelsPage() {
           ) : null}
 
           {filtered.length > 0 && view === 'grid' ? (
-            <div className="lf-tilegrid">
+            <div className="lf-modelgridrow">
               {filtered.map((model) => (
-                <ModelCard
+                <ModelsGridCard
                   key={model.id}
                   model={model}
                   onArchive={() => setArchiving(model)}
                   onAttachLibrary={() => setAttachModel(model)}
-                  attachmentCount={modelAttachmentCount[model.id] ?? 0}
                 />
               ))}
+              <button type="button" className="lf-modelnewcard" onClick={() => setCreateOpen(true)}>
+                <span className="lf-modelnewcard__plus" aria-hidden="true">+</span>
+                <span className="lf-modelnewcard__title">New model</span>
+                <span className="lf-modelnewcard__hint">About 5 minutes</span>
+              </button>
             </div>
           ) : null}
 
@@ -393,77 +398,6 @@ function VersionBadge({ model }: { model: ModelWithVersion }) {
       {status === 'locked' ? <LockIcon size={12} /> : null}
       {label}
     </Badge>
-  );
-}
-
-function ModelCard({
-  model,
-  onArchive,
-  onAttachLibrary,
-  attachmentCount,
-}: {
-  model: ModelWithVersion;
-  onArchive: () => void;
-  onAttachLibrary: () => void;
-  attachmentCount: number;
-}) {
-  return (
-    <Card>
-      <CardBody>
-        <div className="lf-modelcard">
-          <Link to={`/models/${model.id}`} aria-label={`Open model ${model.name}`} className="lf-modelcard__cover">
-            <span className="lf-quicklink__icon" aria-hidden="true">
-              <ModelIcon size={22} />
-            </span>
-          </Link>
-
-          <div className="lf-modelcard__header">
-            <div>
-              <div className="lf-tile__title">
-                <Link to={`/models/${model.id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
-                  {model.name}
-                </Link>
-              </div>
-              <div className="lf-modelcard__slug">/{model.slug}</div>
-            </div>
-          </div>
-
-          <div className="lf-modelcard__meta">
-            <Badge tone={STATUS_TONE[model.status]} dot>
-              {model.status}
-            </Badge>
-            <VersionBadge model={model} />
-          </div>
-
-          {model.activeVersion?.changeSummary ? (
-            <p className="lf-tile__description">{model.activeVersion.changeSummary}</p>
-          ) : null}
-
-          <div className="lf-modelcard__footer lf-modelcard__actions">
-            <span style={{ flex: 1 }}>Updated {formatDate(model.updatedAt)}</span>
-            <Link className="lf-btn lf-btn--sm lf-btn--secondary" to={`/models/${model.id}`}>
-              Open
-            </Link>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={onAttachLibrary}
-            >
-              Attach{(attachmentCount > 0) ? ` (${attachmentCount})` : ''}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label={`Archive ${model.name}`}
-              leftIcon={<ArchiveIcon size={14} />}
-              onClick={onArchive}
-            >
-              Archive
-            </Button>
-          </div>
-        </div>
-      </CardBody>
-    </Card>
   );
 }
 

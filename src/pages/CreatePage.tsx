@@ -30,6 +30,8 @@ interface DraftCard {
   to: string;
   name: string;
   meta: string;
+  /** Cover art reference (placeholder pool in demo mode). */
+  cover: string;
 }
 
 interface LockedCard {
@@ -37,6 +39,8 @@ interface LockedCard {
   to: string;
   name: string;
   versionLabel: string;
+  /** Cover art reference (placeholder pool in demo mode). */
+  cover: string;
 }
 
 function relativeTime(iso: string): string {
@@ -111,6 +115,7 @@ export function CreatePage() {
           to: `/models/${model.id}/versions`,
           name: `${model.name} v${draft.versionNumber}`,
           meta: `Model version · ${relativeTime(draft.updatedAt)}`,
+          cover: draft.coverImagePath ?? model.coverImagePath ?? '/placeholders/gallery/gallery_morning_routine_variant-thumb.svg',
         });
       }
       if (model.status === 'draft') {
@@ -119,6 +124,7 @@ export function CreatePage() {
           to: `/models/${model.id}`,
           name: model.name,
           meta: `Model · ${relativeTime(model.updatedAt)}`,
+          cover: model.coverImagePath ?? '/placeholders/gallery/gallery_morning_routine_variant-thumb.svg',
         });
       }
     }
@@ -130,6 +136,7 @@ export function CreatePage() {
           to: `/environments/${environment.id}/versions`,
           name: `${environment.name} v${draft.versionNumber}`,
           meta: `Environment draft · ${relativeTime(draft.updatedAt)}`,
+          cover: draft.coverImagePath ?? environment.coverImagePath ?? '/placeholders/gallery/gallery_morning_vanity_setup-thumb.svg',
         });
       }
     }
@@ -139,6 +146,7 @@ export function CreatePage() {
         to: `/content-studio/${project.project.id}`,
         name: project.project.name,
         meta: `Content set · Plan · ${relativeTime(project.project.updatedAt)}`,
+        cover: '/placeholders/gallery/gallery_routine_wrapup_story.svg',
       });
     }
     return cards.slice(0, 4);
@@ -156,6 +164,7 @@ export function CreatePage() {
             name: `${model.name} v${version.versionNumber}`,
             versionLabel: `v${version.versionNumber}`,
             at: version.lockedAt,
+            cover: version.coverImagePath ?? model.coverImagePath ?? '/placeholders/gallery/gallery_morning_routine_variant-thumb.svg',
           });
         }
       }
@@ -169,6 +178,7 @@ export function CreatePage() {
             name: `${environment.name} v${version.versionNumber}`,
             versionLabel: `v${version.versionNumber}`,
             at: version.lockedAt,
+            cover: version.coverImagePath ?? environment.coverImagePath ?? '/placeholders/gallery/gallery_morning_vanity_setup-thumb.svg',
           });
         }
       }
@@ -200,7 +210,7 @@ export function CreatePage() {
               </Link>
             </div>
             <div className="lf-createhero__media lf-createhero__media--model" aria-hidden="true">
-              <ModelIcon size={48} />
+              <img src="/placeholders/gallery/gallery_morning_routine_variant.svg" alt="" loading="lazy" />
             </div>
           </CardBody>
         </Card>
@@ -221,7 +231,7 @@ export function CreatePage() {
               </Link>
             </div>
             <div className="lf-createhero__media lf-createhero__media--env" aria-hidden="true">
-              <EnvironmentIcon size={48} />
+              <img src="/placeholders/gallery/gallery_morning_vanity_setup.svg" alt="" loading="lazy" />
             </div>
           </CardBody>
         </Card>
@@ -254,10 +264,13 @@ export function CreatePage() {
           <div className="lf-home__resumegrid">
             {savedDrafts.map((draft) => (
               <Card key={draft.id}>
-                <CardBody>
-                  <div className="lf-createhero__draftpill" aria-hidden="true">
+                <div className="lf-home__resumecover" aria-hidden="true">
+                  <img src={draft.cover} alt="" loading="lazy" />
+                  <span className="lf-createhero__draftpill">
                     <span className="lf-createhero__pill">Draft</span>
-                  </div>
+                  </span>
+                </div>
+                <CardBody>
                   <div className="lf-home__resumebody">
                     <span className="lf-home__resumetitle">{draft.name}</span>
                     <span className="lf-home__resumesubtitle">{draft.meta}</span>
@@ -297,7 +310,7 @@ export function CreatePage() {
             {recentlyLocked.map((item) => (
               <Link key={item.id} to={item.to} className="lf-createhero__lockedcard">
                 <span className="lf-createhero__lockedthumb" aria-hidden="true">
-                  {item.to.startsWith('/models') ? <ModelIcon size={18} /> : <EnvironmentIcon size={18} />}
+                  <img src={item.cover} alt="" loading="lazy" />
                 </span>
                 <span className="lf-createhero__lockedname">{item.name}</span>
                 <LockIcon size={13} />

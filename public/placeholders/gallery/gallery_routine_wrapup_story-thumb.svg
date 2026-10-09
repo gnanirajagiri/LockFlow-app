@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" role="img" aria-label="Routine Wrap-up Story thumbnail (placeholder)">
+  <defs>
+    <linearGradient id="tbg-gallery_routine_wrapup_story" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f1ea"/>
+      <stop offset="1" stop-color="#f4f1ea"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#tbg-gallery_routine_wrapup_story)"/>
+  <g transform="translate(-200 -90) scale(1)">
+  <g>
+    <rect x="340" y="300" width="120" height="96" rx="18" fill="#ffffff" stroke="#e7e2da" stroke-width="2"/>
+    <rect x="334" y="284" width="132" height="26" rx="10" fill="#a8bfa0"/>
+    <rect x="362" y="326" width="76" height="6" rx="3" fill="#6b7280" opacity="0.5"/>
+    <rect x="374" y="342" width="52" height="6" rx="3" fill="#6b7280" opacity="0.3"/>
+  </g></g>
+  <rect x="0" y="330" width="400" height="70" fill="#faf8f5" opacity="0.92"/>
+  <text x="20" y="372" font-family="Inter, system-ui, sans-serif" font-size="20" font-weight="600" fill="#111827">Routine Wrap-up Story</text>
+  <rect x="0.5" y="0.5" width="399" height="399" fill="none" stroke="#a8bfa0" stroke-opacity="0.25"/>
+</svg>

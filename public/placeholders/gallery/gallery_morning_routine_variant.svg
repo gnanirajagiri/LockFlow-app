@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Morning Routine Variant (placeholder)">
+  <defs>
+    <linearGradient id="bg-gallery_morning_routine_variant" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#faf8f5"/>
+      <stop offset="1" stop-color="#f4f1ea"/>
+    </linearGradient>
+    <linearGradient id="ai-gallery_morning_routine_variant" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg-gallery_morning_routine_variant)"/>
+  <ellipse cx="400" cy="470" rx="240" ry="26" fill="#e7e2da" opacity="0.55"/>
+  
+  <g>
+    <circle cx="400" cy="250" r="52" fill="#c98d6b"/>
+    <path d="M316 476c0-58 38-96 84-96s84 38 84 96" fill="#ffffff" stroke="#e7e2da" stroke-width="2"/>
+    <path d="M356 402c14-18 30-26 44-26s30 8 44 26" fill="none" stroke="#ede9fe" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <g opacity="0.9">
+    <rect x="24" y="24" width="34" height="34" rx="10" fill="url(#ai-gallery_morning_routine_variant)"/>
+    <path d="M37 33v16M31 41h12" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+  <text x="30" y="566" font-family="Inter, system-ui, sans-serif" font-size="19" font-weight="600" fill="#111827">Morning Routine Variant</text>
+  <text x="30" y="588" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#6b7280">Placeholder preview · demo mode</text>
+  <rect x="0.5" y="0.5" width="799" height="599" fill="none" stroke="#c98d6b" stroke-opacity="0.25"/>
+</svg>

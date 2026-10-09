@@ -299,7 +299,9 @@ describe('rule 10 — placeholder data is clearly identified', () => {
     for (const output of outputs) {
       expect(output.metadata.placeholder).toBe(true);
       if (output.mediaStoragePath) {
-        expect(output.mediaStoragePath.startsWith('placeholders/')).toBe(true);
+        // Local placeholder path (served from public/) — absolute so nested
+        // routes resolve it, never a provider URL or signed URL.
+        expect(output.mediaStoragePath.replace(/^\//, '').startsWith('placeholders/')).toBe(true);
       }
       expect(output.metadata.provider).toBeNull();
     }

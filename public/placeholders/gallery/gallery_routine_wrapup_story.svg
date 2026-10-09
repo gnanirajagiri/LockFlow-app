@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="Routine Wrap-up Story (placeholder)">
+  <defs>
+    <linearGradient id="bg-gallery_routine_wrapup_story" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f1ea"/>
+      <stop offset="1" stop-color="#f4f1ea"/>
+    </linearGradient>
+    <linearGradient id="ai-gallery_routine_wrapup_story" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg-gallery_routine_wrapup_story)"/>
+  <ellipse cx="400" cy="470" rx="240" ry="26" fill="#e7e2da" opacity="0.55"/>
+  
+  <g>
+    <rect x="340" y="300" width="120" height="96" rx="18" fill="#ffffff" stroke="#e7e2da" stroke-width="2"/>
+    <rect x="334" y="284" width="132" height="26" rx="10" fill="#a8bfa0"/>
+    <rect x="362" y="326" width="76" height="6" rx="3" fill="#6b7280" opacity="0.5"/>
+    <rect x="374" y="342" width="52" height="6" rx="3" fill="#6b7280" opacity="0.3"/>
+  </g>
+  <g opacity="0.9">
+    <rect x="24" y="24" width="34" height="34" rx="10" fill="url(#ai-gallery_routine_wrapup_story)"/>
+    <path d="M37 33v16M31 41h12" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+  <text x="30" y="566" font-family="Inter, system-ui, sans-serif" font-size="19" font-weight="600" fill="#111827">Routine Wrap-up Story</text>
+  <text x="30" y="588" font-family="Inter, system-ui, sans-serif" font-size="13" fill="#6b7280">Placeholder preview · demo mode</text>
+  <rect x="0.5" y="0.5" width="799" height="599" fill="none" stroke="#a8bfa0" stroke-opacity="0.25"/>
+</svg>

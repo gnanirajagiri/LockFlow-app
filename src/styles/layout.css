@@ -799,6 +799,18 @@
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: var(--lf-space-4);
 }
+.lf-home__resumecover {
+  height: 120px;
+  border-radius: var(--lf-radius-lg) var(--lf-radius-lg) 0 0;
+  overflow: hidden;
+  background: var(--lf-color-surface-muted);
+}
+.lf-home__resumecover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .lf-home__resumebody {
   display: flex;
   flex-direction: column;
@@ -973,7 +985,23 @@
 .lf-home__assetcard:hover {
   box-shadow: var(--lf-shadow-sm);
 }
+.lf-home__assetcover {
+  position: relative;
+  display: block;
+  height: 110px;
+  margin: calc(-1 * var(--lf-space-4)) calc(-1 * var(--lf-space-3)) var(--lf-space-2);
+  border-radius: var(--lf-radius-lg) var(--lf-radius-lg) 0 0;
+  overflow: hidden;
+  background: var(--lf-color-surface-muted);
+}
+.lf-home__assetcover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .lf-home__assetpill {
+  z-index: 1;
   position: absolute;
   top: var(--lf-space-2);
   right: var(--lf-space-2);

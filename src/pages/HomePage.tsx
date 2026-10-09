@@ -51,6 +51,8 @@ interface ResumeCard {
   subtitle: string;
   progress: number;
   progressLabel: string;
+  /** Cover art reference (placeholder pool in demo mode). */
+  cover: string;
 }
 
 interface AttentionItem {
@@ -167,6 +169,7 @@ export function HomePage() {
         subtitle: 'Content plan · Studio',
         progress: project.project.status === 'draft' ? Math.min(60, total * 15) : 100,
         progressLabel: project.project.status === 'draft' ? `${project.sceneCount} scenes planned` : 'Ready',
+        cover: '/placeholders/gallery/gallery_routine_wrapup_story.svg',
       });
     }
     for (const model of models) {
@@ -178,6 +181,7 @@ export function HomePage() {
         subtitle: 'Model · Profile',
         progress: 100,
         progressLabel: 'Ready',
+        cover: model.coverImagePath ?? '/placeholders/gallery/gallery_morning_routine_variant.svg',
       });
     }
     for (const environment of environments) {
@@ -188,6 +192,7 @@ export function HomePage() {
         subtitle: 'Environment · Profile',
         progress: environment.status === 'ready' ? 100 : 50,
         progressLabel: environment.status === 'ready' ? 'Ready' : 'Draft',
+        cover: environment.coverImagePath ?? '/placeholders/gallery/gallery_morning_vanity_setup.svg',
       });
     }
     return cards.slice(0, 4);
@@ -264,6 +269,7 @@ export function HomePage() {
       kind: string;
       pill: string;
       pillTone: 'ok' | 'lock' | 'lav';
+      cover: string;
     }> = [];
     for (const asset of [...assets].sort(byUpdated).slice(0, 4)) {
       pills.push({
@@ -273,6 +279,7 @@ export function HomePage() {
         kind: assetTypeLabel(asset),
         pill: assetTypeLabel(asset),
         pillTone: 'lav',
+        cover: asset.coverImagePath ?? '/placeholders/gallery/gallery_morning_vanity_setup.svg',
       });
     }
     for (const output of [...outputs]
@@ -286,6 +293,7 @@ export function HomePage() {
         kind: 'Export',
         pill: 'Exported',
         pillTone: 'ok',
+        cover: output.thumbnailStoragePath ?? '/placeholders/gallery/gallery_serum_product_moment.svg',
       });
     }
     return pills.slice(0, 6);
@@ -357,6 +365,9 @@ export function HomePage() {
               <div className="lf-home__resumegrid">
                 {resumeCards.map((card) => (
                   <Card key={card.id}>
+                    <div className="lf-home__resumecover" aria-hidden="true">
+                      <img src={card.cover} alt="" loading="lazy" />
+                    </div>
                     <CardBody>
                       <div className="lf-home__resumebody">
                         <span className="lf-home__resumetitle">{card.title}</span>
@@ -478,9 +489,12 @@ export function HomePage() {
               <div className="lf-home__assetgrid">
                 {recentAssets.map((asset) => (
                   <Link key={asset.id} to={asset.to} className="lf-home__assetcard">
-                    <span className="lf-home__assetpill" data-tone={asset.pillTone}>
-                      {asset.pillTone === 'lock' ? <LockIcon size={11} /> : null}
-                      {asset.pill}
+                    <span className="lf-home__assetcover" aria-hidden="true">
+                      <img src={asset.cover} alt="" loading="lazy" />
+                      <span className="lf-home__assetpill" data-tone={asset.pillTone}>
+                        {asset.pillTone === 'lock' ? <LockIcon size={11} /> : null}
+                        {asset.pill}
+                      </span>
                     </span>
                     <span className="lf-home__assetname">{asset.name}</span>
                     <span className="lf-home__assetkind">{asset.kind}</span>

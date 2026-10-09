@@ -1,11 +1,16 @@
 /**
  * Versions tab — the version history for one model.
  *
- * Timeline with status filter; click a version to inspect its Character Sheet
- * summary. Draft actions: Edit sheet, Lock version (confirm dialog required),
- * Discard draft (refused by design — no delete path exists in LockFlow).
- * Locked actions: View only, Create new draft from this version. Two-version
- * comparison with field-by-field diffs.
+ * Stage-5 fidelity (board S34): a "Version history" header with a Compare
+ * toggle and Create-new-version action, then a single timeline card where
+ * each version row has a status-icon rail (pencil/lock/gear), a cover
+ * thumbnail with initials fallback, a "v2 Draft"-style title, dates and a
+ * usage line ("Used in N jobs · M campaigns"), and contextual actions.
+ * Draft actions: Edit sheet, Lock version (confirm dialog required).
+ * Locked actions: View only, Create new draft from this version. A footer
+ * info banner reminds that jobs keep the version they were made with.
+ * Two-version comparison with field-by-field diffs lives behind the
+ * Compare toggle.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -16,7 +21,13 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../components/ui/Toast';
-import { PlusIcon } from '../../components/icons';
+import {
+  CheckIcon,
+  CompareIcon,
+  InfoIcon,
+  LockIcon,
+  PlusIcon,
+} from '../../components/icons';
 import { ModelsService } from '../../services/modelsService';
 import { useAuth } from '../../auth/AuthProvider';
 import { SEED_WORKSPACE_ID } from '../../mock/modelsSeed';
@@ -61,11 +72,15 @@ export function VersionsTab({
   const [inspected, setInspected] = useState<string | null>(null);
   const [locking, setLocking] = useState<ModelVersionRecord | null>(null);
   const [draftFlowSource, setDraftFlowSource] = useState<ModelVersionRecord | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  const modelName = data.model?.name ?? 'Model';
 
   // Deep link: /versions?create-draft=<versionId> opens the create-draft
   // dialog with that source preselected (used by the profile header's
   // "Create new draft version" action and locked-sheet entry point).
   const createDraftParam = searchParams.get('create-draft');
+  const draft = useMemo(() => findDraftVersion(versions), [versions]);
   useEffect(() => {
     if (!createDraftParam) return;
     const source = versions.find((version) => version.id === createDraftParam);
@@ -87,9 +102,10 @@ export function VersionsTab({
     [versions, filter],
   );
 
-  const draft = useMemo(() => findDraftVersion(versions), [versions]);
-
   const { toast } = useToast();
+
+  // Newest first — the timeline reads top-down from the latest work.
+  const ordered = useMemo(() => [...filtered].reverse(), [filtered]);
 
   async function handleLockConfirmed() {
     if (!locking) return;
@@ -114,13 +130,19 @@ export function VersionsTab({
   return (
     <div className="lf-section" style={{ gap: 'var(--lf-space-4)' }}>
       <div className="lf-models-toolbar">
-        <div className="lf-models-toolbar__filter">
-          <label className="lf-field__label" htmlFor="versions-filter">
-            Filter
-          </label>
+        <h2 className="lf-section__title" style={{ margin: 0 }}>
+          Version history
+          {versions.length > 0 ? (
+            <span className="lf-tile__description" style={{ marginLeft: 'var(--lf-space-2)' }}>
+              {versions.length} version{versions.length === 1 ? '' : 's'}
+            </span>
+          ) : null}
+        </h2>
+        <div className="lf-modelcard__actions">
           <select
-            id="versions-filter"
+            aria-label="Filter versions"
             className="lf-input"
+            style={{ width: 'auto' }}
             value={filter}
             onChange={(event) => setFilter(event.target.value as VersionFilter)}
           >
@@ -130,37 +152,27 @@ export function VersionsTab({
               </option>
             ))}
           </select>
+          {versions.length >= 2 ? (
+            <Button
+              variant="secondary"
+              leftIcon={<CompareIcon size={14} />}
+              aria-expanded={compareOpen}
+              onClick={() => setCompareOpen((open) => !open)}
+            >
+              {compareOpen ? 'Hide compare' : `Compare v1 → v${versions[1].versionNumber}`}
+            </Button>
+          ) : null}
+          <Button
+            variant="primary"
+            leftIcon={<PlusIcon size={14} />}
+            onClick={() => setDraftFlowSource(versions[versions.length - 1] ?? null)}
+            disabled={draft !== null}
+            title={draft !== null ? 'Finish or lock the open draft first.' : undefined}
+          >
+            Create new version
+          </Button>
         </div>
-        <Button
-          variant="secondary"
-          leftIcon={<PlusIcon size={14} />}
-          onClick={() => setDraftFlowSource(versions[versions.length - 1] ?? null)}
-          disabled={draft !== null}
-        >
-          Create new draft version
-        </Button>
       </div>
-
-      {draft ? (
-        <Card>
-          <CardBody>
-            <div className="lf-models-toolbar">
-              <Badge tone="primary" dot>Open draft</Badge>
-              <span className="lf-tile__description">
-                v{draft.versionNumber} — {draft.changeSummary || 'No change summary yet.'}
-              </span>
-              <div className="lf-modelcard__actions" style={{ marginLeft: 'auto' }}>
-                <Button size="sm" onClick={() => setInspected(draft.id)}>
-                  Inspect
-                </Button>
-                <Button size="sm" variant="primary" onClick={() => setLocking(draft)}>
-                  Lock version
-                </Button>
-              </div>
-            </div>
-          </CardBody>
-        </Card>
-      ) : null}
 
       {versions.length === 0 ? (
         <EmptyState
@@ -171,21 +183,42 @@ export function VersionsTab({
         <Card>
           <CardBody flush>
             <ol className="lf-versionlist" aria-label="Version history" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {filtered.map((version) => (
+              {ordered.map((version) => (
                 <li key={version.id}>
                   <div className="lf-versionrow">
-                    <span className="lf-versionrow__number">v{version.versionNumber}</span>
-                    <Badge tone={version.status === 'locked' ? 'locked' : version.status === 'draft' ? 'primary' : 'neutral'} dot>
-                      {version.status}
-                    </Badge>
-                    <span className="lf-versionrow__summary">
-                      {version.changeSummary || 'No change summary.'}
-                      {version.id === activeVersionId ? ' · active' : ''}
+                    <span className={`lf-versionrow__rail lf-versionrow__rail--${version.status}`} aria-hidden="true">
+                      {version.status === 'locked' ? (
+                        <LockIcon size={13} />
+                      ) : version.status === 'draft' ? (
+                        <CheckIcon size={13} />
+                      ) : (
+                        <InfoIcon size={13} />
+                      )}
                     </span>
-                    <span className="lf-versionrow__dates">
-                      Created {new Date(version.createdAt).toLocaleDateString()}
-                      {version.lockedAt ? ` · Locked ${new Date(version.lockedAt).toLocaleDateString()}` : ''}
-                    </span>
+                    <VersionThumb version={version} />
+                    <div className="lf-versionrow__main">
+                      <div className="lf-versionrow__titleline">
+                        <span className="lf-versionrow__number">
+                          {modelName} v{version.versionNumber}
+                        </span>
+                        <Badge
+                          tone={version.status === 'locked' ? 'locked' : version.status === 'draft' ? 'primary' : 'neutral'}
+                          dot={version.status === 'draft'}
+                        >
+                          {version.status}
+                        </Badge>
+                        {version.id === activeVersionId ? (
+                          <span className="lf-versionrow__activetag">active</span>
+                        ) : null}
+                      </div>
+                      <span className="lf-versionrow__dates">
+                        {version.status === 'draft' ? 'Started' : version.status === 'locked' ? 'Locked' : 'Created'}{' '}
+                        {new Date(version.status === 'draft' ? version.createdAt : version.lockedAt ?? version.createdAt).toLocaleDateString()}
+                        {' · '}
+                        {version.changeSummary || 'No change summary.'}
+                      </span>
+                      <VersionUsageLine versionId={version.id} />
+                    </div>
                     <div className="lf-versionrow__actions">
                       <Button size="sm" variant="ghost" onClick={() => setInspected(version.id)}>
                         Inspect
@@ -211,7 +244,7 @@ export function VersionsTab({
                           title={draft !== null ? 'Finish or lock the open draft first.' : undefined}
                           onClick={() => setDraftFlowSource(version)}
                         >
-                          New draft from this
+                          Duplicate as new draft
                         </Button>
                       )}
                     </div>
@@ -223,7 +256,19 @@ export function VersionsTab({
         </Card>
       )}
 
-      <CompareSection service={service} versions={versions} />
+      <p className="lf-library__note" role="note" style={{ display: 'flex', alignItems: 'center', gap: 'var(--lf-space-2)' }}>
+        <InfoIcon size={14} /> Jobs keep the version they were made with. Locking a draft never
+        changes anything made with an earlier locked version.
+      </p>
+
+      {compareOpen && versions.length >= 2 ? (
+        <CompareSection service={service} versions={versions} />
+      ) : null}
+      {versions.length < 2 ? (
+        <p className="lf-tile__description">
+          Comparison unlocks once the model has at least two versions.
+        </p>
+      ) : null}
 
       {inspected ? (
         <InspectSheetDialog
@@ -271,6 +316,92 @@ export function VersionsTab({
         data={data}
       />
     </div>
+  );
+}
+
+/** Cover thumbnail with the model-initials fallback used across the profile. */
+function VersionThumb({ version }: { version: ModelVersionRecord }) {
+  if (version.coverImagePath) {
+    return (
+      <img
+        className="lf-versionrow__thumb"
+        src={version.coverImagePath}
+        alt=""
+        loading="lazy"
+      />
+    );
+  }
+  return (
+    <span className="lf-versionrow__thumb lf-versionrow__thumb--fallback" aria-hidden="true">
+      A
+    </span>
+  );
+}
+
+/**
+ * Per-version usage line ("Used in N jobs · M campaigns"). Reads the same
+ * provenance pins the Overview tab uses; hidden entirely when a version has
+ * no usage so rows stay calm.
+ */
+function VersionUsageLine({ versionId }: { versionId: string }) {
+  const [usage, setUsage] = useState<{ jobs: number; campaigns: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { ContentStudioService } = await import('../../services/contentService');
+        const { GalleryService } = await import('../../services/galleryService');
+        const { getContentRepository } = await import('../../data/contentFactory');
+        const { getGalleryRepository } = await import('../../data/galleryFactory');
+        const { getLibraryRepository } = await import('../../data/libraryFactory');
+        const { getModelsRepository } = await import('../../data');
+        const { getEnvironmentsRepository } = await import('../../data/environmentsFactory');
+        const { LibraryService } = await import('../../services/libraryService');
+        const { ModelsService: ModelsServiceForUsage } = await import('../../services/modelsService');
+        const { EnvironmentsService } = await import('../../services/environmentsService');
+        const { SEED_LIBRARY_WORKSPACE_ID } = await import('../../mock/librarySeed');
+
+        const content = new ContentStudioService(getContentRepository(), {
+          library: new LibraryService(getLibraryRepository()),
+          models: new ModelsServiceForUsage(getModelsRepository()),
+          environments: new EnvironmentsService(getEnvironmentsRepository()),
+        });
+        const gallery = new GalleryService(
+          getGalleryRepository(),
+          content,
+          SEED_LIBRARY_WORKSPACE_ID,
+        );
+
+        const outputs = await gallery.listOutputs(SEED_LIBRARY_WORKSPACE_ID).catch(() => []);
+        const jobIds = new Set<string>();
+        const campaignNames = new Set<string>();
+        for (const output of outputs) {
+          const provenance = await gallery
+            .resolveProvenance(output.id, SEED_LIBRARY_WORKSPACE_ID)
+            .catch(() => null);
+          if (!provenance) continue;
+          if (provenance.pins.some((pin) => pin.sourceVersionId === versionId)) {
+            jobIds.add(provenance.job.id);
+            if (provenance.project?.name) campaignNames.add(provenance.project.name);
+          }
+        }
+        if (!cancelled) setUsage({ jobs: jobIds.size, campaigns: campaignNames.size });
+      } catch {
+        if (!cancelled) setUsage({ jobs: 0, campaigns: 0 });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [versionId]);
+
+  if (usage === null || (usage.jobs === 0 && usage.campaigns === 0)) return null;
+  return (
+    <span className="lf-versionrow__usage">
+      Used in {usage.jobs} job{usage.jobs === 1 ? '' : 's'}
+      {usage.campaigns > 0 ? ` · ${usage.campaigns} campaign${usage.campaigns === 1 ? '' : 's'}` : ''}
+    </span>
   );
 }
 

@@ -1229,6 +1229,80 @@
 .lf-versionrow:hover {
   background: var(--lf-color-surface-muted);
 }
+
+/* S34 timeline rail: status icon in a soft pill, with a connector line
+   running to the next row so rows read as one vertical history. */
+.lf-versionrow__rail {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  position: relative;
+}
+.lf-versionrow__rail::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 1px;
+  height: calc(var(--lf-space-3) * 2);
+  background: var(--lf-color-border);
+}
+.lf-versionlist > li:last-child .lf-versionrow__rail::after {
+  display: none;
+}
+.lf-versionrow__rail--draft {
+  background: var(--lf-color-primary-soft);
+  color: var(--lf-color-primary);
+}
+.lf-versionrow__rail--locked {
+  background: var(--lf-color-ink);
+  color: var(--lf-color-surface);
+}
+.lf-versionrow__rail--superseded {
+  background: var(--lf-color-surface-muted);
+  color: var(--lf-color-ink-muted);
+}
+
+/* S34 cover thumbnail with initials fallback. */
+.lf-versionrow__thumb {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--lf-radius-md);
+  object-fit: cover;
+  border: 1px solid var(--lf-color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--lf-font-weight-semibold);
+  color: var(--lf-color-ink-muted);
+  background: var(--lf-color-surface-muted);
+}
+
+.lf-versionrow__main {
+  flex: 1;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lf-space-1);
+}
+.lf-versionrow__titleline {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+}
+.lf-versionrow__activetag {
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-ink-muted);
+}
+.lf-versionrow__usage {
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-ink-muted);
+}
 .lf-versionrow:focus-visible {
   outline: none;
   box-shadow: var(--lf-focus-ring);
@@ -1239,6 +1313,7 @@
   flex: none;
   font-weight: var(--lf-font-weight-semibold);
   color: var(--lf-color-ink);
+  font-size: var(--lf-text-lg);
 }
 .lf-versionrow__summary {
   flex: 1;

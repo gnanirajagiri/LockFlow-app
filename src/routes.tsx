@@ -84,6 +84,8 @@ export const PublishingHistoryPage = lazy(() => import('./features/publishing/Pu
 export const PublishingReviewPage = lazy(() => import('./features/publishing/PublishingReviewPage').then((m) => ({ default: m.PublishingReviewPage })));
 export const PublishingRunDetailPage = lazy(() => import('./features/publishing/PublishingRunDetailPage').then((m) => ({ default: m.PublishingRunDetailPage })));
 export const PublishRunDetailOpsPage = lazy(() => import('./features/publishing/PublishRunDetailOpsPage').then((m) => ({ default: m.PublishRunDetailOpsPage })));
+export const CreateDraftsPage = lazy(() => import('./pages/CreateDraftsPage').then((m) => ({ default: m.CreateDraftsPage })));
+
 export const DesignSystemPage = lazy(() => import('./pages/DesignSystemPage').then((m) => ({ default: m.DesignSystemPage })));
 
 export const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));

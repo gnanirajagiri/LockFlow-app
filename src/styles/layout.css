@@ -1115,3 +1115,94 @@
 .lf-sidebar__plan--hidden {
   display: none;
 }
+
+/* ── S09 Saved drafts & review ─────────────────────────────────────── */
+.lf-drafttabs {
+  display: flex;
+  gap: var(--lf-space-5);
+  border-bottom: 1px solid var(--lf-color-border);
+  margin-bottom: var(--lf-space-4);
+}
+.lf-drafttabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  padding: var(--lf-space-2) 0 var(--lf-space-3);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-size: var(--lf-text-sm);
+  font-weight: var(--lf-font-weight-medium);
+  color: var(--lf-color-ink-secondary);
+  cursor: pointer;
+}
+.lf-drafttabs__tab:hover {
+  color: var(--lf-color-ink);
+}
+.lf-drafttabs__tab--active {
+  color: var(--lf-color-ink);
+  border-bottom-color: var(--lf-color-primary);
+}
+.lf-drafttabs__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--lf-color-surface-muted);
+  font-size: var(--lf-text-xs);
+  color: var(--lf-color-ink-secondary);
+}
+
+.lf-drafttable {
+  width: 100%;
+}
+.lf-drafttable__namecell {
+  display: flex;
+  align-items: center;
+  gap: var(--lf-space-3);
+}
+.lf-drafttable__thumb {
+  flex: none;
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--lf-radius-md);
+  overflow: hidden;
+  background: var(--lf-color-surface-muted);
+}
+.lf-drafttable__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.lf-drafttable__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  font-weight: var(--lf-font-weight-semibold);
+  color: var(--lf-color-ink);
+}
+.lf-drafttable__reviewpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--lf-color-warning-bg);
+  color: var(--lf-color-warning-text);
+  font-size: var(--lf-text-xs);
+  font-weight: var(--lf-font-weight-medium);
+}
+.lf-drafttable__muted {
+  color: var(--lf-color-ink-muted);
+}
+.lf-drafttable__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--lf-space-2);
+  justify-content: flex-end;
+}

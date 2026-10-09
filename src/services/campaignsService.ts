@@ -38,6 +38,7 @@ import {
 } from '../domain/campaigns';
 import type { CampaignsRepository, CampaignDetail, CampaignSummary } from '../data/campaignsRepository';
 import type { GalleryService } from './galleryService';
+import type { GalleryOutputRecord } from '../domain/gallery/types';
 
 export interface CampaignGallerySummary {
   output: GalleryOutputEligibilityInput;
@@ -128,6 +129,22 @@ export class CampaignsService {
     const campaign = await this.repo.getCampaign(campaignId);
     isInWorkspace(campaign.workspaceId, activeWorkspaceId);
     return campaign;
+  }
+
+  /**
+   * Read-only lookup of one Gallery output referenced by a campaign item —
+   * used by the home cards for cover-media references. Never copies media;
+   * the campaign only stores the output id.
+   */
+  async resolveItemOutput(
+    galleryOutputId: string,
+    activeWorkspaceId: string,
+  ): Promise<GalleryOutputRecord | null> {
+    try {
+      return await this.gallery.getOutput(galleryOutputId, activeWorkspaceId);
+    } catch {
+      return null;
+    }
   }
 
   async getCampaignDetail(

@@ -64,7 +64,7 @@ export function LoginPage() {
             <LockIcon size={16} />
           </span>
           <span className="lf-auth__brandname">LockFlow</span>
-          {isDemoMode ? <Badge tone="lav">Demo</Badge> : null}
+          {isDemoMode ? <Badge tone="primary">Demo</Badge> : null}
         </div>
         <div className="lf-auth__hero">
           <h1 className="lf-auth__herotitle">
@@ -93,7 +93,7 @@ export function LoginPage() {
               <LockIcon size={16} />
             </span>
             <span className="lf-auth__brandname">LockFlow</span>
-            {isDemoMode ? <Badge tone="lav">Demo</Badge> : null}
+            {isDemoMode ? <Badge tone="primary">Demo</Badge> : null}
           </div>
 
           <h2 className="lf-auth__title">

@@ -3,13 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "LockFlow — an AI content-creation workspace built on continuity: versioned, lockable models, environments and assets.",
+  "description": "LockFlow \u2014 an AI content-creation workspace built on continuity: versioned, lockable models, environments and assets.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "board-coverage": "node scripts/board-coverage.mjs",
     "build:preview": "vite build && node scripts/build-preview.mjs"
   },
   "dependencies": {
